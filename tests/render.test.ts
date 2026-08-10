@@ -13,7 +13,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { CheckCard, CliCard } from "../src/components/Card";
-import { O4Card } from "../src/components/cards";
+import { O3Card, O4Card } from "../src/components/cards";
 import { VerdictPanel } from "../src/components/Verdict";
 import { COPY } from "../src/copy";
 import type { Coverage } from "../src/domain/coverage";
@@ -180,5 +180,34 @@ describe("O4 第三方披露（ADR-0008）", () => {
     expect(html).toContain(COPY.cardStatus.failed);
     expect(html).toContain(COPY.checks.O4.quotaExhausted);
     expect(html).not.toContain('class="retry"');
+  });
+});
+
+describe("O3 第三方披露（终审修复波：ipify 无就地披露）", () => {
+  it("O3 自动执行、无触发控件——披露文案必须始终渲染在卡片说明位", () => {
+    const html = renderToStaticMarkup(
+      createElement(O3Card, {
+        state: { status: "running" },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain(COPY.checks.O3.thirdPartyNote);
+    expect(html).toContain("ipify");
+  });
+
+  it("失败后的重试按钮写明再次直连 ipify，不落回通用「重试」（与 O4 一致执行 ADR-0008）", () => {
+    const html = renderToStaticMarkup(
+      createElement(O3Card, {
+        state: { status: "failed", reason: COPY.checks.O3.failed },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain('class="retry"');
+    expect(html).toContain(COPY.checks.O3.retryLabel);
+    // 破坏性验证过这条会打红：把 O3Card 的 retryLabel 去掉后，这行会因为
+    // 按钮落回通用「重试」而失败（见 --content 计划终审修复波报告）。
+    expect(html).not.toContain(`class="retry">${COPY.actions.retry}<`);
   });
 });

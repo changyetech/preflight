@@ -102,6 +102,14 @@ const ZH = {
       ipv6Label: "IPv6 出口地址",
       failed:
         "IPv6 对照探测未能完成，本项无法判定。这不代表你没有 IPv6——网络恢复后可重试。",
+      /**
+       * O3 自动执行、无控件可挂披露，只能就地放在卡片说明位（终审修复波：ipify 无就地披露）。
+       * O4 遵守了「重试按钮写明第三方」这条规则（consentButton 兼作 retryLabel），O3 之前没有——
+       * cards.tsx 的 retry 落回了通用「重试」，这里连带补上 retryLabel。
+       */
+      thirdPartyNote:
+        "本项由你的浏览器直接访问 ipify（api.ipify.org / api6.ipify.org）完成，你的出口地址对 ipify 可见；本站不经手、不存储。",
+      retryLabel: "重试（将再次由浏览器直连 ipify）",
     },
     O4: {
       title: "IP 类型与风险",
@@ -109,8 +117,9 @@ const ZH = {
       /** ADR-0008：第三方调用必须写在触发它的控件上。文案改动前先读 ADR-0008。 */
       consentButton:
         "检测 IP 风险（将把你的出口 IP 发送至 proxycheck.io 查询）",
+      /** 终审修复波：Turnstile 会加载 challenges.cloudflare.com 且把出口 IP 提交给 Cloudflare，此前全站未披露。 */
       consentNote:
-        "同时会向 StopForumSpam 查询该 IP 是否有滥用收录。本站不存储任何查询结果。",
+        "点击后会先加载 Cloudflare Turnstile 人机验证（challenges.cloudflare.com），验证时你的出口 IP 会一并提交给 Cloudflare。随后同时会向 StopForumSpam 查询该 IP 是否有滥用收录。本站不存储任何查询结果。",
       meaning:
         "机房 IP、公开代理、被大量滥用过的 IP，是触发风控最直接的原因。风险分越高，越容易在登录或调用时被拦。",
       fields: {
@@ -207,7 +216,7 @@ const ZH = {
   footer: {
     privacy: "本站不存储任何检测结果。",
     thirdParty:
-      "IPv6 检测由浏览器直接访问 ipify；IP 风险检测需你手动触发，届时出口 IP 会被发送至 proxycheck.io 与 StopForumSpam。",
+      "IPv6 检测由浏览器直接访问 ipify；IP 风险检测需你手动触发，届时会先加载 Cloudflare Turnstile 人机验证，随后出口 IP 会被发送至 proxycheck.io 与 StopForumSpam。",
   },
 
   errors: {
@@ -336,13 +345,16 @@ const EN: Copy = {
       ipv6Label: "IPv6 exit address",
       failed:
         "The IPv6 comparison probe didn't complete — this item can't be determined. This does not mean you have no IPv6 — retry once your network is back.",
+      thirdPartyNote:
+        "This check runs directly from your browser against ipify (api.ipify.org / api6.ipify.org), so your exit address is visible to ipify. It never passes through, and is never stored by, this site.",
+      retryLabel: "Retry (queries ipify from your browser again)",
     },
     O4: {
       title: "IP Type & Risk",
       idle: "On-demand check — you need to trigger it manually.",
       consentButton: "Check IP risk (sends your exit IP to proxycheck.io)",
       consentNote:
-        "This also queries StopForumSpam for abuse records on that IP. This site stores none of the query results.",
+        "Clicking first loads Cloudflare Turnstile (challenges.cloudflare.com) for bot verification; your exit IP is submitted to Cloudflare as part of that check. It then also queries StopForumSpam for abuse records on that IP. This site stores none of the query results.",
       meaning:
         "Datacenter IPs, public proxies, and heavily abused IPs are the most direct trigger for anti-abuse controls. The higher the risk score, the more likely you are to get blocked at login or on requests.",
       fields: {
@@ -433,7 +445,7 @@ const EN: Copy = {
   footer: {
     privacy: "This site stores none of your check results.",
     thirdParty:
-      "The IPv6 check is made directly from your browser to ipify; the IP risk check requires you to trigger it manually, at which point your exit IP is sent to proxycheck.io and StopForumSpam.",
+      "The IPv6 check is made directly from your browser to ipify; the IP risk check requires you to trigger it manually, at which point Cloudflare Turnstile loads for bot verification first, then your exit IP is sent to proxycheck.io and StopForumSpam.",
   },
 
   errors: {

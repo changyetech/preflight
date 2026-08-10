@@ -15,6 +15,25 @@ describe("受 ADR 约束的文案", () => {
     expect(COPY.checks.O4.consentNote).toContain("StopForumSpam");
   });
 
+  it("O4 说明必须披露 Cloudflare Turnstile（终审修复波：challenges.cloudflare.com 与出口 IP 提交此前全站未提及）", () => {
+    expect(COPY.checks.O4.consentNote).toContain("Cloudflare Turnstile");
+    expect(COPY.checks.O4.consentNote).toContain("challenges.cloudflare.com");
+  });
+
+  it("O3 自动执行、无触发控件，披露文案必须写明直连 ipify（终审修复波：ipify 无就地披露）", () => {
+    expect(COPY.checks.O3.thirdPartyNote).toContain("ipify");
+    expect(COPY.checks.O3.thirdPartyNote).toContain("api.ipify.org");
+  });
+
+  it("O3 的重试按钮必须写明再次直连 ipify，不能落回通用「重试」（终审修复波：与 O4 一致执行 ADR-0008）", () => {
+    expect(COPY.checks.O3.retryLabel).not.toBe(COPY.actions.retry);
+    expect(COPY.checks.O3.retryLabel).toContain("ipify");
+  });
+
+  it("页脚第三方披露也要提到 Turnstile", () => {
+    expect(COPY.footer.thirdParty).toContain("Turnstile");
+  });
+
   it("O2 文案必须区分 Claude 桌面版与 Claude Code CLI 的时区来源（验收标准 2）", () => {
     const note = COPY.checks.O2.scopeNote;
 

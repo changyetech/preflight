@@ -151,6 +151,9 @@ export function O3Card({
       tone={tone}
       meaning={copy.meaning}
       onRetry={state.status === "failed" ? onRetry : undefined}
+      // O3 自动执行、没有触发控件可挂披露；重试就是唯一的触发控件，文案必须写明第三方
+      // （终审修复波：之前落回了通用「重试」，与 O4 的 consentButton 处理不一致）。
+      retryLabel={copy.retryLabel}
     >
       {/* 失败态说的是「无法判定」，绝不能滑向「没有 IPv6」（验收标准 3）。 */}
       {state.status === "failed" ? <Failure reason={copy.failed} /> : null}
@@ -162,6 +165,8 @@ export function O3Card({
           ) : null}
         </>
       ) : null}
+      {/* 无控件的自动检测项，披露只能就地放在说明位（终审修复波：ipify 无就地披露）。 */}
+      <p className="scope-note">{copy.thirdPartyNote}</p>
     </CheckCard>
   );
 }
