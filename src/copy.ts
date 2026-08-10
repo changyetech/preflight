@@ -13,10 +13,14 @@ export const COPY = {
       medium: "中风险",
       high: "高风险",
     },
+    /** 数据不足时的档位文案。绝不能落到「低风险」——没测成不是安全。 */
+    insufficientLabel: "暂无结论",
     /** 初步结论必须带此标注（ADR-0004 / ADR-0005，验收标准 4）。 */
     preliminaryBadge: "初步 · 未含 IP 风险评分",
     fullBadge: "完整 · 已含 IP 风险评分",
     summary: {
+      insufficient:
+        "自动检测项尚未完成，或全部未能完成，暂时无法给出结论。请稍候，或重试下方标为「检测失败」的项。",
       preliminaryLow:
         "自动检测项未发现异常。IP 风险评分尚未纳入，结论仅供参考。",
       preliminaryMedium: "自动检测项发现可疑信号，建议先处理下方标黄的项。",
@@ -173,6 +177,9 @@ export const COPY = {
 
   errors: {
     network: "网络请求失败，请稍后重试。",
+    /** 1001 / 4001：前端请求本身不合法，重试不会好转，措辞里不给「稍后重试」的暗示。 */
+    badRequest: "请求不合法，本项无法完成。若刷新后仍然如此，请反馈给我们。",
+    malformed: "接口返回的数据不完整，本项按检测失败处理。",
     rateLimited: "请求过于频繁，请稍后重试。",
     humanVerification: "人机验证未通过，请重试。",
     upstream: "数据源不可用，本项未能完成检测。",

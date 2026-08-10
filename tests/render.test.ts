@@ -1,0 +1,184 @@
+// 呈现层回归断言。
+//
+// `copy.test.ts` 只能证明「文案还在模块里」，证明不了「文案还渲染在卡片上」。
+// 下面每一条守的都是一个 ADR 级硬约束，而它们在组件里都只是一个三元表达式——
+// 删掉分支后字符串仍在 copy.ts 里，`copy.test.ts` 照样全绿。这组断言堵的是这个缝。
+//
+// 用 react-dom/server 的 renderToStaticMarkup 出静态 HTML，不引 jsdom、不引 testing-library：
+// 断言的是「有没有渲染出来」，不需要一个真实 DOM。测试文件用 createElement 而非 JSX，
+// 是为了留在现有的 `tests/**/*.test.ts` + workers pool 配置里，不动测试基建。
+
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+
+import { CheckCard, CliCard } from "../src/components/Card";
+import { O4Card } from "../src/components/cards";
+import { VerdictPanel } from "../src/components/Verdict";
+import { COPY } from "../src/copy";
+import type { Coverage } from "../src/domain/coverage";
+import type { GeoData } from "../src/domain/types";
+import type { Verdict } from "../src/domain/verdict";
+
+const GEO: GeoData = {
+  ip: "1.2.3.4",
+  country: "CN",
+  region: "Shanghai",
+  city: "Shanghai",
+  postalCode: null,
+  continent: "AS",
+  latitude: "31.2",
+  longitude: "121.4",
+  timezone: "Asia/Shanghai",
+  asn: 4134,
+  asOrganization: "Chinanet",
+  colo: "SHA",
+};
+
+const COVERAGE: Coverage = { done: 3, needCli: 5, failed: 0, pending: 1 };
+
+function renderVerdict(
+  verdict: Verdict,
+  coverage: Coverage = COVERAGE,
+): string {
+  return renderToStaticMarkup(
+    createElement(VerdictPanel, {
+      geo: { status: "done", data: GEO },
+      verdict,
+      coverage,
+    }),
+  );
+}
+
+describe("结论区渲染", () => {
+  it("初步结论必须渲染出「初步 · 未含 IP 风险评分」标注（验收标准 4 / ADR-0005）", () => {
+    const html = renderVerdict({ stage: "preliminary", level: "low" });
+
+    expect(html).toContain(COPY.verdict.preliminaryBadge);
+  });
+
+  it("完整结论渲染的是完整标注，不是初步标注", () => {
+    const html = renderVerdict({ stage: "full", level: "high" });
+
+    expect(html).toContain(COPY.verdict.fullBadge);
+    expect(html).not.toContain(COPY.verdict.preliminaryBadge);
+  });
+
+  it("覆盖度四档与分母都必须渲染在结论旁（ADR-0004）", () => {
+    const html = renderVerdict({ stage: "preliminary", level: "low" });
+
+    expect(html).toContain(`${COPY.coverage.done} 3`);
+    expect(html).toContain(`${COPY.coverage.needCli} 5`);
+    expect(html).toContain(`${COPY.coverage.failed} 0`);
+    expect(html).toContain(`${COPY.coverage.pending} 1`);
+    expect(html).toContain(COPY.coverage.total);
+  });
+
+  it("数据不足时不得出现「低风险」字样与低风险配色（C-1）", () => {
+    const html = renderVerdict({ stage: "insufficient" });
+
+    expect(html).toContain(COPY.verdict.insufficientLabel);
+    expect(html).toContain(COPY.verdict.summary.insufficient);
+    expect(html).not.toContain(COPY.verdict.level.low);
+    expect(html).not.toContain(COPY.verdict.summary.preliminaryLow);
+    // 配色类名也不许落到低风险绿——用户读色块的速度快过读字。
+    expect(html).not.toContain("verdict-low");
+    expect(html).not.toContain("level-low");
+    // 还没有结论，就不该挂「初步 / 完整」这种描述结论成色的标注。
+    expect(html).not.toContain(COPY.verdict.preliminaryBadge);
+    expect(html).not.toContain(COPY.verdict.fullBadge);
+  });
+
+  it("数据不足时覆盖度照常呈现（ADR-0004 不因无结论而豁免）", () => {
+    const html = renderVerdict(
+      { stage: "insufficient" },
+      {
+        done: 0,
+        needCli: 5,
+        failed: 3,
+        pending: 1,
+      },
+    );
+
+    expect(html).toContain(`${COPY.coverage.failed} 3`);
+    expect(html).toContain(`${COPY.coverage.done} 0`);
+  });
+});
+
+describe("卡片重试入口（规格 4.1）", () => {
+  it("灰卡是终态，没有重试入口，但有安装命令可复制", () => {
+    const html = renderToStaticMarkup(
+      createElement(CliCard, {
+        id: "C1",
+        title: COPY.checks.C1.title,
+        meaning: COPY.checks.C1.meaning,
+      }),
+    );
+
+    expect(html).not.toContain('class="retry"');
+    expect(html).toContain(COPY.actions.installCommand);
+    expect(html).toContain(COPY.cardStatus.needCli);
+  });
+
+  it("失败卡有重试入口", () => {
+    const html = renderToStaticMarkup(
+      createElement(CheckCard, {
+        id: "O3",
+        title: COPY.checks.O3.title,
+        status: "failed",
+        meaning: COPY.checks.O3.meaning,
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain('class="retry"');
+    expect(html).toContain(COPY.actions.retry);
+  });
+});
+
+describe("O4 第三方披露（ADR-0008）", () => {
+  it("未触发时按钮上写明 proxycheck.io", () => {
+    const html = renderToStaticMarkup(
+      createElement(O4Card, {
+        state: { status: "idle" },
+        onRun: () => {},
+        onFail: () => {},
+      }),
+    );
+
+    expect(html).toContain(COPY.checks.O4.consentButton);
+    expect(html).toContain("proxycheck.io");
+    expect(html).toContain(COPY.checks.O4.consentNote);
+  });
+
+  it("失败后的重试入口同样写明 proxycheck.io——重试就是那个触发控件", () => {
+    const html = renderToStaticMarkup(
+      createElement(O4Card, {
+        state: { status: "failed", reason: COPY.errors.upstream },
+        onRun: () => {},
+        onFail: () => {},
+      }),
+    );
+
+    expect(html).toContain('class="retry"');
+    expect(html).toContain(COPY.checks.O4.consentButton);
+    expect(html).toContain("proxycheck.io");
+    expect(html).toContain(COPY.checks.O4.consentNote);
+    // 光写「重试」二字就等于把披露藏了起来。
+    expect(html).not.toContain(`class="retry">${COPY.actions.retry}<`);
+  });
+
+  it("配额耗尽呈现为检测失败，且不给重试入口——今天重试多少次都一样", () => {
+    const html = renderToStaticMarkup(
+      createElement(O4Card, {
+        state: { status: "done", data: { status: "quotaExhausted" } },
+        onRun: () => {},
+        onFail: () => {},
+      }),
+    );
+
+    expect(html).toContain(COPY.cardStatus.failed);
+    expect(html).toContain(COPY.checks.O4.quotaExhausted);
+    expect(html).not.toContain('class="retry"');
+  });
+});

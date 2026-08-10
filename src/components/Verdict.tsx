@@ -21,11 +21,16 @@ const SUMMARY = {
   },
 } as const;
 
-/** 分档取文案。初步结论没有「高」这一档——类型层面也没有，这里无需兜底。 */
+/** 分档取文案。初步结论没有「高」这一档、数据不足没有任何档——类型层面也没有，无需兜底。 */
 function summaryOf(verdict: VerdictValue): string {
-  return verdict.stage === "preliminary"
-    ? SUMMARY.preliminary[verdict.level]
-    : SUMMARY.full[verdict.level];
+  switch (verdict.stage) {
+    case "insufficient":
+      return COPY.verdict.summary.insufficient;
+    case "preliminary":
+      return SUMMARY.preliminary[verdict.level];
+    case "full":
+      return SUMMARY.full[verdict.level];
+  }
 }
 
 function CoverageBar({ coverage }: { coverage: Coverage }) {
@@ -67,9 +72,11 @@ export function VerdictPanel({
   coverage: Coverage;
 }) {
   const known = geo.status === "done" ? geo.data : null;
+  // 数据不足时没有 level 可取——配色与文案都走中性档，绝不落到低风险绿。
+  const level = verdict.stage === "insufficient" ? "none" : verdict.level;
 
   return (
-    <section className={`verdict verdict-${verdict.level}`}>
+    <section className={`verdict verdict-${level}`}>
       <p className="exit-ip-label">{COPY.verdict.exitIpLabel}</p>
       <p className="exit-ip">{known?.ip ?? COPY.verdict.exitIpUnknown}</p>
       <p className="exit-location">
@@ -78,16 +85,18 @@ export function VerdictPanel({
       <p className="exit-ip-note">{COPY.verdict.exitIpNote}</p>
 
       <p className="level">
-        <span
-          className={`level-dot level-${verdict.level}`}
-          aria-hidden="true"
-        />
-        {COPY.verdict.level[verdict.level]}
-        <span className="stage-badge">
-          {verdict.stage === "preliminary"
-            ? COPY.verdict.preliminaryBadge
-            : COPY.verdict.fullBadge}
-        </span>
+        <span className={`level-dot level-${level}`} aria-hidden="true" />
+        {verdict.stage === "insufficient"
+          ? COPY.verdict.insufficientLabel
+          : COPY.verdict.level[verdict.level]}
+        {/* 数据不足时不挂「初步 / 完整」标注：还没有结论，也就无所谓这个结论含不含 O4。 */}
+        {verdict.stage === "insufficient" ? null : (
+          <span className="stage-badge">
+            {verdict.stage === "preliminary"
+              ? COPY.verdict.preliminaryBadge
+              : COPY.verdict.fullBadge}
+          </span>
+        )}
       </p>
       <p className="summary">{summaryOf(verdict)}</p>
 

@@ -5,13 +5,29 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { VerdictInput } from "../src/domain/verdict";
+import { INITIAL_PANEL } from "../src/domain/checks";
+import type { GeoData } from "../src/domain/types";
+import type { Verdict, VerdictInput } from "../src/domain/verdict";
 import { computeVerdict, verdictInputFrom } from "../src/domain/verdict";
+
+const GEO: GeoData = {
+  ip: "1.2.3.4",
+  country: "CN",
+  region: "Shanghai",
+  city: "Shanghai",
+  postalCode: null,
+  continent: "AS",
+  latitude: "31.2",
+  longitude: "121.4",
+  timezone: "Asia/Shanghai",
+  asn: 4134,
+  asOrganization: "Chinanet",
+  colo: "SHA",
+};
 
 /** 全清的基线输入：无任何风险信号，且未含 O4。 */
 const CLEAN: VerdictInput = {
-  timezoneMismatch: false,
-  ipv6Leak: false,
+  signals: { timezoneMismatch: false, ipv6Leak: false },
   risk: null,
 };
 
@@ -45,14 +61,24 @@ describe("computeVerdict", () => {
   });
 
   it("时区不一致 → 中", () => {
-    expect(computeVerdict({ ...WITH_RISK, timezoneMismatch: true })).toEqual({
+    expect(
+      computeVerdict({
+        ...WITH_RISK,
+        signals: { timezoneMismatch: true, ipv6Leak: false },
+      }),
+    ).toEqual({
       stage: "full",
       level: "medium",
     });
   });
 
   it("IPv6 泄露 → 中（ADR-0006）", () => {
-    expect(computeVerdict({ ...WITH_RISK, ipv6Leak: true })).toEqual({
+    expect(
+      computeVerdict({
+        ...WITH_RISK,
+        signals: { timezoneMismatch: false, ipv6Leak: true },
+      }),
+    ).toEqual({
       stage: "full",
       level: "medium",
     });
@@ -78,8 +104,7 @@ describe("computeVerdict", () => {
 
   it("未含 O4 时永不为高：即便中风险信号全中，也只到中", () => {
     const allMedium: VerdictInput = {
-      timezoneMismatch: true,
-      ipv6Leak: true,
+      signals: { timezoneMismatch: true, ipv6Leak: true },
       risk: null,
     };
 
@@ -96,8 +121,7 @@ describe("computeVerdict", () => {
   it("高风险优先于中风险信号", () => {
     expect(
       computeVerdict({
-        timezoneMismatch: true,
-        ipv6Leak: true,
+        signals: { timezoneMismatch: true, ipv6Leak: true },
         risk: { riskScore: 100, abuseListed: true },
       }),
     ).toEqual({ stage: "full", level: "high" });
@@ -106,11 +130,35 @@ describe("computeVerdict", () => {
   it("Hosting / 代理检出只是分项提醒，不拉高综合结论（规格 3.2）", () => {
     // 分项颜色由 networkType 与 proxy/vpn 决定，它们根本不进 VerdictInput——
     // 这条断言守的是「输入面只有四个信号」这个设计。
-    expect(Object.keys(WITH_RISK).sort()).toEqual([
+    expect(Object.keys(WITH_RISK).sort()).toEqual(["risk", "signals"]);
+    expect(Object.keys(WITH_RISK.signals!).sort()).toEqual([
       "ipv6Leak",
-      "risk",
       "timezoneMismatch",
     ]);
+  });
+
+  it("一个信号都没有时判「数据不足」，绝不判低风险", () => {
+    // 「什么都没测成」与「测了都没问题」在结论区必须长得不一样。
+    const verdict = computeVerdict({ signals: null, risk: null });
+
+    expect(verdict).toEqual({ stage: "insufficient" });
+    expect(verdict).not.toHaveProperty("level");
+  });
+
+  it("数据不足形态在类型层面就没有 level 字段", () => {
+    const verdict: Verdict = { stage: "insufficient" };
+
+    // @ts-expect-error 「数据不足」不带任何风险档位，渲染不出「低风险」
+    expect(verdict.level).toBeUndefined();
+  });
+
+  it("O4 已出结果时不判数据不足——有证据就该给结论，哪怕 O2/O3 没跑成", () => {
+    expect(
+      computeVerdict({
+        signals: null,
+        risk: { riskScore: 100, abuseListed: null },
+      }),
+    ).toEqual({ stage: "full", level: "high" });
   });
 });
 
@@ -131,14 +179,13 @@ describe("verdictInputFrom", () => {
     });
 
     expect(input).toEqual({
-      timezoneMismatch: false,
-      ipv6Leak: false,
+      signals: { timezoneMismatch: false, ipv6Leak: false },
       risk: null,
     });
     expect(computeVerdict(input).stage).toBe("preliminary");
   });
 
-  it("检测失败的项不贡献风险信号——失败不等于安全，也不等于有风险", () => {
+  it("O1–O3 全部失败 → 数据不足，绝不是低风险", () => {
     const input = verdictInputFrom({
       o1: { status: "failed", reason: "network" },
       o2: { status: "failed", reason: "network" },
@@ -146,22 +193,58 @@ describe("verdictInputFrom", () => {
       o4: { status: "failed", reason: "upstream unavailable" },
     });
 
-    expect(input).toEqual({
-      timezoneMismatch: false,
-      ipv6Leak: false,
-      risk: null,
+    expect(input).toEqual({ signals: null, risk: null });
+    expect(computeVerdict(input)).toEqual({ stage: "insufficient" });
+  });
+
+  it("首帧全部检测中 → 数据不足，绝不是低风险", () => {
+    expect(computeVerdict(verdictInputFrom(INITIAL_PANEL))).toEqual({
+      stage: "insufficient",
+    });
+  });
+
+  it("只要有一项自动检测出了结果，就给初步结论——失败项不贡献信号", () => {
+    const input = verdictInputFrom({
+      o1: { status: "done", data: GEO },
+      o2: {
+        status: "done",
+        data: {
+          browserTimezone: "Asia/Shanghai",
+          exitTimezone: "America/New_York",
+          match: false,
+        },
+      },
+      o3: { status: "failed", reason: "ipify unreachable" },
+      o4: { status: "idle" },
+    });
+
+    expect(input.signals).toEqual({ timezoneMismatch: true, ipv6Leak: false });
+    expect(computeVerdict(input)).toEqual({
+      stage: "preliminary",
+      level: "medium",
     });
   });
 
   it("配额耗尽的 O4 不产生风险输入，结论保持初步（规格 5.3）", () => {
     const input = verdictInputFrom({
-      o1: { status: "running" },
-      o2: { status: "running" },
-      o3: { status: "running" },
+      o1: { status: "done", data: GEO },
+      o2: {
+        status: "done",
+        data: {
+          browserTimezone: "Asia/Shanghai",
+          exitTimezone: "Asia/Shanghai",
+          match: true,
+        },
+      },
+      o3: { status: "done", data: { leak: false, ipv6: null } },
       o4: { status: "done", data: { status: "quotaExhausted" } },
     });
 
     expect(input.risk).toBeNull();
+    expect(computeVerdict(input)).toEqual({
+      stage: "preliminary",
+      level: "low",
+    });
   });
 
   it("O4 完成后取出风险分与滥用收录", () => {
@@ -194,8 +277,7 @@ describe("verdictInputFrom", () => {
     });
 
     expect(input).toEqual({
-      timezoneMismatch: true,
-      ipv6Leak: true,
+      signals: { timezoneMismatch: true, ipv6Leak: true },
       risk: { riskScore: 100, abuseListed: true },
     });
   });
@@ -215,6 +297,6 @@ describe("verdictInputFrom", () => {
       o4: { status: "idle" },
     });
 
-    expect(input.timezoneMismatch).toBe(false);
+    expect(input.signals?.timezoneMismatch).toBe(false);
   });
 });

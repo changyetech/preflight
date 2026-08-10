@@ -92,6 +92,11 @@
   background: var(--tone-danger);
 }
 
+/* 数据不足：中性灰。绝不借用低风险的绿——那正是把「没测成」说成「没问题」。 */
+.level-none {
+  background: var(--text);
+}
+
 .stage-badge {
   padding: 0.15rem 0.5rem;
   border: 1px solid var(--border);

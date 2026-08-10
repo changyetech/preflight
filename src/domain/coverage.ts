@@ -2,6 +2,7 @@
 
 import type { OnlineCheck, PanelState } from "./checks";
 import { CLI_CHECK_IDS } from "./checks";
+import type { RiskData } from "./types";
 
 /**
  * 覆盖度分档。规格 3.4 列的是三档，这里多一档 `pending`：
@@ -19,7 +20,6 @@ export type Coverage = {
 
 type Bucket = "done" | "failed" | "pending";
 
-/** 配额耗尽不是「已完成」：没有查询发生，就没有结果可报（规格 5.3 / docs/api.md 3.2）。 */
 function bucketOf(check: OnlineCheck<unknown>): Bucket {
   switch (check.status) {
     case "idle":
@@ -28,11 +28,21 @@ function bucketOf(check: OnlineCheck<unknown>): Bucket {
     case "failed":
       return "failed";
     case "done":
-      return (check.data as { status?: string } | null)?.status ===
-        "quotaExhausted"
-        ? "failed"
-        : "done";
+      return "done";
   }
+}
+
+/**
+ * O4 单独判：配额耗尽虽然是一次成功的 200 响应，却不是「已完成」——
+ * 没有查询发生，就没有结果可报（规格 5.3 / docs/api.md 3.2）。
+ *
+ * 这个特例只属于 O4，所以写在 O4 自己的分支里，而不是去嗅探任意检测项数据上有没有
+ * `status` 字段——否则日后哪个检测项的数据碰巧带 `status`，就会被误分到「检测失败」。
+ */
+function bucketOfRisk(check: OnlineCheck<RiskData>): Bucket {
+  return check.status === "done" && check.data.status === "quotaExhausted"
+    ? "failed"
+    : bucketOf(check);
 }
 
 export function computeCoverage(panel: PanelState): Coverage {
@@ -43,8 +53,15 @@ export function computeCoverage(panel: PanelState): Coverage {
     pending: 0,
   };
 
-  for (const check of [panel.o1, panel.o2, panel.o3, panel.o4]) {
-    coverage[bucketOf(check)] += 1;
+  const buckets = [
+    bucketOf(panel.o1),
+    bucketOf(panel.o2),
+    bucketOf(panel.o3),
+    bucketOfRisk(panel.o4),
+  ];
+
+  for (const bucket of buckets) {
+    coverage[bucket] += 1;
   }
 
   return coverage;

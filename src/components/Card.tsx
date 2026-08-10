@@ -35,6 +35,7 @@ export function CheckCard({
   tone = "neutral",
   meaning,
   onRetry,
+  retryLabel = COPY.actions.retry,
   children,
 }: {
   id: string;
@@ -44,6 +45,11 @@ export function CheckCard({
   meaning: string;
   /** 只有「检测失败」提供重试；灰卡（需 CLI）是终态，不传此项（规格 4.1）。 */
   onRetry?: () => void;
+  /**
+   * 重试按钮文案。会触发第三方调用的项必须在这里写明调用对象（ADR-0008）——
+   * 重试就是那个触发控件，光写「重试」等于把披露藏了起来。
+   */
+  retryLabel?: string;
   children?: ReactNode;
 }) {
   return (
@@ -65,7 +71,7 @@ export function CheckCard({
 
       {onRetry ? (
         <button type="button" className="retry" onClick={onRetry}>
-          {COPY.actions.retry}
+          {retryLabel}
         </button>
       ) : null}
     </article>

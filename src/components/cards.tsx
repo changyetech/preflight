@@ -15,7 +15,6 @@ import type {
   RiskData,
   TimezoneResult,
 } from "../domain/types";
-import { HIGH_RISK_SCORE, MEDIUM_RISK_SCORE } from "../domain/verdict";
 import { requestTurnstileToken, turnstileConfigured } from "../turnstile";
 
 function Field({ label, value }: { label: string; value: string }) {
@@ -221,10 +220,18 @@ export function O4Card({
 
   const data = state.status === "done" ? state.data : null;
   const ok = data?.status === "ok" ? data : null;
+  // 分项颜色直接吃契约给的 riskLevel（docs/api.md 3.1 已按规格 3.2 的阈值分好级），
+  // 不在前端拿 riskScore 再算一遍——同一套阈值放两处迟早会分叉。
+  // 唯一的本地叠加：Hosting 与代理检出把绿拉成黄（规格 3.2 的分项提醒），但不拉高综合结论。
   const tone: CardTone = ok
-    ? ok.riskScore >= HIGH_RISK_SCORE
+    ? ok.riskLevel === "high"
       ? "danger"
-      : ok.riskScore >= MEDIUM_RISK_SCORE || ok.networkType === "Hosting"
+      : ok.riskLevel === "medium" ||
+          ok.networkType === "Hosting" ||
+          ok.proxy ||
+          ok.vpn ||
+          ok.tor ||
+          ok.scraper
         ? "warn"
         : "ok"
     : "neutral";
@@ -259,6 +266,8 @@ export function O4Card({
       tone={tone}
       meaning={copy.meaning}
       onRetry={state.status === "failed" ? () => void trigger() : undefined}
+      // 重试同样会把出口 IP 发往 proxycheck.io，披露必须跟着这个按钮走（ADR-0008）。
+      retryLabel={copy.consentButton}
     >
       {state.status === "idle" ? (
         <p className="conclusion">{copy.idle}</p>
@@ -280,6 +289,11 @@ export function O4Card({
           </button>
           <p className="consent-note">{copy.consentNote}</p>
         </>
+      ) : null}
+      {/* 失败态的触发控件是 CheckCard 的重试按钮（文案已换成 consentButton），
+          这里补上第二个第三方 StopForumSpam 的披露，与首次触发时看到的一致。 */}
+      {state.status === "failed" ? (
+        <p className="consent-note">{copy.consentNote}</p>
       ) : null}
 
       <div ref={turnstileRef} className="turnstile" />

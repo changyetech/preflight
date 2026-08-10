@@ -24,5 +24,8 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["worker", "tests", "vitest.config.ts"]
+  "include": ["worker", "tests", "vitest.config.ts"],
+  // 渲染测试挂的是前端组件（JSX + DOM 类型），归 tsconfig.app.json 管；
+  // 这里保持无 DOM、无 JSX，免得 Worker 代码顺手用上浏览器 API 还能编过。
+  "exclude": ["tests/render.test.ts"]
 }
