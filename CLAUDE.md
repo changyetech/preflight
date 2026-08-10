@@ -23,9 +23,9 @@ Web application
 
 This repo documents its own **contracts** and **specs** under `docs/` (contract documents live directly under `docs/`, not in sub-directories):
 
-- API interface specifications (endpoints, request/response schemas) → `docs/`
-- Error format and error code registry → `docs/`
-- Response envelope format, retry/backoff strategies, auth contracts → `docs/`
+- API interface specifications (endpoints, request/response schemas) → `docs/` — **[docs/api.md](docs/api.md)**：`/api/geo` 与 `/api/risk` 的请求/响应 schema、响应信封、错误码注册表、隐私约束
+- Error format and error code registry → `docs/` — 见 [docs/api.md](docs/api.md) 第 1 / 4 节
+- Response envelope format, retry/backoff strategies, auth contracts → `docs/` — 见 [docs/api.md](docs/api.md) 第 1 节
 - Project-private convention documents → `docs/` (see [Convention Documents](#convention-documents))
 - Feature / domain design specs → `docs/specs/`
 - Implementation plans → `docs/plans/`
@@ -129,6 +129,7 @@ ipcheck/
 ├── CONTEXT.md         # Ubiquitous language glossary (domain terms only, no implementation)
 ├── refs/ipcheck/      # Reference: the published ipcheck CLI repo (read-only source material)
 └── docs/
+    ├── api.md         # API contract: /api/geo & /api/risk schemas, error code registry
     ├── adr/           # Architecture Decision Records (0001-*.md, sequentially numbered)
     ├── specs/         # Feature / design specifications (the "what")
     ├── plans/         # Implementation plans (the "how")
