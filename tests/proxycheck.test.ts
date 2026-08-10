@@ -34,7 +34,7 @@ const FIXTURE = {
 };
 
 function stubFetch(reply: unknown | Error) {
-  const fetchMock = vi.fn(async () => {
+  const fetchMock = vi.fn(async (_url: string) => {
     if (reply instanceof Error) throw reply;
     if (reply instanceof Response) return reply;
     return Response.json(reply);
@@ -92,7 +92,7 @@ describe("fetchProxycheck", () => {
 
     await fetchProxycheck("185.59.221.75", "my-secret-key");
 
-    const url = new URL(fetchMock.mock.calls[0][0] as unknown as string);
+    const url = new URL(fetchMock.mock.calls[0][0]);
     expect(url.origin).toBe("https://proxycheck.io");
     expect(url.pathname).toBe("/v3/185.59.221.75");
     expect(url.searchParams.get("key")).toBe("my-secret-key");
