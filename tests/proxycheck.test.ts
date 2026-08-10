@@ -49,7 +49,13 @@ function fixtureWithRisk(ip: string, risk: number) {
     status: "ok",
     [ip]: {
       network: { type: "Residential" },
-      detections: { proxy: false, vpn: false, tor: false, scraper: false, risk },
+      detections: {
+        proxy: false,
+        vpn: false,
+        tor: false,
+        scraper: false,
+        risk,
+      },
     },
   };
 }
@@ -118,7 +124,13 @@ describe("fetchProxycheck", () => {
       status: "ok",
       "1.2.3.4": {
         network: { type: null },
-        detections: { proxy: true, vpn: false, tor: false, scraper: false, risk: 100 },
+        detections: {
+          proxy: true,
+          vpn: false,
+          tor: false,
+          scraper: false,
+          risk: 100,
+        },
       },
     });
 

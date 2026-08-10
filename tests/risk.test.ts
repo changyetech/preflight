@@ -9,7 +9,13 @@ const PROXYCHECK_OK = {
   status: "ok",
   RESULT_IP: {
     network: { type: "Hosting" },
-    detections: { proxy: false, vpn: true, tor: false, scraper: false, risk: 100 },
+    detections: {
+      proxy: false,
+      vpn: true,
+      tor: false,
+      scraper: false,
+      risk: 100,
+    },
   },
 };
 
@@ -103,9 +109,7 @@ describe("POST /api/risk 只用来源 IP", () => {
 
     const calls = fetchMock.mock.calls.map(([url]) => url);
     expect(calls.some((url) => url.includes("8.8.8.8"))).toBe(false);
-    expect(
-      calls.some((url) => url.includes("/v3/203.0.113.11")),
-    ).toBe(true);
+    expect(calls.some((url) => url.includes("/v3/203.0.113.11"))).toBe(true);
   });
 
   it("StopForumSpam 也只查来源 IP", async () => {

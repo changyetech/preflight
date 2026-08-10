@@ -5,11 +5,7 @@
 // PROXYCHECK_API_KEY 只存在于 Worker Secret，不进仓库、不进响应、不进日志（ADR-0008）。
 
 export type NetworkType =
-  | "Residential"
-  | "Business"
-  | "Wireless"
-  | "Hosting"
-  | null;
+  "Residential" | "Business" | "Wireless" | "Hosting" | null;
 
 export type RiskLevel = "low" | "medium" | "high";
 

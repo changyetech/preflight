@@ -72,7 +72,11 @@ describe("GET /api/geo", () => {
       "application/json; charset=utf-8",
     );
 
-    const body = (await response.json()) as { code: number; message: string; data: object };
+    const body = (await response.json()) as {
+      code: number;
+      message: string;
+      data: object;
+    };
     expect(body.code).toBe(0);
     expect(body.message).toBe("ok");
     expect(Object.keys(body.data).sort()).toEqual([...GEO_FIELDS, "ip"].sort());

@@ -35,7 +35,10 @@ export function geoFrom(cf: CfLike | undefined, ip: string | null): Geo {
   for (const field of GEO_FIELDS) {
     const value = cf?.[field];
     // 空字符串按缺失处理：cf 偶尔会给空串，前端把它当有效值会渲染出空白行。
-    geo[field] = value === undefined || value === null || value === "" ? null : (value as string | number);
+    geo[field] =
+      value === undefined || value === null || value === ""
+        ? null
+        : (value as string | number);
   }
 
   return geo;

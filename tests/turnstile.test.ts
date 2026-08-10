@@ -35,7 +35,10 @@ describe("verifyTurnstile", () => {
 
   it("siteverify 判定无效时拒绝", async () => {
     stubFetch(
-      Response.json({ success: false, "error-codes": ["invalid-input-response"] }),
+      Response.json({
+        success: false,
+        "error-codes": ["invalid-input-response"],
+      }),
     );
 
     await expect(verifyTurnstile("bad", "secret", "1.2.3.4")).resolves.toBe(
