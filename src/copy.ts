@@ -195,8 +195,11 @@ const ZH = {
       columnCli: "CLI",
       auto: "自动",
       onDemand: "按需",
-      /** CLI 覆盖全部 9 项（CLI README 功能表），这一列没有「—」的取值（C1 修复）。 */
-      available: "✓",
+      /**
+       * CLI 覆盖全部 9 项（CLI README 功能表），这一列没有「—」的取值（C1 修复）。
+       * 用带文字的「支持」而不是裸符号「✓」——屏幕阅读器对孤立符号的朗读不稳定（N3）。
+       */
+      available: "支持",
       dash: "—",
     },
   },
@@ -422,7 +425,7 @@ const EN: Copy = {
       columnCli: "CLI",
       auto: "Automatic",
       onDemand: "On demand",
-      available: "✓",
+      available: "Yes",
       dash: "—",
     },
   },

@@ -11,6 +11,8 @@
 import { SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
+import { COPY, COPY_EN } from "../src/copy";
+
 describe("Accept-Language 不触发自动跳转", () => {
   it("Accept-Language: en 请求根路径，仍原样返回（非重定向），与不带该头时一致", async () => {
     const withHeader = await SELF.fetch("https://example.com/", {
@@ -32,7 +34,9 @@ describe("/en 是独立的英文静态资源，不是中文页面的软 404 兜�
 
     expect(response.status).toBe(200);
     expect(html).toContain('lang="en"');
-    expect(html).toContain("Network Environment Checkup");
+    // 绑定 COPY_EN.site.title 而非字面量：copy.ts 改了标题，这条断言要能跟着变红
+    // （N2：上一版直接写死英文字符串，锁不住 en/index.html 与 COPY_EN 的一致性）。
+    expect(html).toContain(COPY_EN.site.title);
   });
 
   it("根路径仍是中文 HTML，两份入口互不覆盖", async () => {
@@ -40,7 +44,7 @@ describe("/en 是独立的英文静态资源，不是中文页面的软 404 兜�
     const html = await response.text();
 
     expect(html).toContain('lang="zh-CN"');
-    expect(html).toContain("网络环境体检");
+    expect(html).toContain(COPY.site.title);
   });
 
   it("不存在的路径返回真实 404，而不是软 404（I1：曾经的 SPA 回退会让任意路径都 200）", async () => {

@@ -70,7 +70,7 @@ fmt: ## Format code
 	pnpm exec prettier --write "src/**/*.{ts,tsx,css}" "worker/**/*.ts" "tests/**/*.ts" "*.{ts,json}"
 
 .PHONY: check
-check: fmt lint test build ## Run all quality checks (fmt + lint + test + build)
+check: fmt lint build test ## Run all quality checks (fmt + lint + build + test)
 
 # ==============================================================================
 # HOUSEKEEPING
