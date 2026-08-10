@@ -59,4 +59,22 @@ describe("落地内容三段", () => {
     expect(html).toContain(COPY_EN.landing.compare.title);
     expect(html).not.toContain(COPY.landing.why.title);
   });
+
+  // C1 修复的渲染层回归：CLI README.md 功能表里 O1-O4 与 C1-C5 全部 9 项 CLI 都测得到，
+  // 对照表的 CLI 列因此必须恒为「有」（compare.available），不能出现「—」——
+  // compareTable.test.ts 只测数据（owner/execution 字段），测不出「数据对、CLI 列渲染成 —」
+  // 这种呈现层缺陷，所以必须在这里对渲染出的 HTML 做断言。
+  it("对照表 CLI 列 9 行全部渲染为「有」，不出现「—」", () => {
+    const html = renderLanding("zh");
+    const tableStart = html.indexOf("compare-table");
+    const table = html.slice(tableStart);
+
+    // 每行两个单元格：Web 列可能是「—」（仅 CLI 项），但 CLI 列这一整列不该有任何「—」。
+    const cliColumnCells = table.match(/<td>[^<]*<\/td>\s*<\/tr>/g) ?? [];
+    expect(cliColumnCells).toHaveLength(9);
+    for (const cell of cliColumnCells) {
+      expect(cell).toContain(COPY.landing.compare.available);
+      expect(cell).not.toContain(COPY.landing.compare.dash);
+    }
+  });
 });

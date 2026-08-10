@@ -21,7 +21,10 @@ export type Probe = { reachable: true; ip: string } | { reachable: false };
  */
 export function judgeIpv6(v4: Probe, v6: Probe): OnlineCheck<Ipv6Result> {
   if (!v4.reachable) {
-    return { status: "failed", reason: "ipify 对照端点不可达，无法判定 IPv6" };
+    // 这个 reason 不面向用户展示——O3Card 渲染失败态时用的是 copy.checks.O3.failed
+    // （cards.tsx），不读这个字段。这里只需要一个非空、非语言相关的内部诊断标识，
+    // 不走 i18n（m1：之前这里硬编码了中文，属于绕过 i18n 的死文案）。
+    return { status: "failed", reason: "ipv6-probe-v4-unreachable" };
   }
 
   return v6.reachable

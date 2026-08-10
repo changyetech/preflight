@@ -49,9 +49,10 @@ export function Landing() {
                         : compare.onDemand
                       : compare.dash}
                   </td>
-                  <td>
-                    {row.owner === "cli" ? compare.cliOnly : compare.dash}
-                  </td>
+                  {/* CLI 覆盖全部 9 项（CLI README.md 功能表），这一列恒为「有」——
+                      C1 的教训：之前把「归属＝Web 能否在线测」误当成「哪边有这功能」，
+                      导致 O1-O4 在 CLI 列显示「—」，与 landing.install 里「CLI 覆盖全部 9 项」自相矛盾。 */}
+                  <td>{compare.available}</td>
                 </tr>
               ))}
             </tbody>

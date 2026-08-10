@@ -9,7 +9,6 @@ import { computeCoverage } from "./domain/coverage";
 import { judgeIpv6 } from "./domain/ipv6";
 import { browserTimezone, compareTimezone } from "./domain/timezone";
 import { computeVerdict, verdictInputFrom } from "./domain/verdict";
-import { getCopy, type Lang } from "./copy";
 import { useCopy } from "./i18n";
 import { probeIpify } from "./probes/ipify";
 
@@ -17,8 +16,8 @@ function reasonOf(fallback: string, error: unknown): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-/** `lang` 决定接口错误文案与兜底提示的语言（默认中文，/en 下传 "en"，规格第 7 节）。 */
-export function usePanel(lang: Lang = "zh") {
+/** 错误文案的语言只有一个真相来源：`useCopy()`（m3：去掉冗余的 `lang` 参数）。 */
+export function usePanel() {
   const copy = useCopy();
   const [panel, setPanel] = useState<PanelState>(INITIAL_PANEL);
 
@@ -31,7 +30,7 @@ export function usePanel(lang: Lang = "zh") {
     }));
 
     try {
-      const geo = await fetchGeo(getCopy(lang));
+      const geo = await fetchGeo(copy);
       setPanel((prev) => ({
         ...prev,
         o1: { status: "done", data: geo },
@@ -47,7 +46,7 @@ export function usePanel(lang: Lang = "zh") {
       } as const;
       setPanel((prev) => ({ ...prev, o1: failed, o2: failed }));
     }
-  }, [copy, lang]);
+  }, [copy]);
 
   const runIpv6 = useCallback(async () => {
     setPanel((prev) => ({ ...prev, o3: { status: "running" } }));
@@ -62,7 +61,7 @@ export function usePanel(lang: Lang = "zh") {
       setPanel((prev) => ({ ...prev, o4: { status: "running" } }));
 
       try {
-        const data = await fetchRisk(turnstileToken, getCopy(lang));
+        const data = await fetchRisk(turnstileToken, copy);
         setPanel((prev) => ({ ...prev, o4: { status: "done", data } }));
       } catch (error) {
         // proxycheck 不可用（5001）是检测失败，不是低风险——绝不能呈现成「没查出问题」。
@@ -75,7 +74,7 @@ export function usePanel(lang: Lang = "zh") {
         }));
       }
     },
-    [copy, lang],
+    [copy],
   );
 
   const failRisk = useCallback((reason: string) => {

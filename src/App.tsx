@@ -14,7 +14,7 @@ import { usePanel } from "./usePanel";
 function AppShell({ lang }: { lang: "zh" | "en" }) {
   const COPY = useCopy();
   const { panel, coverage, verdict, runGeo, runIpv6, runRisk, failRisk } =
-    usePanel(lang);
+    usePanel();
 
   return (
     <div className="page">
