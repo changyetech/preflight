@@ -81,7 +81,9 @@ O4 IP 类型与风险。按需触发，串联 proxycheck v3 与 StopForumSpam �
 
 > **`/api/risk` 不接受、也不读取任何客户端传入的 IP。** 查询目标恒为本次请求的来源 IP（`CF-Connecting-IP`）。请求体或查询串里出现 `ip` 之类的字段一律被忽略，既不改变查询目标，也不产生错误。这是硬约束：否则本站会退化成一个任意 IP 查询代理，proxycheck 配额会被第三方白嫖（规格 5.1 / 验收标准 6）。
 
-**处理顺序**：Turnstile 校验 → Rate Limiting → DO 日配额 → proxycheck v3 + StopForumSpam → 组装响应。任一前置环节拒绝，都不会消耗后续环节的资源。
+**处理顺序**：Rate Limiting → Turnstile 校验 → DO 日配额 → proxycheck v3 + StopForumSpam → 组装响应。任一前置环节拒绝，都不会消耗后续环节的资源。
+
+限流排在 Turnstile 之前是刻意的：限流是绑定内的本地判定，Turnstile 是一次跨网络 siteverify 往返。反过来排，任何未鉴权的调用者都能以 1:1 放大出无上限的 siteverify 出站请求——虽然烧不到 proxycheck 额度，仍是一个零成本可触发的出站放大面。
 
 ### 3.1 响应 200 · `status: "ok"`
 
@@ -136,6 +138,7 @@ O4 IP 类型与风险。按需触发，串联 proxycheck v3 与 StopForumSpam �
 |---|---|---|
 | 400 | 1001 | 请求体不是合法 JSON |
 | 403 | 2010 | 缺失 `turnstileToken`，或 Turnstile siteverify 判定 token 无效 |
+| 404 | 4001 | 路由未命中：`/api/` 下不存在的路径，或方法不匹配（如 `GET /api/risk`） |
 | 429 | 2020 | 触发 Rate Limiting 绑定的单 IP 限流 |
 | 500 | 5001 | proxycheck 不可用（网络失败、非 200、`status != "ok"`） |
 | 500 | 5002 | 无法确定来源 IP（`CF-Connecting-IP` 缺失） |
@@ -152,6 +155,7 @@ O4 IP 类型与风险。按需触发，串联 proxycheck v3 与 StopForumSpam �
 | 1001 | 400 | `parameter error` | 请求体解析失败 |
 | 2010 | 403 | `human verification failed` | Turnstile token 缺失或校验不通过 |
 | 2020 | 429 | `too many requests` | 单 IP 限流 |
+| 4001 | 404 | `resource not found` | `/api/` 下路由未命中或方法不匹配 |
 | 5001 | 500 | `upstream unavailable` | proxycheck 调用失败 |
 | 5002 | 500 | `client ip unavailable` | 拿不到来源 IP |
 

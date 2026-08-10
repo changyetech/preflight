@@ -1,7 +1,11 @@
 // POST /api/risk：O4 IP 类型与风险，契约见 docs/api.md 第 3 节。
 //
-// 处理顺序 Turnstile → 限流 → 配额 → 数据源，是按「成本从低到高」排的：
-// 前一道拦住的请求，绝不会消耗后一道的资源。
+// 处理顺序 限流 → Turnstile → 配额 → 数据源，是按「成本从低到高」排的：
+// 限流是绑定内的本地判定，Turnstile 是一次跨网络 siteverify 往返，配额是一次 DO 往返，
+// 数据源是两次跨网络调用。前一道拦住的请求，绝不会消耗后一道的资源。
+//
+// 限流必须排在 Turnstile 之前：否则任何未鉴权的调用者都能以 1:1 放大出无上限的
+// siteverify 出站请求——虽然烧不到 proxycheck 额度，仍是一个零成本可触发的出站放大面。
 
 import type { Env } from "./env";
 import { fetchProxycheck } from "./proxycheck";
@@ -28,6 +32,11 @@ export async function handleRisk(
     return fail(ERROR.PARAMETER, "body must be valid json");
   }
 
+  const { success } = await env.RISK_RATE_LIMITER.limit({ key: ip });
+  if (!success) {
+    return fail(ERROR.RATE_LIMITED, "too many risk lookups from this ip");
+  }
+
   const token = (body as { turnstileToken?: unknown } | null)?.turnstileToken;
   const verified = await verifyTurnstile(
     typeof token === "string" ? token : null,
@@ -36,11 +45,6 @@ export async function handleRisk(
   );
   if (!verified) {
     return fail(ERROR.HUMAN_VERIFICATION, "turnstile token missing or invalid");
-  }
-
-  const { success } = await env.RISK_RATE_LIMITER.limit({ key: ip });
-  if (!success) {
-    return fail(ERROR.RATE_LIMITED, "too many risk lookups from this ip");
   }
 
   // 配额耗尽是容量状态而非故障：返回 200 让前端优雅降级为「今日额度已用尽」，

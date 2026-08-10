@@ -9,6 +9,7 @@ export const ERROR = {
     message: "human verification failed",
   },
   RATE_LIMITED: { code: 2020, status: 429, message: "too many requests" },
+  NOT_FOUND: { code: 4001, status: 404, message: "resource not found" },
   UPSTREAM: { code: 5001, status: 500, message: "upstream unavailable" },
   CLIENT_IP: { code: 5002, status: 500, message: "client ip unavailable" },
 } as const;

@@ -9,7 +9,11 @@ import { DurableObject } from "cloudflare:workers";
 
 import type { Env } from "./env";
 
-/** proxycheck 注册免费版每日 1,000 次（ADR-0007）。 */
+/**
+ * proxycheck 注册免费版每日 1,000 次（ADR-0007）。
+ * 这个常量绑死在账户档位上：改 proxycheck 账户档位（免费 1,000 → 付费 10,000+）时必须同步改这里，
+ * 否则要么白白闲置已付费的额度，要么在本地放行后撞上上游的硬拒绝。
+ */
 export const DAILY_LIMIT = 1000;
 
 /** 单实例：全站共用一个计数器，名字固定。 */

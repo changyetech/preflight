@@ -78,7 +78,13 @@ export async function fetchProxycheck(
   }
 
   const detections = entry.detections ?? {};
-  const riskScore = detections.risk ?? 0;
+  const riskScore = detections.risk;
+  // 风险分缺失（上游改字段名、给 null 等）一律视为数据源不可用，走 5001。
+  // 绝不能默认成 0——那会把有风险的 IP 静默报成「低风险」，与 stopforumspam 那边
+  // 坚持的「查不到不能谎报安全」自相矛盾。
+  if (typeof riskScore !== "number") {
+    return null;
+  }
 
   return {
     networkType: entry.network?.type ?? null,

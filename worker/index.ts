@@ -3,6 +3,7 @@
 
 import type { Env } from "./env";
 import { handleGeo } from "./geo";
+import { ERROR, fail } from "./response";
 import { handleRisk } from "./risk";
 
 // Durable Object 类必须从入口再导出，Workers 运行时才能找到它。
@@ -20,8 +21,9 @@ export default {
       return handleRisk(request, env);
     }
 
+    // /api/* 下的一切都走统一信封，路由未命中也不例外（docs/api.md 3.3）。
     if (url.pathname.startsWith("/api/")) {
-      return new Response("Not Found", { status: 404 });
+      return fail(ERROR.NOT_FOUND, "no such endpoint");
     }
 
     return env.ASSETS.fetch(request);

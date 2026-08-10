@@ -140,6 +140,35 @@ describe("fetchProxycheck", () => {
     });
   });
 
+  it("风险分缺失或非数字时视为上游失败，绝不默认成 0", async () => {
+    // 默认成 0 会被 riskLevelOf 判成 low，等于把有风险的 IP 静默报成安全。
+    const detections = { proxy: true, vpn: false, tor: false, scraper: false };
+
+    stubFetch({ status: "ok", "1.2.3.4": { network: {}, detections } });
+    await expect(fetchProxycheck("1.2.3.4", "k")).resolves.toBeNull();
+
+    stubFetch({
+      status: "ok",
+      "1.2.3.4": { network: {}, detections: { ...detections, risk: null } },
+    });
+    await expect(fetchProxycheck("1.2.3.4", "k")).resolves.toBeNull();
+
+    stubFetch({
+      status: "ok",
+      "1.2.3.4": { network: {}, detections: { ...detections, risk: "100" } },
+    });
+    await expect(fetchProxycheck("1.2.3.4", "k")).resolves.toBeNull();
+  });
+
+  it("风险分为 0 是合法取值，不当作缺失", async () => {
+    stubFetch(fixtureWithRisk("1.2.3.4", 0));
+
+    await expect(fetchProxycheck("1.2.3.4", "k")).resolves.toMatchObject({
+      riskScore: 0,
+      riskLevel: "low",
+    });
+  });
+
   it("status 非 ok 时视为上游失败", async () => {
     stubFetch({ status: "denied", message: "Daily queries exhausted" });
 

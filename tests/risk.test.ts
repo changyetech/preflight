@@ -1,7 +1,7 @@
-// POST /api/risk 组装：Turnstile → 限流 → 配额 → 数据源 → 响应（docs/api.md 第 3 节）。
+// POST /api/risk 组装：限流 → Turnstile → 配额 → 数据源 → 响应（docs/api.md 第 3 节）。
 import { env, runInDurableObject } from "cloudflare:test";
 import { SELF } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DAILY_LIMIT, quotaStub, utcDay } from "../worker/quota";
 
@@ -71,6 +71,12 @@ async function seedQuota(day: string, used: number) {
     );
   });
 }
+
+// DO 的 SQL 存储在同一个测试文件里是跨用例延续的，配额计数必须逐例复位，
+// 否则「配额耗尽」那一例会把后面的用例全部污染成 quotaExhausted。
+beforeEach(async () => {
+  await seedQuota(utcDay(new Date()), 0);
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -245,16 +251,52 @@ describe("POST /api/risk 拒绝与降级", () => {
     ).toBe(false);
   });
 
-  it("GET /api/risk 返回 404（本接口只接受 POST）", async () => {
+  it("proxycheck 缺失风险分时按数据源不可用处理，返回 500 / 5001", async () => {
+    // 风险分缺失绝不能默认成 0——那会把有风险的 IP 静默报成「低风险」。
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("challenges.cloudflare.com")) {
+          return Response.json({ success: true });
+        }
+        if (url.includes("proxycheck.io")) {
+          return Response.json({
+            status: "ok",
+            "203.0.113.35": {
+              network: { type: "Residential" },
+              detections: {
+                proxy: false,
+                vpn: false,
+                tor: false,
+                scraper: false,
+              },
+            },
+          });
+        }
+        return Response.json({ success: 1, ip: { appears: 0 } });
+      }),
+    );
+
+    const response = await postRisk("203.0.113.35", { turnstileToken: "good" });
+    const body = (await response.json()) as { code: number };
+
+    expect(response.status).toBe(500);
+    expect(body.code).toBe(5001);
+  });
+
+  it("GET /api/risk 返回 404 / 4001，且走统一信封", async () => {
     const response = await SELF.fetch("https://example.com/api/risk");
+    const body = (await response.json()) as { code: number; message: string };
 
     expect(response.status).toBe(404);
+    expect(body.code).toBe(4001);
+    expect(body.message).toBe("resource not found");
   });
 });
 
 describe("POST /api/risk 限流", () => {
-  it("单 IP 连续超限后返回 429 / 2020", async () => {
-    stubUpstreams();
+  it("单 IP 连续超限后返回 429 / 2020，且被限流的请求不触达任何第三方", async () => {
+    const fetchMock = stubUpstreams();
 
     const statuses: number[] = [];
     for (let i = 0; i < 15; i++) {
@@ -266,10 +308,36 @@ describe("POST /api/risk 限流", () => {
     }
 
     expect(statuses).toContain(429);
-    // 限流必须发生在配额之前：被限流的请求不应烧掉 proxycheck 额度
-    const limitedAt = statuses.indexOf(429);
-    expect(statuses.slice(limitedAt).every((status) => status === 429)).toBe(
-      true,
+
+    const passed = statuses.filter((status) => status !== 429).length;
+    const calls = fetchMock.mock.calls.map(([url]) => url);
+    // 限流排在最前：放行几次，就只该有几次 siteverify 与几次 proxycheck 调用。
+    // 这同时钉住了「限流在 Turnstile 之前」与「限流在配额/数据源之前」两件事。
+    expect(
+      calls.filter((url) => url.includes("challenges.cloudflare.com")).length,
+    ).toBe(passed);
+    expect(calls.filter((url) => url.includes("proxycheck.io")).length).toBe(
+      passed,
     );
+  });
+
+  it("被限流时不发出 siteverify 请求（限流排在 Turnstile 之前）", async () => {
+    const fetchMock = stubUpstreams();
+
+    // 先把该 IP 刷到限流
+    for (let i = 0; i < 15; i++) {
+      const response = await postRisk("203.0.113.98", {
+        turnstileToken: "good",
+      });
+      await response.text();
+    }
+    fetchMock.mockClear();
+
+    const response = await postRisk("203.0.113.98", { turnstileToken: "good" });
+    const body = (await response.json()) as { code: number };
+
+    expect(response.status).toBe(429);
+    expect(body.code).toBe(2020);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
