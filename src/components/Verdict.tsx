@@ -37,7 +37,8 @@ function CoverageBar({ coverage }: { coverage: Coverage }) {
       <span className="chip chip-cli">
         {COPY.coverage.needCli} {coverage.needCli}
       </span>
-      <span className="chip chip-failed">
+      {/* 失败档恒久呈现（ADR-0004），但为 0 时不上警示色——0 个失败不该看起来像个警告。 */}
+      <span className={`chip ${coverage.failed > 0 ? "chip-failed" : ""}`}>
         {COPY.coverage.failed} {coverage.failed}
       </span>
       {/* 未触发的按需项既非已完成也非失败，单列一档，不与上面两档混计（ADR-0004）。 */}

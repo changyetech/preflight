@@ -55,9 +55,16 @@ export function O1Card({
           <Field
             label={copy.fields.location}
             value={
-              [state.data.city, state.data.region, state.data.country]
-                .filter(Boolean)
-                .join(" · ") || unknown
+              // 城市与地区常常同名（如 Osaka · Osaka），去重免得读起来像故障。
+              [
+                ...new Set(
+                  [
+                    state.data.city,
+                    state.data.region,
+                    state.data.country,
+                  ].filter(Boolean),
+                ),
+              ].join(" · ") || unknown
             }
           />
           <Field
