@@ -1,0 +1,182 @@
+# ipcheck Web 设计规格
+
+- 日期：2026-08-10
+- 状态：待评审
+- 术语：见 [CONTEXT.md](../../CONTEXT.md)
+- 相关决策：[ADR-0001](../adr/0001-web-as-cli-frontend-not-replacement.md) ~ [ADR-0008](../adr/0008-privacy-informed-consent-upfront.md)
+
+## 1. 目标与非目标
+
+### 目标
+
+面向 Claude Code / AI 工具用户的在线网络环境体检站，同时作为 `ai-ipcheck` CLI 的公开门面。用户打开 `ipcheck.omnikit.run` 即可看到出口 IP 归属、时区一致性与 IPv6 泄露判定和一句风险定论，并被明确告知哪些项必须装 CLI 才能测。
+
+### 非目标
+
+- 不复刻仅 CLI 项（ADR-0001）
+- 不做 DNS 泄露检测（Workers 拿不到 DNS 查询日志，见 ADR-0001）
+- 不做 Claude 端点检测（Web 无法读取本机 `ANTHROPIC_BASE_URL`）
+- 不存储任何检测结果、不做报告分享链接（ADR-0002 / ADR-0008）
+- 不做 WebRTC 泄露检测（现代浏览器 mDNS 混淆已使其大面积失效，会给出假信号）
+
+## 2. 检测项总表
+
+共 **9 项**，由 ipcheck CLI README 的 7 行功能表映射而来，其中两行按能力边界拆分。覆盖度的分母恒为 9。
+
+| ID | 检测项 | 归属 | 执行 | 数据来源 | 风险贡献 |
+|---|---|---|---|---|---|
+| O1 | 出口 IP 与归属（IP / 国家 / 地区 / 城市 / ASN / 组织 / IANA 时区） | 可在线 | 自动 | `request.cf` | 信息项，不判风险 |
+| O2 | 系统时区一致性（浏览器时区 vs 出口 IP 时区） | 可在线 | 自动 | `Intl.DateTimeFormat()` + `request.cf.timezone` | 中 |
+| O3 | IPv6 泄露 | 可在线 | 自动 | ipify 双端点（ADR-0003） | 中（ADR-0006） |
+| O4 | IP 类型与风险（网络类型 / 代理检出 / 风险分 / 滥用收录） | 可在线 | **按需** | proxycheck v3 + StopForumSpam（ADR-0007） | 高 / 中 |
+| C1 | 本机真实 IP（国内直连回显） | 仅 CLI | — | — | — |
+| C2 | 本地 DNS 服务器与 DNS 泄露 | 仅 CLI | — | — | — |
+| C3 | 代理检测（环境变量 / 系统代理 / TUN） | 仅 CLI | — | — | — |
+| C4 | CC CLI 时区一致性（认 `$TZ`） | 仅 CLI | — | — | — |
+| C5 | Claude 端点检测（官方直连 / 国产大模型 / 中转 + 黑名单） | 仅 CLI | — | — | — |
+
+### 2.1 O1 出口 IP 与归属
+
+全部字段取自 `request.cf`，官方文档确认 `country / region / city / postalCode / continent / latitude / longitude / timezone / asn / asOrganization / colo` **所有套餐可用**。零成本、零延迟、无配额。
+
+「真实 IP」一词禁用（见 CONTEXT.md）——Web 只能看到出口 IP，不得让用户以为我们扒到了代理背后的地址。
+
+### 2.2 O2 系统时区一致性
+
+比较 `Intl.DateTimeFormat().resolvedOptions().timeZone` 与 `request.cf.timezone`，均为 IANA 时区名。
+
+**必须在卡片内显式说明**：浏览器时区跟随**系统时区**，因此本项对应 Claude **桌面版**；Claude Code **CLI 认 `$TZ`**，网页测不到，属于 C4。缺了这句话，CLI 用户会误以为自己的 `$TZ` 已被检查——而 CLI 的综合结论恰恰以 CC CLI 那条为准。
+
+### 2.3 O3 IPv6 泄露
+
+浏览器并发 fetch：
+
+- `https://api.ipify.org?format=json`（仅 IPv4，作对照）
+- `https://api6.ipify.org?format=json`（仅 IPv6）
+
+判定表：
+
+| v4 端点 | v6 端点 | 判定 | 状态 |
+|---|---|---|---|
+| 通 | 通 | **IPv6 泄露**，展示 IPv6 地址并与出口 IPv4 归属地比对 | 已完成（中风险） |
+| 通 | 不通 | IPv6 未启用 | 已完成（无风险） |
+| 不通 | 不通 | 第三方故障 | **检测失败** |
+| 不通 | 通 | 异常，按第三方故障处理 | 检测失败 |
+
+对照实验是必需的：浏览器把 CORS 失败与网络失败抛成同一个不透明 `TypeError`，没有 v4 对照就无法区分「用户没有 IPv6」与「ipify 挂了」（ADR-0003）。
+
+### 2.4 O4 IP 类型与风险（按需）
+
+单次 proxycheck v3 调用取得 `network.type`（Residential / Business / Wireless / Hosting / null）、Proxy/VPN/TOR/Scraper 布尔量、风险分；另调 StopForumSpam 取滥用收录。
+
+按钮文案必须包含「将把你的出口 IP 发送至 proxycheck.io 查询」（ADR-0008）。
+
+## 3. 风险判定
+
+### 3.1 综合结论三档
+
+沿用 CLI 的三档语义，输入信号按 Web 能力重述：
+
+- **高（红）**：proxycheck 风险分 ≥ 70
+- **中（黄）**：以下任一命中——系统时区与出口 IP 时区不一致 ／ 检出 IPv6 泄露 ／ StopForumSpam 有滥用收录
+- **低（绿）**：以上皆不命中
+
+与 CLI 的差异及理由：CLI 的「黑名单命中→高」随 C5 一并不适用；「TUN 未开→中」属 C3 不适用；IPv6 泄露由 CLI 的「仅进建议」升格为中（ADR-0006）。
+
+### 3.2 分项颜色（不等于综合结论）
+
+沿用 CLI：风险分 < 30 绿 / < 70 黄 / ≥ 70 红。网络类型为 Hosting、以及 proxycheck 检出代理，均为**黄色分项提醒，不拉高综合结论**——与 CLI 一致。
+
+### 3.3 两段式（ADR-0005）
+
+- **初步结论**：O1–O3 完成后立即给出，取值域仅「低 / 中」，必须带标注「初步 · 未含 IP 风险评分」
+- **完整结论**：O4 完成后重算，是唯一可能取「高」的形态
+
+### 3.4 覆盖度三分（ADR-0004）
+
+结论旁恒久呈现 `已完成 X · 需 CLI Y · 检测失败 Z`，`X + Y + Z = 9`。
+
+典型态：首屏 `已完成 3 · 需 CLI 5 · 检测失败 1`（若 O3 失败）；点击 O4 后 `已完成 4 · 需 CLI 5`。
+
+「检测失败」必须与「需 CLI」分开呈现：前者刷新可能就好了，是用户唯一能自己解决的状态；后者是永久的（ADR-0004 的 A 方案）。
+
+## 4. 页面结构
+
+单页，自上而下：
+
+1. **首屏结论区** — 出口 IP（大号）+ 城市/国家 + 一句话风险定论 + 覆盖度三分
+2. **检测项卡片流** — 9 张卡片按 O1, O2, O3, O4, C1…C5 顺序排列；仅 CLI 项为灰卡，穿插在其语义位置而非堆到末尾，每张灰卡带一键复制 `pip install ai-ipcheck`
+3. **落地内容** — 「为什么需要」/「安装 CLI」/「Web 与 CLI 完整功能对照表」
+4. **页脚** — 「本站不存储任何检测结果」
+
+### 4.1 卡片五态
+
+`未开始` / `检测中` / `已完成` / `检测失败` / `需 CLI`。「需 CLI」是终态，不提供重试；「检测失败」提供重试。
+
+### 4.2 视觉方向
+
+信息架构取 whoer.net（首屏给定论），视觉质感取 ipinfo.io（克制的浅色 SaaS 风、充足留白），每卡配「这意味着什么」的解释文案取 ipleak.net。
+
+明确拒绝：whoer.net 的深色广告风（毁可信度，而可信度是本产品唯一资产）、whatismyipaddress.com 的广告驱动布局、browserleaks.com 的无解释高密度表格（目标用户看不懂）。
+
+不复刻 CLI 的终端表格。
+
+## 5. 架构
+
+- **托管**：单个 Worker + Static Assets，域名 `ipcheck.omnikit.run`（一级子域，Universal SSL 覆盖）
+- **前端**：React + Vite
+- **存储**：无 KV、无 D1（ADR-0002）
+- **配额守卫**：单实例 Durable Object（SQLite 后端），记 proxycheck 日调用数
+- **限流**：Workers Rate Limiting 绑定，作用于 `/api/risk`
+- **人机验证**：Turnstile，仅作用于 `/api/risk`
+- **密钥**：proxycheck API key 存 Worker Secret
+
+### 5.1 接口
+
+| 接口 | 说明 |
+|---|---|
+| `GET /api/geo` | 由 `request.cf` 派生 O1 数据 |
+| `POST /api/risk` | 校验 Turnstile token → 过限流 → 过 DO 配额 → 调 proxycheck v3 + StopForumSpam |
+
+**`/api/risk` 不得接受客户端传入的 IP**，必须使用该请求自身的来源 IP。否则本站会退化成一个任意 IP 查询代理，你的 proxycheck 配额会被第三方白嫖。
+
+### 5.2 地理数据来源的可替换性
+
+地理数据抽成可替换来源：生产读 `request.cf`，测试注入固定值。这既是 TDD 的前置条件，也让「本地 dev 是否拿得到真值」这一未决事实不阻塞开发。
+
+### 5.3 降级
+
+- proxycheck 配额耗尽 → O4 显示「今日额度已用尽」，计入「检测失败」，初步结论保持有效
+- ipify 不可用 → O3 计入「检测失败」；可降级为零依赖启发式（观察浏览器连本站用的是 v4 还是 v6），该降级为可选、非 v1 必须
+
+## 6. 隐私（ADR-0008）
+
+- O4 按钮上标注第三方调用对象
+- 页脚声明零留存
+- 关闭 Workers 请求日志中的客户端 IP 记录
+- 新增任何第三方调用，必须在触发它的控件上同步标注
+
+## 7. 国际化
+
+中文为默认，英文置于 `/en` 显式路径，右上角手动切换。**不做 `Accept-Language` 自动跳转**——本站用户大量在用代理，按地区/语言自动跳转正是他们最反感的行为，且会让「我看到的是哪个版本」变得不可预测。
+
+## 8. 验收标准
+
+1. 首屏在无任何用户交互下呈现 O1–O3 结果、初步结论与覆盖度三分
+2. O2 卡片文案明确区分 Claude 桌面版与 Claude Code CLI 的时区来源
+3. O3 在无 IPv6 环境判为「IPv6 未启用」而非「检测失败」；在 ipify 不可达时判为「检测失败」而非「IPv6 未启用」
+4. 未点击 O4 时综合结论永不显示「高」，且始终带「初步」标注
+5. 点击 O4 后覆盖度由 `已完成 3` 变为 `已完成 4`，结论重算
+6. `/api/risk` 忽略请求体中的任何 IP 参数，只用来源 IP
+7. 缺失 / 无效 Turnstile token 时 `/api/risk` 拒绝服务
+8. DO 配额耗尽时 O4 优雅降级，不影响 O1–O3 与初步结论
+9. 全站无任何持久化写入用户数据的代码路径
+10. 移动端视口下首屏结论区与覆盖度完整可见
+
+## 9. 上线前必须验证的未决事实
+
+| # | 未决事实 | 风险 |
+|---|---|---|
+| 1 | `api6.ipify.org` 在**具备 IPv6** 的环境下的 CORS 响应头 | 若 CORS 不通，会把有 IPv6 的用户误判为无 IPv6，即把有风险的人判成安全 |
+| 2 | `wrangler dev` 本地模式下 `request.cf` 地理字段是真值还是占位值 | 影响开发体验，不影响设计（见 5.2） |
+| 3 | Cloudflare Workers Observability 默认是否记录客户端 IP，以及关闭方式 | 直接关系 ADR-0008 的承诺能否兑现，**阻塞上线** |

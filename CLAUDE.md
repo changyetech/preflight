@@ -126,7 +126,10 @@ A static map of the repo. Contract and convention documents live directly under 
 ipcheck/
 ├── CLAUDE.md          # This file - project rules, conventions, and module guide
 ├── AGENTS.md          # → @CLAUDE.md
+├── CONTEXT.md         # Ubiquitous language glossary (domain terms only, no implementation)
+├── refs/ipcheck/      # Reference: the published ipcheck CLI repo (read-only source material)
 └── docs/
+    ├── adr/           # Architecture Decision Records (0001-*.md, sequentially numbered)
     ├── specs/         # Feature / design specifications (the "what")
     ├── plans/         # Implementation plans (the "how")
     └── ...            # API specs, error codes, convention docs (contracts live directly here)
