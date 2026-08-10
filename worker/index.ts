@@ -4,6 +4,9 @@
 import type { Env } from "./env";
 import { handleGeo } from "./geo";
 
+// Durable Object 类必须从入口再导出，Workers 运行时才能找到它。
+export { QuotaCounter } from "./quota";
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
