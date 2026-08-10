@@ -26,6 +26,7 @@ export type Verdict =
   | { stage: "full"; level: "low" | "medium" | "high" };
 
 /** 风险分分级阈值（规格 3.2）：< 30 低 / < 70 中 / ≥ 70 高。 */
+export const MEDIUM_RISK_SCORE = 30;
 export const HIGH_RISK_SCORE = 70;
 
 export function computeVerdict(input: VerdictInput): Verdict {

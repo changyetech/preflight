@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 
 import { COPY } from "../copy";
+import { CLI_CHECK } from "../domain/checks";
 
 export type CardTone = "neutral" | "ok" | "warn" | "danger" | "muted";
 
@@ -85,7 +86,7 @@ export function CliCard({
     <CheckCard
       id={id}
       title={title}
-      status="needCli"
+      status={CLI_CHECK.status}
       tone="muted"
       meaning={meaning}
     >

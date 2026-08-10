@@ -15,7 +15,7 @@ import type {
   RiskData,
   TimezoneResult,
 } from "../domain/types";
-import { HIGH_RISK_SCORE } from "../domain/verdict";
+import { HIGH_RISK_SCORE, MEDIUM_RISK_SCORE } from "../domain/verdict";
 import { requestTurnstileToken, turnstileConfigured } from "../turnstile";
 
 function Field({ label, value }: { label: string; value: string }) {
@@ -224,7 +224,7 @@ export function O4Card({
   const tone: CardTone = ok
     ? ok.riskScore >= HIGH_RISK_SCORE
       ? "danger"
-      : ok.riskScore >= 30 || ok.networkType === "Hosting"
+      : ok.riskScore >= MEDIUM_RISK_SCORE || ok.networkType === "Hosting"
         ? "warn"
         : "ok"
     : "neutral";

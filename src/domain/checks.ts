@@ -12,10 +12,6 @@ export const ONLINE_CHECK_IDS = ["O1", "O2", "O3", "O4"] as const;
 /** 仅 CLI 项。 */
 export const CLI_CHECK_IDS = ["C1", "C2", "C3", "C4", "C5"] as const;
 
-export type OnlineCheckId = (typeof ONLINE_CHECK_IDS)[number];
-export type CliCheckId = (typeof CLI_CHECK_IDS)[number];
-export type CheckId = OnlineCheckId | CliCheckId;
-
 /** 覆盖度的分母恒为 9（规格第 2 节）。 */
 export const TOTAL_CHECKS = ONLINE_CHECK_IDS.length + CLI_CHECK_IDS.length;
 

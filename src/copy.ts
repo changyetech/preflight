@@ -161,7 +161,6 @@ export const COPY = {
   },
 
   cli: {
-    badge: "需 CLI",
     /** 灰卡是终态，不提供重试（规格 4.1）。 */
     hint: "本项需要读取本机环境，装 CLI 后可测：",
   },
