@@ -31,15 +31,15 @@ help: ## Show this help
 
 .PHONY: build
 build: ## Build for production
-	@echo "TODO: define build command"
+	pnpm build
 
 # ==============================================================================
 # DEV
 # ==============================================================================
 
 .PHONY: dev
-dev: ## Start dev server
-	@echo "TODO: define dev command"
+dev: ## Start dev server (wrangler dev, 单 Worker + Static Assets)
+	pnpm wrangler dev
 
 # ==============================================================================
 # DEPENDENCY MANAGEMENT
@@ -47,7 +47,7 @@ dev: ## Start dev server
 
 .PHONY: install
 install: ## Install dependencies
-	@echo "TODO: define install command"
+	pnpm install
 
 # ==============================================================================
 # TESTING
@@ -55,7 +55,7 @@ install: ## Install dependencies
 
 .PHONY: test
 test: ## Run tests
-	@echo "TODO: define test command"
+	pnpm vitest run
 
 # ==============================================================================
 # CODE QUALITY
@@ -63,14 +63,14 @@ test: ## Run tests
 
 .PHONY: lint
 lint: ## Run linter
-	@echo "TODO: define lint command"
+	pnpm lint
 
 .PHONY: fmt
 fmt: ## Format code
-	@echo "TODO: define fmt command"
+	pnpm exec prettier --write "src/**/*.{ts,tsx,css}" "worker/**/*.ts" "tests/**/*.ts" "*.{ts,json}"
 
 .PHONY: check
-check: fmt lint test ## Run all quality checks (fmt + lint + test)
+check: fmt lint test build ## Run all quality checks (fmt + lint + test + build)
 
 # ==============================================================================
 # HOUSEKEEPING
@@ -78,4 +78,4 @@ check: fmt lint test ## Run all quality checks (fmt + lint + test)
 
 .PHONY: clean
 clean: ## Remove build artifacts and generated files
-	@echo "TODO: define clean command"
+	rm -rf dist node_modules/.tmp .wrangler

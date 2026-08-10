@@ -24,9 +24,10 @@ Thumbs.db
 /build/
 /output/
 /bin/
+/.wrangler/
 
 # Dependencies (add framework-specific entries as needed)
-# /node_modules/
+/node_modules/
 # /vendor/
 
 # Coverage

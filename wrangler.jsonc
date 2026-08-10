@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ipcheck",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-08",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // 单 Worker + Static Assets：dist/ 由 Vite 构建产出，/api/* 由 worker/index.ts 处理，
+  // 其余路径交给静态资源（见 docs/specs/2026-08-10-ipcheck-web.md 第 5 节）。
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+  },
+
+  // 域名绑定：待人工执行（无 Cloudflare 账号凭据，未实际部署）。
+  // 人工需要执行：
+  //   1. 在 Cloudflare Dashboard 确认 ipcheck.omnikit.run 所在 zone 已托管、Universal SSL 已覆盖该一级子域
+  //   2. 取消下面 routes 字段的注释，替换为实际 zone_name，然后执行 `pnpm wrangler deploy`
+  //   3. 执行 `curl -sI https://ipcheck.omnikit.run` 确认返回 200 且证书有效
+  // "routes": [
+  //   { "pattern": "ipcheck.omnikit.run", "custom_domain": true }
+  // ],
+
+  // Observability（未决事实 #3，见计划「验证记录」小节）：
+  // 官方文档未给出 Workers Logs 是否默认记录客户端 IP 的明确结论，也未找到按字段排除 IP 的配置项。
+  // 在结论确认前，保守起见先关闭 observability，避免违反 ADR-0008 的零留存承诺。
+  // 待人工核实后（见验证记录），如确认可安全开启并排除 IP 字段，再打开并调整此处配置。
+  "observability": {
+    "enabled": false,
+  },
+}
