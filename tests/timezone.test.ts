@@ -32,6 +32,8 @@ describe("compareTimezone", () => {
   });
 
   it("比对不区分大小写与首尾空白：IANA 名同义写法不算不一致", () => {
-    expect(compareTimezone(" Asia/Shanghai ", "asia/shanghai").match).toBe(true);
+    expect(compareTimezone(" Asia/Shanghai ", "asia/shanghai").match).toBe(
+      true,
+    );
   });
 });

@@ -45,12 +45,28 @@ const FIRST_SCREEN: PanelState = {
 describe("computeCoverage", () => {
   it("四档之和恒为 9，需 CLI 恒为 5", () => {
     const panels: PanelState[] = [
-      { o1: { status: "running" }, o2: { status: "running" }, o3: { status: "running" }, o4: { status: "idle" } },
+      {
+        o1: { status: "running" },
+        o2: { status: "running" },
+        o3: { status: "running" },
+        o4: { status: "idle" },
+      },
       FIRST_SCREEN,
-      { ...FIRST_SCREEN, o3: { status: "failed", reason: "ipify unreachable" } },
+      {
+        ...FIRST_SCREEN,
+        o3: { status: "failed", reason: "ipify unreachable" },
+      },
       { ...FIRST_SCREEN, o4: { status: "running" } },
-      { ...FIRST_SCREEN, o4: { status: "failed", reason: "upstream unavailable" } },
-      { o1: { status: "failed", reason: "x" }, o2: { status: "failed", reason: "x" }, o3: { status: "failed", reason: "x" }, o4: { status: "failed", reason: "x" } },
+      {
+        ...FIRST_SCREEN,
+        o4: { status: "failed", reason: "upstream unavailable" },
+      },
+      {
+        o1: { status: "failed", reason: "x" },
+        o2: { status: "failed", reason: "x" },
+        o3: { status: "failed", reason: "x" },
+        o4: { status: "failed", reason: "x" },
+      },
     ];
 
     for (const panel of panels) {

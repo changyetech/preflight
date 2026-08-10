@@ -1,121 +1,74 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "./assets/vite.svg";
-import heroImg from "./assets/hero.png";
+// 单页：首屏结论区 + 9 张检测卡（规格第 4 节）。
+// 落地内容与 i18n 不在本任务范围内（归 --content 子计划）。
+
 import "./App.css";
 
+import { CliCard } from "./components/Card";
+import { O1Card, O2Card, O3Card, O4Card } from "./components/cards";
+import { VerdictPanel } from "./components/Verdict";
+import { COPY } from "./copy";
+import { usePanel } from "./usePanel";
+
 function App() {
-  const [count, setCount] = useState(0);
+  const { panel, coverage, verdict, runGeo, runIpv6, runRisk, failRisk } =
+    usePanel();
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
+    <div className="page">
+      <header className="site-header">
+        <h1>{COPY.site.title}</h1>
+        <p>{COPY.site.tagline}</p>
+      </header>
+
+      <VerdictPanel geo={panel.o1} verdict={verdict} coverage={coverage} />
+
+      {/* 灰卡穿插在语义相邻的可在线项旁边，而不是堆到末尾：
+          用户看完「网页测到了什么」，紧接着就该看到「同一件事 CLI 还能多测什么」。 */}
+      <section className="cards">
+        <O1Card state={panel.o1} onRetry={() => void runGeo()} />
+        <CliCard
+          id="C1"
+          title={COPY.checks.C1.title}
+          meaning={COPY.checks.C1.meaning}
+        />
+
+        <O2Card state={panel.o2} onRetry={() => void runGeo()} />
+        <CliCard
+          id="C4"
+          title={COPY.checks.C4.title}
+          meaning={COPY.checks.C4.meaning}
+        />
+
+        <O3Card state={panel.o3} onRetry={() => void runIpv6()} />
+        <CliCard
+          id="C2"
+          title={COPY.checks.C2.title}
+          meaning={COPY.checks.C2.meaning}
+        />
+
+        <CliCard
+          id="C3"
+          title={COPY.checks.C3.title}
+          meaning={COPY.checks.C3.meaning}
+        />
+
+        <O4Card
+          state={panel.o4}
+          onRun={(token) => void runRisk(token)}
+          onFail={failRisk}
+        />
+        <CliCard
+          id="C5"
+          title={COPY.checks.C5.title}
+          meaning={COPY.checks.C5.meaning}
+        />
       </section>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      <footer className="site-footer">
+        <p>{COPY.footer.privacy}</p>
+        <p>{COPY.footer.thirdParty}</p>
+      </footer>
+    </div>
   );
 }
 

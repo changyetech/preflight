@@ -28,13 +28,19 @@ describe("computeVerdict", () => {
 
   it("风险分 ≥ 70 → 高", () => {
     expect(
-      computeVerdict({ ...WITH_RISK, risk: { riskScore: 70, abuseListed: false } }),
+      computeVerdict({
+        ...WITH_RISK,
+        risk: { riskScore: 70, abuseListed: false },
+      }),
     ).toEqual({ stage: "full", level: "high" });
   });
 
   it("风险分 69 未达阈值，不判高", () => {
     expect(
-      computeVerdict({ ...WITH_RISK, risk: { riskScore: 69, abuseListed: false } }),
+      computeVerdict({
+        ...WITH_RISK,
+        risk: { riskScore: 69, abuseListed: false },
+      }),
     ).toEqual({ stage: "full", level: "low" });
   });
 
@@ -54,13 +60,19 @@ describe("computeVerdict", () => {
 
   it("StopForumSpam 有滥用收录 → 中", () => {
     expect(
-      computeVerdict({ ...WITH_RISK, risk: { riskScore: 0, abuseListed: true } }),
+      computeVerdict({
+        ...WITH_RISK,
+        risk: { riskScore: 0, abuseListed: true },
+      }),
     ).toEqual({ stage: "full", level: "medium" });
   });
 
   it("滥用收录未知（第三方不可用）不贡献风险", () => {
     expect(
-      computeVerdict({ ...WITH_RISK, risk: { riskScore: 0, abuseListed: null } }),
+      computeVerdict({
+        ...WITH_RISK,
+        risk: { riskScore: 0, abuseListed: null },
+      }),
     ).toEqual({ stage: "full", level: "low" });
   });
 
@@ -106,7 +118,14 @@ describe("verdictInputFrom", () => {
   it("O4 未触发时 risk 为 null，结论停在初步", () => {
     const input = verdictInputFrom({
       o1: { status: "running" },
-      o2: { status: "done", data: { browserTimezone: "Asia/Shanghai", exitTimezone: "Asia/Shanghai", match: true } },
+      o2: {
+        status: "done",
+        data: {
+          browserTimezone: "Asia/Shanghai",
+          exitTimezone: "Asia/Shanghai",
+          match: true,
+        },
+      },
       o3: { status: "done", data: { leak: false, ipv6: null } },
       o4: { status: "idle" },
     });
@@ -148,7 +167,14 @@ describe("verdictInputFrom", () => {
   it("O4 完成后取出风险分与滥用收录", () => {
     const input = verdictInputFrom({
       o1: { status: "running" },
-      o2: { status: "done", data: { browserTimezone: "Asia/Shanghai", exitTimezone: "America/New_York", match: false } },
+      o2: {
+        status: "done",
+        data: {
+          browserTimezone: "Asia/Shanghai",
+          exitTimezone: "America/New_York",
+          match: false,
+        },
+      },
       o3: { status: "done", data: { leak: true, ipv6: "2001:db8::1" } },
       o4: {
         status: "done",
@@ -177,7 +203,14 @@ describe("verdictInputFrom", () => {
   it("时区无法比对（边缘未给出时区）不算不一致", () => {
     const input = verdictInputFrom({
       o1: { status: "running" },
-      o2: { status: "done", data: { browserTimezone: "Asia/Shanghai", exitTimezone: null, match: null } },
+      o2: {
+        status: "done",
+        data: {
+          browserTimezone: "Asia/Shanghai",
+          exitTimezone: null,
+          match: null,
+        },
+      },
       o3: { status: "running" },
       o4: { status: "idle" },
     });

@@ -29,8 +29,7 @@ export type TimezoneResult = {
 
 /** O3 IPv6 泄露（规格 2.3）。判定表只有「泄露」与「未启用」两个成功态，第三方故障不在此处。 */
 export type Ipv6Result =
-  | { leak: true; ipv6: string }
-  | { leak: false; ipv6: null };
+  { leak: true; ipv6: string } | { leak: false; ipv6: null };
 
 /** O4 IP 类型与风险，见 docs/api.md 第 3 节。 */
 export type RiskData =
