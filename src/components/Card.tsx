@@ -2,14 +2,16 @@
 
 import { useState, type ReactNode } from "react";
 
-import { COPY } from "../copy";
+import type { Copy } from "../copy";
 import { CLI_CHECK } from "../domain/checks";
+import { useCopy } from "../i18n";
 
 export type CardTone = "neutral" | "ok" | "warn" | "danger" | "muted";
 
-type CardStatus = keyof typeof COPY.cardStatus;
+type CardStatus = keyof Copy["cardStatus"];
 
 export function CopyButton({ text }: { text: string }) {
+  const COPY = useCopy();
   const [copied, setCopied] = useState(false);
 
   return (
@@ -35,7 +37,7 @@ export function CheckCard({
   tone = "neutral",
   meaning,
   onRetry,
-  retryLabel = COPY.actions.retry,
+  retryLabel,
   children,
 }: {
   id: string;
@@ -52,6 +54,9 @@ export function CheckCard({
   retryLabel?: string;
   children?: ReactNode;
 }) {
+  const COPY = useCopy();
+  const label = retryLabel ?? COPY.actions.retry;
+
   return (
     <article className={`card tone-${tone}`}>
       <header>
@@ -71,7 +76,7 @@ export function CheckCard({
 
       {onRetry ? (
         <button type="button" className="retry" onClick={onRetry}>
-          {retryLabel}
+          {label}
         </button>
       ) : null}
     </article>
@@ -88,6 +93,8 @@ export function CliCard({
   title: string;
   meaning: string;
 }) {
+  const COPY = useCopy();
+
   return (
     <CheckCard
       id={id}

@@ -25,6 +25,16 @@
   font-size: 0.85rem;
 }
 
+.lang-switch {
+  float: right;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: var(--text-h);
+  text-decoration: none;
+}
+
 /* ---------- 首屏结论区 ---------- */
 
 .verdict {
@@ -317,6 +327,55 @@ button {
 
 .turnstile:not(:empty) {
   margin-top: 0.6rem;
+}
+
+/* ---------- 落地内容 ---------- */
+
+.landing {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 2rem;
+}
+
+.landing-section h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.landing-section p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.compare-table-wrap {
+  margin-top: 0.6rem;
+  overflow-x: auto;
+}
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.compare-table th,
+.compare-table td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.compare-table th {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.compare-table td:nth-child(2) {
+  white-space: normal;
 }
 
 /* ---------- 页脚 ---------- */

@@ -1,10 +1,18 @@
-// 全站文案集中在此，不散落到 JSX 里——第 4 个任务要把它整体抽成翻译资源（规格第 7 节）。
+// 全站文案集中在此，不散落到 JSX 里（规格第 7 节）。
 // 纯字符串模块，不引任何 DOM 依赖，因此可被单测直接断言（部分文案是 ADR 的硬性要求，不得被改版误删）。
+//
+// 中英双语：ZH 是既有文案（默认版本），EN 是逐字段翻译，`typeof ZH` 约束 EN 结构必须完全对齐——
+// 漏翻一个字段会直接报编译错误，而不是运行时才发现某处英文页面掉回中文。
 
-export const COPY = {
+const ZH = {
   site: {
     title: "ipcheck · 网络环境体检",
     tagline: "开跑 Claude 之前，先看清自己的网络长什么样",
+  },
+
+  nav: {
+    /** 右上角语言切换（规格第 7 节）：链接文案是目标语言的自称，不是当前语言。 */
+    switchTo: "English",
   },
 
   verdict: {
@@ -169,6 +177,29 @@ export const COPY = {
     hint: "本项需要读取本机环境，装 CLI 后可测：",
   },
 
+  /** 落地内容三段（规格第 4 节第 3 项 / --content 计划步骤 1-3）。 */
+  landing: {
+    why: {
+      title: "为什么需要体检",
+      body: "AI 工具对访问环境很敏感，最容易踩雷的集中在四类：出口 IP 类型与历史滥用记录过高触发风控、系统与出口 IP 时区不一致露出破绽、IPv6 悄悄绕过代理暴露真实位置、本地 DNS 把你访问过的域名暴露给本地运营商。本站可在线检测前三类；DNS 泄露需要读取本机 DNS 查询日志，网页结构性拿不到，属于仅 CLI 项。",
+    },
+    install: {
+      title: "安装 CLI 补全全部 9 项",
+      body: "网页版是快速摸底，能测 4 项；CLI 覆盖全部 9 项，包括本机真实 IP、DNS 泄露、代理与 TUN 检测、Claude Code 时区一致性与端点检测。",
+    },
+    compare: {
+      title: "Web 与 CLI 完整功能对照表",
+      columnId: "编号",
+      columnItem: "检测项",
+      columnWeb: "网页",
+      columnCli: "CLI",
+      auto: "自动",
+      onDemand: "按需",
+      cliOnly: "仅 CLI",
+      dash: "—",
+    },
+  },
+
   footer: {
     privacy: "本站不存储任何检测结果。",
     thirdParty:
@@ -187,3 +218,238 @@ export const COPY = {
     unknown: "检测失败，请稍后重试。",
   },
 } as const;
+
+/**
+ * 把 ZH 的字面量类型（`"出口 IP"` 这种具体字符串）拓宽成 `string`。
+ * EN 按 `Copy`（而非 `typeof ZH`）类型检查，这样英文译文不必凑巧等于某个中文字面量，
+ * 同时保留结构约束：EN 漏翻、多翻一个字段照样是编译错误。
+ */
+type Widen<T> = T extends string
+  ? string
+  : T extends readonly (infer U)[]
+    ? readonly Widen<U>[]
+    : { [K in keyof T]: Widen<T[K]> };
+
+export type Copy = Widen<typeof ZH>;
+export type Lang = "zh" | "en";
+
+/** 英文版。术语对齐 CLI `README_EN.md`：Exit IP / Overall Verdict / Coverage（--content 计划步骤 7）。 */
+const EN: Copy = {
+  site: {
+    title: "ipcheck · Network Environment Checkup",
+    tagline: "Know your network before you launch Claude",
+  },
+
+  nav: {
+    switchTo: "中文",
+  },
+
+  verdict: {
+    level: {
+      low: "Low risk",
+      medium: "Medium risk",
+      high: "High risk",
+    },
+    insufficientLabel: "No verdict yet",
+    preliminaryBadge: "Preliminary · IP risk score not included",
+    fullBadge: "Full · IP risk score included",
+    summary: {
+      insufficient:
+        'Automated checks haven\'t finished, or all of them failed — no verdict yet. Please wait, or retry any item marked "Check failed" below.',
+      preliminaryLow:
+        "No anomalies found by the automated checks. IP risk score isn't included yet, so this verdict is preliminary.",
+      preliminaryMedium:
+        "The automated checks found suspicious signals — review the items marked yellow below first.",
+      fullLow: "No anomalies found in any check.",
+      fullMedium:
+        "Suspicious signals found — review the items marked yellow below.",
+      fullHigh:
+        "Your exit IP is high risk. AI tools are quite likely to trigger anti-abuse controls right now.",
+    },
+    exitIpLabel: "Exit IP",
+    exitIpUnknown: "Unavailable",
+    exitIpNote:
+      "This is the public address your traffic leaves the proxy with, not the machine address behind the proxy.",
+  },
+
+  coverage: {
+    done: "Done",
+    needCli: "Needs CLI",
+    failed: "Check failed",
+    pending: "Not run yet",
+    total: "9 items total",
+    hint: "The verdict only covers completed items. Items that need the CLI are structurally out of reach for a webpage — install the CLI to test them.",
+  },
+
+  cardStatus: {
+    idle: "Not started",
+    running: "Checking",
+    done: "Done",
+    failed: "Check failed",
+    needCli: "Needs CLI",
+  },
+
+  actions: {
+    retry: "Retry",
+    copy: "Copy",
+    copied: "Copied",
+    installCommand: "pip install ai-ipcheck",
+    meaningLabel: "What this means",
+  },
+
+  checks: {
+    O1: {
+      title: "Exit IP Info",
+      meaning:
+        "This is what every website — including Claude — sees as you. The further this location is from where you actually are, the more likely your traffic gets flagged as anomalous.",
+      fields: {
+        location: "Location",
+        asn: "ISP / ASN",
+        timezone: "IP timezone",
+        colo: "Edge colo",
+      },
+      unknown: "Unknown",
+    },
+    O2: {
+      title: "System Timezone Consistency",
+      match: "System timezone matches the exit IP timezone.",
+      mismatch: "System timezone does not match the exit IP timezone.",
+      unknown:
+        "The edge didn't return a timezone for the exit IP — can't compare.",
+      meaning:
+        "A timezone mismatch is one of the most common proxy tells: the IP says United States, but the system clock says Beijing time — anti-abuse controls catch that instantly.",
+      scopeNote:
+        "This item reads the browser timezone, which follows the system timezone — so it corresponds to the Claude desktop app. Claude Code CLI honors the $TZ environment variable, which a webpage cannot read — that's C4, and it needs the CLI installed to test.",
+      browserLabel: "System (browser) timezone",
+      exitLabel: "Exit IP timezone",
+    },
+    O3: {
+      title: "IPv6 Leak",
+      leak: "IPv6 exit detected — your IPv6 traffic is bypassing the proxy and connecting directly.",
+      disabled: "No IPv6 exit detected — no IPv6 leak.",
+      meaning:
+        "Most proxies only handle IPv4. If your machine has IPv6, some traffic slips past the proxy and goes out directly, exposing an address from a different location — you think you're on a US IP, but the other side also sees your home broadband's IPv6.",
+      ipv6Label: "IPv6 exit address",
+      failed:
+        "The IPv6 comparison probe didn't complete — this item can't be determined. This does not mean you have no IPv6 — retry once your network is back.",
+    },
+    O4: {
+      title: "IP Type & Risk",
+      idle: "On-demand check — you need to trigger it manually.",
+      consentButton: "Check IP risk (sends your exit IP to proxycheck.io)",
+      consentNote:
+        "This also queries StopForumSpam for abuse records on that IP. This site stores none of the query results.",
+      meaning:
+        "Datacenter IPs, public proxies, and heavily abused IPs are the most direct trigger for anti-abuse controls. The higher the risk score, the more likely you are to get blocked at login or on requests.",
+      fields: {
+        networkType: "Network type",
+        riskScore: "Risk score",
+        detections: "Proxy detections",
+        abuse: "Abuse records",
+      },
+      networkType: {
+        Residential: "Residential",
+        Business: "Business",
+        Wireless: "Wireless",
+        Hosting: "Datacenter / Hosting",
+        unknown: "Unknown",
+      },
+      detectionLabels: {
+        proxy: "Proxy",
+        vpn: "VPN",
+        tor: "Tor",
+        scraper: "Scraper",
+      },
+      noDetection: "None detected",
+      hostingNote:
+        "A datacenter IP is a per-item flag — it doesn't raise the overall verdict by itself, but it does draw more attention from anti-abuse controls.",
+      abuse: {
+        listed: "Listed",
+        clean: "Clean",
+        unknown: "Unknown (data source unavailable)",
+      },
+      quotaExhausted:
+        'Today\'s quota is exhausted. This item counts as "Check failed" toward coverage and resets after UTC midnight; other items and the preliminary verdict are unaffected.',
+      turnstileMissing:
+        "The human-verification widget isn't configured — this item is unavailable for now.",
+    },
+    C1: {
+      title: "Real Public IP",
+      meaning:
+        "Your real public IP, obtained via a domestic direct-connect echo. A webpage can only see the exit IP, not the machine behind the proxy — that's a capability boundary, not something we skipped.",
+    },
+    C2: {
+      title: "Local DNS Server & DNS Leak",
+      meaning:
+        "Which server handles your DNS queries — a webpage can't get query logs, so this is structurally untestable online. A DNS leak exposes the domains you've visited to your local ISP.",
+    },
+    C3: {
+      title: "Proxy Detection (env vars / system proxy / TUN)",
+      meaning:
+        'Requires reading local environment variables and the system proxy configuration. The CLI can catch cases like "you think your proxy is on but it isn\'t actually taking effect."',
+    },
+    C4: {
+      title: "Claude Code CLI Timezone Consistency",
+      meaning:
+        "Claude Code CLI honors the $TZ environment variable, which can differ from the system timezone. A webpage can't read $TZ — the O2 check above only tests the system timezone and doesn't cover this item.",
+    },
+    C5: {
+      title: "Claude Endpoint Check",
+      meaning:
+        'Official direct / domestic LLM / relay, plus a known-endpoint blacklist match. Requires reading the local ANTHROPIC_BASE_URL configuration, which a webpage can\'t read. This is the only CLI item that can produce a "high risk" verdict on its own.',
+    },
+  },
+
+  cli: {
+    hint: "This item requires reading your local environment — install the CLI to test it:",
+  },
+
+  landing: {
+    why: {
+      title: "Why you need a checkup",
+      body: "AI tools are sensitive to your network environment. The most common pitfalls fall into four categories: exit IP type or abuse history that triggers anti-abuse controls; a mismatch between system and exit IP timezone; IPv6 quietly bypassing the proxy and exposing your real location; and local DNS exposing the domains you visit to your local ISP. This site can check the first three online; a DNS leak requires reading local DNS query logs, which a webpage structurally cannot access — it's a CLI-only item.",
+    },
+    install: {
+      title: "Install the CLI for all 9 checks",
+      body: "The web version is a quick first look — it covers 4 items. The CLI covers all 9, including your real public IP, DNS leaks, proxy/TUN detection, and Claude Code timezone and endpoint checks.",
+    },
+    compare: {
+      title: "Web vs. CLI: Full Feature Comparison",
+      columnId: "ID",
+      columnItem: "Check item",
+      columnWeb: "Web",
+      columnCli: "CLI",
+      auto: "Automatic",
+      onDemand: "On demand",
+      cliOnly: "CLI only",
+      dash: "—",
+    },
+  },
+
+  footer: {
+    privacy: "This site stores none of your check results.",
+    thirdParty:
+      "The IPv6 check is made directly from your browser to ipify; the IP risk check requires you to trigger it manually, at which point your exit IP is sent to proxycheck.io and StopForumSpam.",
+  },
+
+  errors: {
+    network: "Network request failed — please retry shortly.",
+    badRequest:
+      "The request was invalid, so this item can't be completed. If this persists after a refresh, please let us know.",
+    malformed:
+      "The response was incomplete — this item is treated as a check failure.",
+    rateLimited: "Too many requests — please retry shortly.",
+    humanVerification: "Human verification failed — please retry.",
+    upstream: "The data source is unavailable — this item couldn't be checked.",
+    clientIp: "Couldn't determine your exit IP.",
+    unknown: "Check failed — please retry shortly.",
+  },
+} as const;
+
+/** 默认导出仍是中文（规格第 7 节：中文为默认），保持既有引用不受影响。 */
+export const COPY: Copy = ZH;
+export const COPY_EN: Copy = EN;
+
+export function getCopy(lang: Lang): Copy {
+  return lang === "en" ? EN : ZH;
+}

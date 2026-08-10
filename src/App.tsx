@@ -1,21 +1,25 @@
-// 单页：首屏结论区 + 9 张检测卡（规格第 4 节）。
-// 落地内容与 i18n 不在本任务范围内（归 --content 子计划）。
+// 单页：首屏结论区 + 9 张检测卡 + 落地内容（规格第 4 节）。
+// 语言由路径决定（`/en` 为英文，其余中文），不做 Accept-Language 自动跳转（规格第 7 节）。
 
 import "./App.css";
 
 import { CliCard } from "./components/Card";
 import { O1Card, O2Card, O3Card, O4Card } from "./components/cards";
+import { LangSwitch } from "./components/LangSwitch";
+import { Landing } from "./components/Landing";
 import { VerdictPanel } from "./components/Verdict";
-import { COPY } from "./copy";
+import { CopyProvider, langFromPathname, useCopy } from "./i18n";
 import { usePanel } from "./usePanel";
 
-function App() {
+function AppShell({ lang }: { lang: "zh" | "en" }) {
+  const COPY = useCopy();
   const { panel, coverage, verdict, runGeo, runIpv6, runRisk, failRisk } =
-    usePanel();
+    usePanel(lang);
 
   return (
     <div className="page">
       <header className="site-header">
+        <LangSwitch lang={lang} />
         <h1>{COPY.site.title}</h1>
         <p>{COPY.site.tagline}</p>
       </header>
@@ -64,11 +68,23 @@ function App() {
         />
       </section>
 
+      <Landing />
+
       <footer className="site-footer">
         <p>{COPY.footer.privacy}</p>
         <p>{COPY.footer.thirdParty}</p>
       </footer>
     </div>
+  );
+}
+
+function App() {
+  const lang = langFromPathname(window.location.pathname);
+
+  return (
+    <CopyProvider lang={lang}>
+      <AppShell lang={lang} />
+    </CopyProvider>
   );
 }
 

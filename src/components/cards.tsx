@@ -7,7 +7,7 @@
 import { useRef, useState } from "react";
 
 import { CheckCard, type CardTone } from "./Card";
-import { COPY } from "../copy";
+import { useCopy } from "../i18n";
 import type { OnlineCheck } from "../domain/checks";
 import type {
   GeoData,
@@ -37,6 +37,7 @@ export function O1Card({
   state: OnlineCheck<GeoData>;
   onRetry: () => void;
 }) {
+  const COPY = useCopy();
   const copy = COPY.checks.O1;
   const unknown = copy.unknown;
 
@@ -92,6 +93,7 @@ export function O2Card({
   state: OnlineCheck<TimezoneResult>;
   onRetry: () => void;
 }) {
+  const COPY = useCopy();
   const copy = COPY.checks.O2;
   const data = state.status === "done" ? state.data : null;
   const tone: CardTone =
@@ -136,6 +138,7 @@ export function O3Card({
   state: OnlineCheck<Ipv6Result>;
   onRetry: () => void;
 }) {
+  const COPY = useCopy();
   const copy = COPY.checks.O3;
   const data = state.status === "done" ? state.data : null;
   const tone: CardTone = data?.leak ? "warn" : data ? "ok" : "neutral";
@@ -164,6 +167,7 @@ export function O3Card({
 }
 
 function RiskDetail({ data }: { data: Extract<RiskData, { status: "ok" }> }) {
+  const COPY = useCopy();
   const copy = COPY.checks.O4;
   const detections = (["proxy", "vpn", "tor", "scraper"] as const).filter(
     (key) => data[key],
@@ -214,6 +218,7 @@ export function O4Card({
   onRun: (token: string) => void;
   onFail: (reason: string) => void;
 }) {
+  const COPY = useCopy();
   const copy = COPY.checks.O4;
   const turnstileRef = useRef<HTMLDivElement>(null);
   const [verifying, setVerifying] = useState(false);

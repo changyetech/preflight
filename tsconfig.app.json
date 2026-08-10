@@ -22,5 +22,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "tests/render.test.ts"]
+  "include": ["src", "tests/render.test.ts", "tests/landing.test.ts"]
 }

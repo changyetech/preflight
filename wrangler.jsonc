@@ -7,9 +7,12 @@
 
   // 单 Worker + Static Assets：dist/ 由 Vite 构建产出，/api/* 由 worker/index.ts 处理，
   // 其余路径交给静态资源（见 docs/specs/2026-08-10-ipcheck-web.md 第 5 节）。
+  // not_found_handling: SPA——dist/ 里只有一份 index.html，直接访问 /en 这类前端路由时
+  // 也要落到同一个 index.html（200，而非静态资源的默认 404），语言由 App 里的路径判断接管（规格第 7 节）。
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
   },
 
   // proxycheck 日配额守卫：单实例 Durable Object，SQLite 后端（ADR-0002）。
