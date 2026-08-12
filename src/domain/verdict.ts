@@ -100,7 +100,13 @@ export function computeVerdict(input: VerdictInput): Verdict {
 }
 
 export function verdictInputFrom(panel: PanelState): VerdictInput {
-  const timezone = panel.o2.status === "done" ? panel.o2.data : null;
+  // `match` 为 null = 无从比对（出口 IP 没给时区），按契约 §2.3 不贡献信号——
+  // 与下面 O5／O6 取「可比对性」是同一条语义。只看 status 会让一个信号都没产出的面板
+  // 打出绿字「未发现异常」。
+  const timezone =
+    panel.o2.status === "done" && panel.o2.data.match !== null
+      ? panel.o2.data
+      : null;
   const ipv6 = panel.o3.status === "done" ? panel.o3.data : null;
   const risk = panel.o4.status === "done" ? panel.o4.data : null;
   // 「检测项 done」与「产出了信号」是**两件事**，O5／O6 把这个区别放大成了常态：

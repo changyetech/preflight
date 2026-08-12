@@ -394,6 +394,37 @@ describe("verdictInputFrom", () => {
     expect(computeVerdict(input)).toEqual({ stage: "insufficient" });
   });
 
+  it("O2 无从比对 + 其余全失败／无从比对 → 数据不足，绝不是「低风险 · 未发现异常」", () => {
+    // 每一格都是本产品用户的常见情形：出口 IP 没给时区、ipify 被阻断、
+    // Cloudflare 1.1.1.1 不发 ECS、浏览器禁用 WebRTC。
+    // O2 的 match: null 与 O5／O6 的 comparable: false 是同一条语义（契约 §2.3），
+    // 只看 status 会让一个信号都没产出的面板打出绿字。
+    const input = verdictInputFrom({
+      o1: { status: "done", data: { ...GEO, timezone: null } },
+      o2: {
+        status: "done",
+        data: {
+          browserTimezone: "Asia/Shanghai",
+          exitTimezone: null,
+          match: null,
+        },
+      },
+      o3: { status: "failed", reason: "ipify unreachable" },
+      o4: { status: "idle" },
+      o5: {
+        status: "done",
+        data: {
+          resolverGeo: null,
+          comparison: { comparable: false, reason: "noEcs" },
+        },
+      },
+      o6: { status: "failed", reason: "udp-egress-webrtc-unavailable" },
+    });
+
+    expect(input.signals).toBeNull();
+    expect(computeVerdict(input)).toEqual({ stage: "insufficient" });
+  });
+
   it("O5／O6 的「无从比对」不贡献信号，与「未命中」同一个结论", () => {
     // 这是本功能最容易做错的一格：把「没测出来」渲染成绿色是本产品的红线，
     // 但在**综合结论**上，无从比对与未命中确实必须一致——差别只在该项自己的呈现。
@@ -490,22 +521,36 @@ describe("verdictInputFrom", () => {
     });
   });
 
-  it("时区无法比对（边缘未给出时区）不算不一致", () => {
-    const input = verdictInputFrom({
-      o1: { status: "running" },
-      o2: {
-        status: "done",
-        data: {
-          browserTimezone: "Asia/Shanghai",
-          exitTimezone: null,
-          match: null,
-        },
+  it("时区无法比对（边缘未给出时区）不算不一致，也不算一条信号", () => {
+    const o2NoComparison = {
+      status: "done",
+      data: {
+        browserTimezone: "Asia/Shanghai",
+        exitTimezone: null,
+        match: null,
       },
-      o3: { status: "running" },
-      o4: { status: "idle" },
-      ...SPLIT_TUNNEL_PENDING,
-    });
+    } as const;
 
-    expect(input.signals?.timezoneMismatch).toBe(false);
+    // 有别的信号在场时：不一致必须是 false，不能把「测不出来」算成异常。
+    expect(
+      verdictInputFrom({
+        o1: { status: "running" },
+        o2: o2NoComparison,
+        o3: { status: "done", data: { leak: false, ipv6: null } },
+        o4: { status: "idle" },
+        ...SPLIT_TUNNEL_PENDING,
+      }).signals,
+    ).toEqual({ ...NO_SIGNALS });
+
+    // 只有它时：它压根不是一条信号，面板落「数据不足」而不是「初步 · 低」。
+    expect(
+      verdictInputFrom({
+        o1: { status: "running" },
+        o2: o2NoComparison,
+        o3: { status: "running" },
+        o4: { status: "idle" },
+        ...SPLIT_TUNNEL_PENDING,
+      }).signals,
+    ).toBeNull();
   });
 });

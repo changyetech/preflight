@@ -168,6 +168,42 @@ describe("probeDnsEgress · 取消路径", () => {
     expect(new Set(urls).size).toBe(3);
   });
 
+  it("HTTP 200 但形状不对 ⇒ 探测失败，绝不当成「无 ECS 段」", async () => {
+    // ip-api 用 200 返回 JSON 错误体是它文档化的行为。当成「无 ECS 段」的话，卡片会
+    // 打出一句**关于用户 DNS 服务商的假陈述**，把他引向一个不存在的原因，而真实原因
+    // （第三方挂了、刷新可能就好）被完全遮蔽。CLI 侧是同一条判断，此前 Web 没有。
+    for (const body of [
+      {},
+      { status: "fail", message: "quota exceeded" },
+      { edns: { geo: "Japan - IT7 Networks Inc" } }, // 只有 edns、没有 dns
+    ]) {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(JSON.stringify(body), {
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      await expect(probeDnsEgress()).resolves.toEqual({ ok: false });
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("dns 段存在时照常返回观测，edns 缺失是正常输入而非失败", async () => {
+    // 这一格必须与上一格分得开：不发 ECS 的服务商（Cloudflare 1.1.1.1）是典型用户，
+    // 他们该看到「已完成 · 无从比对」，不是「检测失败」。
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ dns: { geo: "Japan - Google LLC" } }), {
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(probeDnsEgress()).resolves.toEqual({
+      ok: true,
+      ecsGeo: null,
+      resolverGeo: "Japan - Google LLC",
+    });
+  });
+
   it("已中止的 signal（组件已卸载）不再发请求，直接按探测失败收场", async () => {
     // 没有这条，卸载后最长 15s（3 次 × 5s 重试）还在打第三方——与 O6 的处理不对称。
     const fetchSpy = vi.spyOn(globalThis, "fetch");

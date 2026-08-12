@@ -58,6 +58,14 @@ export async function probeDnsEgress(
       if (!response.ok) continue;
 
       const body = (await response.json()) as IpApiResponse;
+
+      // `dns` 段在真实响应里恒存在，缺了说明对方换了 schema，或用 HTTP 200 返回了
+      // JSON 错误体（`{"status":"fail",...}`，ip-api 文档化的行为）。此时若当成
+      // 「无 ECS 段」，卡片会打出一句**关于用户 DNS 服务商的假陈述**，把他引向一个
+      // 不存在的原因，而真实原因（第三方挂了、刷新可能就好）被完全遮蔽；覆盖度还会
+      // 把这次「什么都没测到」记成已完成。与 CLI 是同一条判断（cli/src/probe/dns_egress.rs）。
+      if (typeof body?.dns !== "object" || body.dns === null) continue;
+
       // edns 段缺失即「响应中无 ECS 段」，是判定表里的一行正常输入，不是失败。
       return {
         ok: true,

@@ -78,6 +78,8 @@ function pendingPeerConnection(instances: { closed: boolean }[]) {
 
 const SRFLX =
   "candidate:842163049 1 udp 1677729535 203.0.113.7 54321 typ srflx raddr 0.0.0.0 rport 0";
+const SRFLX_V6 =
+  "candidate:842163050 1 udp 1677729534 2001:db8::1 54321 typ srflx raddr :: rport 0";
 const HOST =
   "candidate:1467250027 1 udp 2122260223 9b36eaac-bb2e.local 51234 typ host";
 
@@ -132,6 +134,47 @@ describe("probeStun", () => {
 
     expect(probe.webrtcSupported).toBe(true);
     expect(probe.reflexiveIps).toEqual([]);
+  });
+
+  it("双栈：协议族不由候选到达顺序决定，两条连接都取 IPv4", async () => {
+    // 比对的另一侧恒为 IPv4（出口 IP 来自 /api/geo）。若拿第一个到达的就收工，
+    // 下面这组输入会让一条取到 IPv6、另一条取到 IPv4 ⇒ N_fam = 1 ⇒「无从比对」，
+    // 而同一台机器换个时刻又可能正常出结论——平价验收无从复现。
+    scope.RTCPeerConnection = fakePeerConnection((url) =>
+      url.includes("cloudflare") ? [SRFLX_V6, SRFLX] : [SRFLX, SRFLX_V6],
+    );
+
+    expect((await probeStun()).reflexiveIps).toEqual([
+      "203.0.113.7",
+      "203.0.113.7",
+    ]);
+  });
+
+  it("只有 IPv6 srflx 时如实返回它，不假装没测到", async () => {
+    // 同族筛选是 domain/udpEgress 的职责（契约 §2.6 第 2 行），探测层不替它做判断。
+    scope.RTCPeerConnection = fakePeerConnection(() => [SRFLX_V6]);
+
+    expect((await probeStun()).reflexiveIps).toEqual([
+      "2001:db8::1",
+      "2001:db8::1",
+    ]);
+  });
+
+  it("两条里只坏一条时照常探测，不谎报「浏览器禁用了 WebRTC」", async () => {
+    // 构造函数的成败与 STUN URL 无关，报成禁用是一句可能不成立的话；
+    // 而两个失败原因的可行动性正好相反（契约 §5.6），这一格值得保守。
+    let created = 0;
+    scope.RTCPeerConnection = class extends fakePeerConnection(() => [SRFLX]) {
+      constructor(config: { iceServers: { urls: string[] }[] }) {
+        if (created++ === 0) throw new Error("first one blows up");
+        super(config);
+      }
+    };
+
+    expect(await probeStun()).toEqual({
+      reflexiveIps: ["203.0.113.7"],
+      webrtcSupported: true,
+    });
   });
 
   it("只有一个 STUN 答上来时就只报一个——没答上来的不占位（N_ok 的定义）", async () => {

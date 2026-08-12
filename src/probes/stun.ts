@@ -77,7 +77,28 @@ function reflexiveAddressOf(line: string): string | null {
   return address ? address : null;
 }
 
-/** 单个 STUN 的取值：拿到第一个反射地址即收工；超时、中止、交换失败一律记作没答上来。 */
+function isIpv4(ip: string): boolean {
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(ip);
+}
+
+/**
+ * 从这条连接收到的全部 srflx 里挑一个，**优先 IPv4**。
+ *
+ * **协议族不能由 ICE 候选的到达顺序决定。** 比对的另一侧恒为 IPv4（出口 IP 取自
+ * `/api/geo`），而双栈主机上浏览器会为 IPv4 与 IPv6 分别收集 srflx，谁先到没有保证：
+ * 拿第一个到的就收工，同一台机器可能正常出结论、可能 `N_fam = 1`、也可能 `N_fam = 0`
+ * ——什么都没测出来，覆盖度却把它算作「已完成」，而且**平价验收无从复现**。
+ * CLI 侧同一个不确定性由 `first_ipv4` 消掉（`cli/src/probe/stun.rs`，触发源是
+ * `getaddrinfo` 顺序），这里对齐它，只是把「筛请求端」换成「筛候选」。
+ */
+function preferIpv4(addresses: string[]): string | null {
+  return addresses.find(isIpv4) ?? addresses[0] ?? null;
+}
+
+/**
+ * 单个 STUN 的取值：**收集到候选结束或超时为止的全部 srflx**，再按上面的规则挑一个。
+ * 超时、中止、交换失败一律记作没答上来。
+ */
 function reflexiveFrom(
   pc: PeerConnection,
   signal: AbortSignal | undefined,
@@ -85,6 +106,7 @@ function reflexiveFrom(
   return new Promise((resolve) => {
     let timer: ReturnType<typeof setTimeout>;
     let settled = false;
+    const reflexive: string[] = [];
 
     const finish = (ip: string | null) => {
       if (settled) return;
@@ -97,15 +119,16 @@ function reflexiveFrom(
     };
     const onAbort = () => finish(null);
 
-    timer = setTimeout(() => finish(null), TIMEOUT_MS);
+    // 超时不等于白等：已经收到的 srflx 照常算数，只是没等到收集结束。
+    timer = setTimeout(() => finish(preferIpv4(reflexive)), TIMEOUT_MS);
     signal?.addEventListener("abort", onAbort);
 
     pc.addEventListener("icecandidate", (event) => {
-      // null 候选 = 收集结束。走到这里还没拿到 srflx，就是这个 STUN 没答上来。
-      if (event.candidate === null) return finish(null);
+      // null 候选 = 收集结束。此时手里一个 srflx 都没有，就是这个 STUN 没答上来。
+      if (event.candidate === null) return finish(preferIpv4(reflexive));
 
       const ip = reflexiveAddressOf(event.candidate.candidate);
-      if (ip !== null) finish(ip);
+      if (ip !== null) reflexive.push(ip);
     });
 
     // 没有 m 行就不会开始候选收集，数据通道是拿它的最省事的办法。
@@ -135,9 +158,10 @@ export async function probeStun(signal?: AbortSignal): Promise<StunProbe> {
     open(ctor as PeerConnectionCtor, url),
   );
   const opened = connections.filter((pc) => pc !== null);
-  if (opened.length < connections.length) {
-    // 一个开不出来说明整个 WebRTC 栈被禁或被桩掉了，此时已开的也一并关掉。
-    for (const pc of opened) pc.close();
+  if (opened.length === 0) {
+    // **全部**开不出来才说明整个 WebRTC 栈被禁或被桩掉了。只坏一条时照常探测：
+    // 构造函数的成败与 STUN URL 无关，把它报成「你的浏览器禁用了 WebRTC」是一句
+    // 可能不成立的话，而两个失败原因的可行动性正好相反（契约 §5.6）。
     return { reflexiveIps: [], webrtcSupported: false };
   }
 
