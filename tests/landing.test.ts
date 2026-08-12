@@ -58,7 +58,8 @@ describe("落地内容三段", () => {
     const whyIndex = html.indexOf(COPY_ZH_HANS.landing.why.body);
 
     expect(whyIndex).toBeGreaterThanOrEqual(0);
-    // C2（DNS 泄露）的标题只应出现在对照表行里，不应出现在「为什么需要」正文中声称可测。
+    // 「为什么需要」正文不应声称本站能检测 DNS 泄露——DNS 泄露判定是 O5 的能力（契约 §2.5），
+    // 与 C2（本地 DNS 服务器配置）是两回事，这句话不该在两者之间混用。
     expect(COPY_ZH_HANS.landing.why.body).not.toContain("检测 DNS 泄露");
   });
 

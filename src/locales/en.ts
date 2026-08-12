@@ -232,7 +232,8 @@ export const EN = {
         "Your real public IP, obtained via a domestic direct-connect echo. A webpage can only see the exit IP, not the machine behind the proxy — that's a capability boundary, not something we skipped.",
     },
     C2: {
-      title: "Local DNS Server & DNS Leak",
+      /** 契约 §1 收缩：DNS 泄露判定拆到 O5，本项只剩「本地 DNS 服务器配置」（ADR-0014）。 */
+      title: "Local DNS Server Configuration",
       meaning:
         "Which server handles your DNS queries — a webpage can't get query logs, so this is structurally untestable online. A DNS leak exposes the domains you've visited to your local ISP.",
     },
