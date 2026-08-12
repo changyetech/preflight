@@ -5,7 +5,8 @@
     "aliases": "同一个 ISO2 可以有多个键——ip-api 对个别国家会返回两种写法（实测：Netherlands 与 The Netherlands、Turkey 与 Türkiye）。收全是必需的，少收一个写法就是一次「查不到」。",
     "unknown": "查不到的国家名一律视为**未知**，按 verdict.md 2.3 不贡献信号；**不得回退成「两国不同」**——那会把「我不认识这个名字」包装成一次泄露告警，即凭空造出误报。",
     "nonIso": "值以数据源为准而非 ISO 注册表：Kosovo 记 XK（用户自定义区，ISO 3166-1 未分配），因为那正是 ip-api 返回的代码，而本表唯一的用途是与同源数据比对。",
-    "provenance": "本表由 ip-api.com 自身的响应逐条取得（每条都是同一次响应里的 country 与 countryCode 配对），核实日期 2026-08-12，非人工誊抄。缺 AQ / AX / CC / UM 四个地区——实测未取到可确认的写法，按上面的 unknown 约定处理，宁缺勿猜。"
+    "provenance": "本表由 ip-api.com 自身的响应逐条取得（每条都是同一次响应里 country 与 countryCode 的配对），核实日期 2026-08-12，非人工誊抄。共 239 个键、237 个 ISO2。",
+    "completeness": "完备性以「ip-api 实际会返回什么」为准，不以 ISO 3166 全集为准。相对 ISO 3166-1 已分配集合，本表缺以下 13 个代码：AQ AX BV CC CX EH GS HM PN SH SJ TF UM。其中多数是无人定居或无独立 IP 分配的地区；**已实测确认 AX（奥兰）不是缺口**——RIPE 登记在 AX 名下的三段地址（本地 ISP AX Networks Ab / Crosskey）被 ip-api 一律判为 Finland / FI，即 ip-api 根本不产出这个代码。其余几个同样查不到可确认的写法，按下面的 unknown 约定处理，宁缺勿猜——猜一个 ip-api 永远不会返回的键，除了让人误以为已覆盖之外没有任何作用。"
   },
   "countries": {
     "Afghanistan": "AF",

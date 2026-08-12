@@ -175,10 +175,10 @@ ipcheck/
 │   ├── domain/        # 纯逻辑：结论判级、覆盖度、时区比对、IPv6、对照表
 │   └── probes/        # 浏览器直连的第三方探测（ipify）
 ├── Cargo.toml         # 纯 workspace（members = ["cli"]）+ dist 发布配置
-├── cli/               # ipcheck CLI（Rust）——判级契约的**全集实现**，8 项全测
+├── cli/               # ipcheck CLI（Rust）——判级契约的**全集实现**，10 项全测
 │   └── src/
 │       ├── domain/    # 纯逻辑：检测项、覆盖度、判级（golden 向量在此消费）
-│       ├── probe/     # 8 项探测 + 第三方调用；不碰终端
+│       ├── probe/     # 10 项探测 + 第三方调用；不碰终端
 │       ├── copy/      # 文案：en 为源语言，其余语种是 partial 补丁、字段级回落
 │       ├── render.rs  # 人读报告（参考 Web 的视觉结构，无表格边框）
 │       └── json.rs    # `--json`：机器可读，也是平价验收唯一的 oracle

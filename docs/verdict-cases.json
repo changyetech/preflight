@@ -5,9 +5,9 @@
     "signals": "输入是原始观测值而非派生布尔量（如给 riskScore 数值而不是 riskScoreHigh），以便阈值本身也被测到。",
     "unknown": "null 表示未知——该检测项未执行、进行中或已失败。未知一律不贡献信号（verdict.md 2.3）。字段整体缺省等同于 null。",
     "applies": "该用例适用的实现，取值域只有 web 与 cli 两个，没有别的取值。两端通用的用例把 web 与 cli 两项都写上（不存在 both 这种写法）。仅列出该端可测的信号；某信号在该端结构性不可测时不出现在 signals 里。同时列出两端的用例因此只能声明**两端都可测**的信号（即不含 tzMismatchCliEnv 与 tunOff）——这类用例钉的正是两端平价：同一组原始观测值，两端必须给出同一个结论。",
-    "pairsWith": "指向另一条用例的 id，含义是「这两条的 expect 必须完全相同」。用于证明某个取值是**无从比对**而不是**未命中**——单看一条用例分不出这两者，只有让它与一条已知未命中的用例给出同一结论才说得清。两条配对用例除了被比对的那个字段外，其余 signals 必须逐一相同，否则证明不成立。",
+    "pairsWith": "指向另一条用例的 id，含义是「本条与所指用例的 expect 必须完全相同」。用于证明某个取值是**无从比对**而不是**未命中**——单看一条用例分不出这两者，只有让它与一条已知未命中的用例给出同一结论才说得清。两条用例除了被比对的那个字段外，其余 signals 必须逐一相同，否则证明不成立。方向固定为「无从比对」→ 作为基准的「未命中」用例；基准用例自己不带本字段，因此多条无从比对的用例可以共同指向同一条基准（udpEgress 就有两条）。",
     "dnsEgress": "dnsEcsCountry 与 exitCountry 是 ISO2 国家代码，派生出 dnsEgressLeak（verdict.md 2.5）。任一为 null 即无从比对，不贡献信号——这与「两者相同」在综合结论上等价，两者的用例成对存在正是为了锁住这一点。",
-    "udpEgress": "stunReflexiveIps 是各 STUN 报出的反射地址数组，exitIp 是出口 IP，二者派生出 udpEgressMismatch（verdict.md 2.6）。数组为 null 表示 O6 检测失败；数组内地址互不一致、或与 exitIp 协议族不同，均为无从比对而非未命中。",
+    "udpEgress": "stunReflexiveIps 是**成功取回反射地址**的 STUN 列表（即 verdict.md 2.6 的 N_ok），exitIp 是出口 IP，二者派生出 udpEgressMismatch。null 与 **空数组 [] 同义**：一个 STUN 都没答上来，N_ok = 0 < 2 ⇒ O6 检测失败。单元素数组同理（N_ok = 1 < 2 ⇒ 检测失败）——列表里只放答上来的，没答上来的不占位。数组内地址互不一致、或与 exitIp 协议族不同因而同族数不足 2，均为无从比对而非未命中。",
     "expect": "stage 为 insufficient 时没有 level 字段——这与类型层面的设计一致，不是省略。",
     "aiIpcheckDiverges": "标记该输入下 ipcheck CLI 与已归档的 ai-ipcheck 结论不同。平价比对（见实现计划 --output）遇到这些用例应按新契约判定，不得当作回归。",
     "pairing": "riskScore 与 anonymous 必须成对：两者同为数值/布尔，或同为 null。只给其中一个是契约禁止的状态（verdict.md 2.3）。"
@@ -375,7 +375,7 @@
         "stage": "full",
         "level": "low"
       },
-      "note": "CLI 的常态：8 项全测且干净。"
+      "note": "CLI 的常态：10 项全测且干净。"
     },
     {
       "id": "cli-full-low-anonymous-50",
@@ -654,7 +654,6 @@
         "stage": "full",
         "level": "low"
       },
-      "pairsWith": "both-full-low-dns-ecs-missing",
       "note": "DNS 与 TCP 从同一国出网：代理确实接管了解析路径。与 both-full-low-dns-ecs-missing 成对。"
     },
     {
@@ -724,7 +723,6 @@
         "stage": "full",
         "level": "low"
       },
-      "pairsWith": "both-full-low-udp-stun-disagree",
       "note": "UDP 与 TCP 同一个出口：代理确实全局接管。与 both-full-low-udp-stun-disagree 成对。"
     },
     {
@@ -774,6 +772,7 @@
         "stage": "full",
         "level": "low"
       },
+      "pairsWith": "both-full-low-udp-egress-matches",
       "note": "反射地址是 IPv6、出口 IP 是 IPv4：跨协议族不得判命中，那是 O3（IPv6 泄露）已经在管的事，在这里再算一次等于同一个事实进两次判级。只比同协议族（verdict.md 2.6）。"
     },
     {
