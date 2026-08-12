@@ -21,7 +21,7 @@
 | `HOMEBREW_TAP_TOKEN` | **secret** | GitHub Secret | CLI 发版时推 tap 失败 |
 | CLI 的 `proxycheck_key` | **secret** | 用户本机 | CLI 配额 100 次/天而非 1000 |
 
-**只有 CLI 是零配置可用的**——不配任何东西也能跑完 9 项，只是 proxycheck 走无 key 的 100 次/天。Web 侧则必须配齐 Turnstile 与 proxycheck 才有完整功能。
+**只有 CLI 是零配置可用的**——不配任何东西也能跑完 8 项，只是 proxycheck 走无 key 的 100 次/天。Web 侧则必须配齐 Turnstile 与 proxycheck 才有完整功能。
 
 ---
 

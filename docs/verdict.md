@@ -2,9 +2,9 @@
 
 - 状态：**契约（normative）**——代码与本文不一致时，以本文为准（见 CLAUDE.md「Authoritative Source」）
 - 适用范围：**两个实现**——ipcheck Web（TypeScript，`src/domain/`）与 ipcheck CLI（Rust，`cli/`）
-- 相关：[ADR-0010](./adr/0010-verdict-contract-normative-cli-full-implementation.md)（本文的权威性来源）、[ADR-0011](./adr/0011-capability-boundary-divergence.md)（两端差异如何表达）、[ADR-0012](./adr/0012-cli-direct-third-party-not-worker-api.md)（CLI 不走本站 API）
+- 相关：[ADR-0010](./adr/0010-verdict-contract-normative-cli-full-implementation.md)（本文的权威性来源）、[ADR-0011](./adr/0011-capability-boundary-divergence.md)（两端差异如何表达）、[ADR-0012](./adr/0012-cli-direct-third-party-not-worker-api.md)（CLI 不走本站 API）、[ADR-0013](./adr/0013-drop-vendor-endpoint-check.md)（移除厂商端点检测）
 
-本文定义「一次网络环境体检得出什么结论」。它是**两个实现共同的判据**：CLI 是全集实现（9 项全测），Web 是它在浏览器 + 边缘能力边界内的**投影**（C1–C5 恒为「需 CLI」）。
+本文定义「一次网络环境体检得出什么结论」。它是**两个实现共同的判据**：CLI 是全集实现（8 项全测），Web 是它在浏览器 + 边缘能力边界内的**投影**（C1–C4 恒为「需 CLI」）。
 
 判级规则**只在本文修改**。两端的代码、`docs/specs/` 下的设计规格、任何 UI 文案都不得单方面重述或改写它。
 
@@ -12,7 +12,9 @@
 
 ## 1. 检测项注册表
 
-共 **9 项**，覆盖度的分母恒为 9。ID 是跨端稳定标识，**不得复用、不得改号**。
+共 **8 项**，覆盖度的分母恒为 8。ID 是跨端稳定标识，**不得复用、不得改号**。
+
+> **C5 是已废弃的编号**：它曾是「AI 厂商端点检测」，读本机的厂商专属配置。已按 [ADR-0013](./adr/0013-drop-vendor-endpoint-check.md) 移除——ipcheck 只检测网络环境，不检测任何具体工具的配置。**C5 这个编号不得再被任何检测项使用**（ID 不复用的规则对已删除的 ID 同样成立）。
 
 | ID | 语义 | 归属 | Web 执行 | CLI 执行 |
 |---|---|---|---|---|
@@ -23,8 +25,7 @@
 | C1 | 本机真实 IP（国内直连回显） | 仅 CLI | 需 CLI | 自动 |
 | C2 | 本地 DNS 服务器与 DNS 泄露 | 仅 CLI | 需 CLI | 自动 |
 | C3 | 代理检测（环境变量 / 系统代理 / TUN） | 仅 CLI | 需 CLI | 自动 |
-| C4 | CC CLI 时区一致性（认 `$TZ`） | 仅 CLI | 需 CLI | 自动 |
-| C5 | Claude 端点检测（官方直连 / 国产大模型 / 中转 + 黑名单） | 仅 CLI | 需 CLI | 自动 |
+| C4 | `$TZ` 时区一致性（进程环境变量 vs 出口 IP 时区） | 仅 CLI | 需 CLI | 自动 |
 
 **O4 的执行时机两端不同是刻意的**：Web 侧按需触发（用户显式同意把出口 IP 发给 proxycheck，ADR-0008），CLI 侧自动执行（用户装 CLI 并运行本身即为同意，且 CLI 用自己的配额，见 [ADR-0012](./adr/0012-cli-direct-third-party-not-worker-api.md)）。这不影响判级规则，只影响 `preliminary` 形态出现的频率。
 
@@ -58,7 +59,6 @@
 - `networkType == "Hosting"`（机房 IP）——机房 IP 不等于有问题
 - proxycheck 的 `proxy` / `vpn` / `tor` / `scraper` 检出
 - 本地 DNS 为国内 DNS（C2）
-- **Claude 端点命中已知中转黑名单（C5）**——必须展示并告警，但不进综合结论（见 [ADR-0010](./adr/0010-verdict-contract-normative-cli-full-implementation.md)，这是相对 `ai-ipcheck` 的刻意变更）
 - `tzMismatchSystem` **在 CLI 侧**（见 §5.1）
 
 ### 2.2 `ipv6Leak` 的判定
@@ -154,10 +154,10 @@ IPv6 泄露贡献「中」而非「高」：它暴露的是地理位置，不像
 **综合结论永远不得脱离覆盖度单独呈现**（ADR-0004）。
 
 **Web**：`已完成 X · 需 CLI Y · 检测失败 Z`，另有 `按需未测 W`，仅在 `W > 0` 时呈现。
-不变量：`X + Y + Z + W = 9`。
+不变量：`X + Y + Z + W = 8`。
 
 **CLI**：`已完成 X · 检测失败 Z`。
-不变量：`X + Z = 9`。CLI 没有「需 CLI」档（它就是 CLI），也没有「按需未测」档（O4 自动执行）。
+不变量：`X + Z = 8`。CLI 没有「需 CLI」档（它就是 CLI），也没有「按需未测」档（O4 自动执行）。
 
 **分档规则**（两端一致）：
 
@@ -173,27 +173,27 @@ IPv6 泄露贡献「中」而非「高」：它暴露的是地理位置，不像
 
 ### 5.1 时区：同名不同物
 
-CLI 比的是 `$TZ`（Claude Code CLI 真正认的那个），Web 比的是系统／浏览器时区（对应 Claude 桌面版）。Web **结构性读不到 `$TZ`**。
+CLI 比的是 `$TZ`（命令行工具从进程环境继承的那个），Web 比的是系统／浏览器时区（对应图形界面应用）。Web **结构性读不到 `$TZ`**。
 
 因此契约里是**两个信号**，不是一个：
 
-- CLI：`tzMismatchCliEnv` 贡献「中」；`tzMismatchSystem` **展示但不贡献**（沿用 Python 版「综合结论以 CC CLI 为准」）
+- CLI：`tzMismatchCliEnv` 贡献「中」；`tzMismatchSystem` **展示但不贡献**（综合结论以命令行进程实际认的时区为准）
 - Web：`tzMismatchCliEnv` 不可测；`tzMismatchSystem` 贡献「中」，作为 `$TZ` 不可得时的**降级代理**
 
-**可观察后果**：用户在 `~/.claude/settings.json` 里把 `TZ` 设成了与出口 IP 匹配的时区（正确），但系统时区没改 → **CLI 判低，Web 判中**。这是预期行为。
+**可观察后果**：用户在 shell 配置里把 `TZ` 导出成了与出口 IP 匹配的时区（正确），但系统时区没改 → **CLI 判低，Web 判中**。这是预期行为。
 
 **呈现约束**：
 
-- Web 必须在该项内显式说明「本项对应 Claude 桌面版；Claude Code CLI 认 `$TZ`，网页测不到，属于 C4」。缺了这句话，CLI 用户会误以为自己的 `$TZ` 已被检查。
+- Web 必须在该项内显式说明「本项测的是系统时区（图形界面应用看到的那个）；命令行工具认 `$TZ`，网页测不到，属于 C4」。缺了这句话，CLI 用户会误以为自己的 `$TZ` 已被检查。
 - CLI 必须**同时展示两条**（`$TZ` 一条、系统时区一条），并标明只有前者进综合结论。
 
 **为什么不让 CLI 也把 `tzMismatchSystem` 算「中」**：那会对设了 `$TZ` 的用户产生误报——而设了 `$TZ` 的恰恰是最懂行的那批。用误报换表面一致，是拿正确性买整齐。
 
 ### 5.2 仅 CLI 的中档信号
 
-`tzMismatchCliEnv` 与 `tunOff` 在 Web 侧结构性不可测，C5 的黑名单告警同样只有 CLI 能给。**Web 的「低风险」因此弱于 CLI 的「低风险」**——它只意味着"在网页能测的范围内没发现异常"。
+`tzMismatchCliEnv` 与 `tunOff` 在 Web 侧结构性不可测。**Web 的「低风险」因此弱于 CLI 的「低风险」**——它只意味着"在网页能测的范围内没发现异常"。
 
-**呈现约束**：Web 必须始终呈现覆盖度（`需 CLI 5`），使这个弱化对用户可见。这正是覆盖度不可省略的原因。
+**呈现约束**：Web 必须始终呈现覆盖度（`需 CLI 4`），使这个弱化对用户可见。这正是覆盖度不可省略的原因。
 
 ### 5.3 O4 的执行时机
 

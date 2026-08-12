@@ -5,6 +5,13 @@
 - 术语：见 [CONTEXT.md](../../CONTEXT.md)
 - 相关决策：[ADR-0001](../adr/0001-web-as-cli-frontend-not-replacement.md) ~ [ADR-0008](../adr/0008-privacy-informed-consent-upfront.md)
 
+> **本文是 point-in-time 的设计规格，部分内容已被后续决策取代**（CLAUDE.md「Authoritative Source」：design spec 描述写作当时的意图，不等于当前行为）。判级与检测项的当前判据以 **[docs/verdict.md](../verdict.md)** 为准。
+>
+> 已知的取代关系：
+>
+> - **C5「Claude 端点检测」整项移除，检测项 9 → 8、覆盖度分母 9 → 8**（[ADR-0013](../adr/0013-drop-vendor-endpoint-check.md)）。下文第 2 节总表的 C5 行、以及各处「9 项」「需 CLI 5 项」的表述均已失效，`C5` 是废弃编号、不得复用。
+> - **判级规则已提升为独立的 normative 契约**（[ADR-0010](../adr/0010-verdict-contract-normative-cli-full-implementation.md)），下文与判级相关的章节不再是权威来源。
+
 ## 1. 目标与非目标
 
 ### 目标

@@ -9,7 +9,6 @@
     "aiIpcheckDiverges": "标记该输入下 ipcheck CLI 与已归档的 ai-ipcheck 结论不同。平价比对（见实现计划 --output）遇到这些用例应按新契约判定，不得当作回归。",
     "pairing": "riskScore 与 anonymous 必须成对：两者同为数值/布尔，或同为 null。只给其中一个是契约禁止的状态（verdict.md 2.3）。"
   },
-  "notInThisFile": "Claude 端点命中中转黑名单（C5）不是信号（verdict.md 2.1 / ADR-0010），判级函数不接收它，因此无法在此表达。它对 ai-ipcheck 平价比对的影响记在实现计划的验收清单里：该场景下 ai-ipcheck 判高、ipcheck CLI 按其余信号定档。",
   "cases": [
     {
       "id": "web-insufficient-nothing-produced",
@@ -373,7 +372,7 @@
         "stage": "full",
         "level": "low"
       },
-      "note": "CLI 的常态：9 项全测且干净。"
+      "note": "CLI 的常态：8 项全测且干净。"
     },
     {
       "id": "cli-full-low-anonymous-50",
