@@ -103,7 +103,7 @@ export const EN = {
        * CLI 那一侧的完整说明归 C4 卡，这里只留最小限定 + 指路，避免两张卡讲同一段话。
        */
       scopeNote:
-        "Covers the Claude desktop app — the browser timezone follows the system timezone. Claude Code CLI reads $TZ, which a webpage can't — see C4.",
+        "Covers the Claude desktop app (browser = system timezone). Claude Code CLI reads $TZ — see C4.",
       browserLabel: "System (browser) timezone",
       exitLabel: "Exit IP timezone",
     },

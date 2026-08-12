@@ -91,7 +91,7 @@ export const ZH_HANS: Copy = {
       meaning:
         "时区对不上是最常见的代理特征之一：IP 显示在美国、系统却是北京时间，风控一眼就能看出来。",
       scopeNote:
-        "本项对应 Claude 桌面版——浏览器时区跟随系统时区。Claude Code CLI 认的是 $TZ，网页读不到，见 C4。",
+        "本项对应 Claude 桌面版（浏览器时区＝系统时区）。Claude Code CLI 认 $TZ，见 C4。",
       browserLabel: "系统（浏览器）时区",
       exitLabel: "出口 IP 时区",
     },
