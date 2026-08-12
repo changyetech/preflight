@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import { COPY, COPY_ZH_HANS, LOCALES, getCopy } from "../src/copy";
+import { TOTAL_CHECKS } from "../src/domain/checks";
 
 describe.each(
   LOCALES.map((locale) => [locale.id, getCopy(locale.id)] as const),
@@ -63,6 +64,82 @@ describe.each(
       "brew install <owner>/tap/ipcheck",
     );
     expect(copy.actions.installCommand).not.toContain("ai-ipcheck");
+  });
+
+  // 契约 §5.5 呈现约束：缺了这句，用户会拿浏览器 DoH 的绿色结论去为命令行工具背书。
+  it("O5 必须写明本项测的是浏览器 DNS，且提示 DoH 与 CLI 的差异（契约 §5.5）", () => {
+    expect(copy.checks.O5.scopeNote).toContain("DoH");
+    expect(copy.checks.O5.scopeNote.toUpperCase()).toContain("CLI");
+  });
+
+  // 契约 §2.1／§2.5 硬约束 1：resolver 归属只展示不判定。
+  it("O5 展示 resolver 归属，但必须标明它不参与判定", () => {
+    expect(copy.checks.O5.resolverNote).toBeTruthy();
+    expect(copy.checks.O5.resolverNote.length).toBeGreaterThan(0);
+  });
+
+  // ECS 缺失时状态是「已完成」而非「失败」，卡片必须点明是 DNS 服务商不发 ECS（brief 硬约束）。
+  it("O5 的 ECS 缺失说明必须点出 ECS／EDNS 相关字样", () => {
+    const text = copy.checks.O5.noEcs.toUpperCase();
+    expect(text.includes("ECS") || text.includes("EDNS")).toBe(true);
+  });
+
+  // O5 三种「无从比对」各自独立成句，不得共用措辞（契约 §2.5 硬约束 3）。
+  it("O5 三种「无从比对」文案互不相同", () => {
+    const reasons = [
+      copy.checks.O5.noEcs,
+      copy.checks.O5.unmappedCountry,
+      copy.checks.O5.unknownExitCountry,
+    ];
+    expect(new Set(reasons).size).toBe(reasons.length);
+  });
+
+  // 契约 §5.6 呈现约束：WebRTC 被禁用与探测超时的可恢复性相反，文案必须能区分。
+  it("O6 两种失败原因文案不同，且禁用 WebRTC 那条写明 CLI 不受影响", () => {
+    expect(copy.checks.O6.webrtcUnavailable).not.toBe(
+      copy.checks.O6.stunUnanswered,
+    );
+    expect(copy.checks.O6.webrtcUnavailable.toUpperCase()).toContain("WEBRTC");
+    expect(copy.checks.O6.webrtcUnavailable.toUpperCase()).toContain("CLI");
+  });
+
+  // O6「无从比对」（stunDisagree／familyMismatch／unknownExitIp）要与「未命中」在措辞上可区分。
+  it("O6「无从比对」三条文案与「未命中」互不相同", () => {
+    const distinct = [
+      copy.checks.O6.noMismatch,
+      copy.checks.O6.familyMismatch,
+      copy.checks.O6.unknownExitIp,
+      copy.checks.O6.stunDisagree,
+    ];
+    expect(new Set(distinct).size).toBe(distinct.length);
+  });
+
+  // ADR-0008：O5／O6 自动执行、没有触发控件，前置披露必须列出全部新增第三方域名。
+  it("首屏前置告知列出 O5／O6 的第三方域名（ADR-0008）", () => {
+    expect(copy.footer.thirdParty).toContain("ip-api.com");
+    expect(copy.footer.thirdParty).toContain("stun.cloudflare.com");
+    expect(copy.footer.thirdParty).toContain("stun.l.google.com");
+  });
+
+  // O5／O6 自动执行、无控件可挂披露，只能就地放在卡片说明位（与 O3 同一套处理）。
+  it("O5／O6 的第三方披露写明各自访问的域名", () => {
+    expect(copy.checks.O5.thirdPartyNote).toContain("ip-api.com");
+    expect(copy.checks.O6.thirdPartyNote).toContain("stun.cloudflare.com");
+    expect(copy.checks.O6.thirdPartyNote).toContain("stun.l.google.com");
+  });
+
+  // O5／O6 的重试按钮同样是触发控件，文案不得落回通用「重试」（ADR-0008 一致执行）。
+  it("O5／O6 的重试按钮写明再次访问哪个第三方", () => {
+    expect(copy.checks.O5.retryLabel).not.toBe(copy.actions.retry);
+    expect(copy.checks.O5.retryLabel).toContain("ip-api.com");
+    expect(copy.checks.O6.retryLabel).not.toBe(copy.actions.retry);
+    expect(copy.checks.O6.retryLabel).toContain("stun.cloudflare.com");
+  });
+
+  // 覆盖度分母改为 10 后，总数文案不得停留在旧的 8（呈现层随分母变化联动）。
+  it("覆盖度总数文案与 TOTAL_CHECKS 一致，不停留在旧的 8", () => {
+    expect(copy.coverage.total).toContain(String(TOTAL_CHECKS));
+    expect(copy.coverage.total).not.toContain("8");
   });
 });
 

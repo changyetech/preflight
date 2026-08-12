@@ -1,4 +1,4 @@
-// 四张可在线检测卡（规格 2.1 ~ 2.4）。
+// 六张可在线检测卡（规格 2.1 ~ 2.4，O5／O6 见判级契约 §2.5／§2.6）。
 //
 // 状态到卡片的映射规则：
 //   - 「检测失败」一律给重试入口，并原样展示失败原因；失败绝不呈现为「没查出问题」
@@ -9,11 +9,14 @@ import { useRef, useState } from "react";
 import { CheckCard, type CardTone } from "./Card";
 import { useCopy } from "../i18n";
 import type { OnlineCheck } from "../domain/checks";
+import { UDP_EGRESS_WEBRTC_UNAVAILABLE } from "../domain/udpEgress";
 import type {
+  DnsEgressResult,
   GeoData,
   Ipv6Result,
   RiskData,
   TimezoneResult,
+  UdpEgressResult,
 } from "../domain/types";
 import { requestTurnstileToken, turnstileConfigured } from "../turnstile";
 
@@ -307,6 +310,133 @@ export function O4Card({
       ) : null}
 
       <div ref={turnstileRef} className="turnstile" />
+    </CheckCard>
+  );
+}
+
+export function O5Card({
+  state,
+  onRetry,
+}: {
+  state: OnlineCheck<DnsEgressResult>;
+  onRetry: () => void;
+}) {
+  const COPY = useCopy();
+  const copy = COPY.checks.O5;
+  const data = state.status === "done" ? state.data : null;
+  const comparison = data?.comparison ?? null;
+  // 「无从比对」不是绿色的「未泄露」，也不是失败——中性色，避免读成任何一种结论（契约 §2.5）。
+  const tone: CardTone =
+    comparison?.comparable === true
+      ? comparison.leak
+        ? "warn"
+        : "ok"
+      : "neutral";
+
+  return (
+    <CheckCard
+      id="O5"
+      title={copy.title}
+      status={state.status}
+      tone={tone}
+      meaning={copy.meaning}
+      onRetry={state.status === "failed" ? onRetry : undefined}
+      retryLabel={copy.retryLabel}
+    >
+      {/* 探测本身失败，唯一失败原因，不必按 reason 分支（契约 §2.5 判定表最后一行）。 */}
+      {state.status === "failed" ? <Failure reason={copy.failed} /> : null}
+      {comparison ? (
+        <>
+          <p className="conclusion">
+            {comparison.comparable
+              ? comparison.leak
+                ? copy.leak
+                : copy.noLeak
+              : comparison.reason === "noEcs"
+                ? copy.noEcs
+                : comparison.reason === "unmappedCountry"
+                  ? copy.unmappedCountry
+                  : copy.unknownExitCountry}
+          </p>
+          {comparison.comparable ? (
+            <>
+              <Field label={copy.ecsLabel} value={comparison.ecsCountry} />
+              <Field label={copy.exitLabel} value={comparison.exitCountry} />
+            </>
+          ) : null}
+        </>
+      ) : null}
+      {data ? (
+        <Field
+          label={copy.resolverLabel}
+          value={data.resolverGeo ?? COPY.checks.O1.unknown}
+        />
+      ) : null}
+      {/* resolver 归属只展示不判定，紧跟在字段后面说明理由（契约 §2.1／§2.5 硬约束 1）。 */}
+      {data ? <p className="scope-note">{copy.resolverNote}</p> : null}
+      {/* 无控件的自动检测项，第三方披露就地放在说明位（与 O3 同一套处理）。 */}
+      <p className="scope-note">{copy.thirdPartyNote}</p>
+      <p className="scope-note">{copy.scopeNote}</p>
+    </CheckCard>
+  );
+}
+
+export function O6Card({
+  state,
+  onRetry,
+}: {
+  state: OnlineCheck<UdpEgressResult>;
+  onRetry: () => void;
+}) {
+  const COPY = useCopy();
+  const copy = COPY.checks.O6;
+  const data = state.status === "done" ? state.data : null;
+  // 同 O5：无从比对是中性色，绝不落到绿色——WebRTC 被禁用（检测失败）同样不得渲染为绿色。
+  const tone: CardTone =
+    data?.comparable === true ? (data.mismatch ? "warn" : "ok") : "neutral";
+
+  return (
+    <CheckCard
+      id="O6"
+      title={copy.title}
+      status={state.status}
+      tone={tone}
+      meaning={copy.meaning}
+      onRetry={state.status === "failed" ? onRetry : undefined}
+      retryLabel={copy.retryLabel}
+    >
+      {/* 两个失败原因文案不同：浏览器不允许 vs 探测超时，刷新的可恢复性相反（契约 §5.6）。 */}
+      {state.status === "failed" ? (
+        <Failure
+          reason={
+            state.reason === UDP_EGRESS_WEBRTC_UNAVAILABLE
+              ? copy.webrtcUnavailable
+              : copy.stunUnanswered
+          }
+        />
+      ) : null}
+      {data ? (
+        <>
+          <p className="conclusion">
+            {data.comparable
+              ? data.mismatch
+                ? copy.mismatch
+                : copy.noMismatch
+              : data.reason === "familyMismatch"
+                ? copy.familyMismatch
+                : data.reason === "unknownExitIp"
+                  ? copy.unknownExitIp
+                  : copy.stunDisagree}
+          </p>
+          {data.comparable ? (
+            <>
+              <Field label={copy.reflexiveLabel} value={data.reflexiveIp} />
+              <Field label={copy.exitLabel} value={data.exitIp} />
+            </>
+          ) : null}
+        </>
+      ) : null}
+      <p className="scope-note">{copy.thirdPartyNote}</p>
     </CheckCard>
   );
 }

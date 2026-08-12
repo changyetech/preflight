@@ -59,7 +59,7 @@ export const EN = {
     needCli: "Needs CLI",
     failed: "Check failed",
     pending: "Not run yet",
-    total: "8 items total",
+    total: "10 items total",
     hint: "The verdict only covers completed items. Items that need the CLI are structurally out of reach for a webpage — install the CLI to test them.",
   },
 
@@ -170,6 +170,62 @@ export const EN = {
       turnstileMissing:
         "The human-verification widget isn't configured — this item is unavailable for now.",
     },
+    O5: {
+      title: "DNS Egress Leak",
+      meaning:
+        "If your DNS queries leave from a different country than your proxied traffic, whoever operates that resolver — and anyone watching that path — can see which sites you're resolving, even while your HTTP/TCP traffic looks proxied. This is one of the two most common split-tunnel leaks (the other is UDP, see O6).",
+      /** 契约 §5.5 呈现约束：缺了这句，用户会拿浏览器 DoH 的绿色结论去为命令行工具背书。 */
+      scopeNote:
+        "This checks the DNS path your browser actually uses. If your browser has Secure DNS (DoH) enabled, its result can differ from your command-line tools, which use the system resolver instead — that's covered by the CLI. If the two disagree, trust the CLI.",
+      resolverLabel: "Resolver location",
+      /** 契约 §2.1／§2.5 硬约束 1：resolver 归属只展示，不参与判定。 */
+      resolverNote:
+        "Shown for reference only — it doesn't affect the verdict. Which country your resolver sits in depends on which DNS provider you picked, not on whether your traffic is proxied.",
+      ecsLabel: "DNS client subnet country",
+      exitLabel: "Exit IP country",
+      leak: "Your DNS queries appear to leave from a different country than your exit IP — DNS may be bypassing the proxy.",
+      noLeak:
+        "Your DNS queries appear to leave from the same country as your exit IP — no DNS egress leak detected.",
+      /** 三种「无从比对」各一条独立说明，都不得回退成「泄露」或「未泄露」（契约 §2.5 硬约束 3）。 */
+      noEcs:
+        "Your DNS provider doesn't send EDNS Client Subnet data, so this can't determine whether your DNS queries are proxied.",
+      unmappedCountry:
+        "Your resolver reported a client-subnet location we don't recognize, so this can't be compared.",
+      unknownExitCountry:
+        "The exit IP's country isn't available yet (see the Exit IP check above), so this can't be compared.",
+      failed:
+        "The DNS egress probe didn't complete — this item can't be determined. Retry once your network is back.",
+      thirdPartyNote:
+        "This check runs directly from your browser against ip-api.com (a freshly randomized subdomain each time), so your exit address is visible to it. It never passes through, and is never stored by, this site.",
+      retryLabel: "Retry (queries ip-api.com from your browser again)",
+    },
+    O6: {
+      title: "UDP Egress Consistency",
+      meaning:
+        "Most proxies only reliably capture TCP. If UDP traffic slips out through a different path, it can expose a different address than the one your other traffic shows — including to services that use UDP directly (WebRTC, some game and VoIP clients, and select AI tooling).",
+      reflexiveLabel: "UDP reflexive address",
+      exitLabel: "Exit IP",
+      mismatch:
+        "Your UDP traffic appears to exit from a different address than your exit IP — UDP may be bypassing the proxy.",
+      noMismatch:
+        "Your UDP traffic appears to exit from the same address as your exit IP — no UDP egress mismatch detected.",
+      /** 三种「无从比对」各一条，且必须与命中／未命中在措辞上可区分（契约 §2.6 判定表第 2/3/4 行）。 */
+      familyMismatch:
+        "The UDP reflexive address and your exit IP are different address families (IPv4/IPv6), so they can't be compared on equal terms.",
+      unknownExitIp:
+        "The exit IP isn't available yet (see the Exit IP check above), so this can't be compared.",
+      stunDisagree:
+        "The two STUN servers reported different addresses, so there's no single reliable value to compare — this can happen with multi-exit clusters or symmetric NAT.",
+      /** 契约 §5.6 呈现约束：必须区分「浏览器不允许」与「探测超时」，且前者绝不渲染成绿色。 */
+      webrtcUnavailable:
+        "Your browser has WebRTC disabled, so this item can't determine whether UDP is proxied. The CLI isn't affected by this — it uses a raw UDP socket, not your browser's WebRTC stack.",
+      stunUnanswered:
+        "Neither STUN server answered before the timeout — likely a transient network issue. Retry.",
+      thirdPartyNote:
+        "This check uses your browser's WebRTC to exchange STUN requests with stun.cloudflare.com and stun.l.google.com, so your UDP reflexive address is visible to them. It never passes through, and is never stored by, this site.",
+      retryLabel:
+        "Retry (probes stun.cloudflare.com and stun.l.google.com again)",
+    },
     C1: {
       title: "Real Public IP",
       meaning:
@@ -195,7 +251,7 @@ export const EN = {
   /** 检测卡区的两个分区标题（规格第 4 节第 2 项）。 */
   sections: {
     online: {
-      title: "What this page can check (4)",
+      title: "What this page can check (6)",
       body: "Your browser and the Cloudflare edge cover these — nothing to install locally.",
     },
     cli: {
@@ -216,8 +272,8 @@ export const EN = {
       body: "AI tools are sensitive to your network environment. The most common pitfalls fall into four categories: exit IP type or abuse history that triggers anti-abuse controls; a mismatch between system and exit IP timezone; IPv6 quietly bypassing the proxy and exposing your real location; and local DNS exposing the domains you visit to your local ISP. This site can check the first three online; a DNS leak requires reading local DNS query logs, which a webpage structurally cannot access — it's a CLI-only item.",
     },
     install: {
-      title: "Install the CLI for all 8 checks",
-      body: "The web version is a quick first look — it covers 4 items. The CLI covers all 8, including your real public IP, DNS leaks, proxy/TUN detection, and the $TZ timezone check.",
+      title: "Install the CLI for all 10 checks",
+      body: "The web version is a quick first look — it covers 6 items. The CLI covers all 10, including your real public IP, DNS leaks, proxy/TUN detection, and the $TZ timezone check.",
     },
     compare: {
       title: "Web vs. CLI: Full Feature Comparison",
@@ -239,7 +295,7 @@ export const EN = {
   footer: {
     privacy: "This site stores none of your check results.",
     thirdParty:
-      "The IPv6 check is made directly from your browser to ipify; the IP risk check requires you to trigger it manually, at which point Cloudflare Turnstile loads for bot verification first, then your exit IP is sent to proxycheck.io and StopForumSpam.",
+      "Three checks run automatically as soon as the page loads, directly from your browser: the IPv6 check queries ipify, the DNS egress check queries ip-api.com, and the UDP egress check queries stun.cloudflare.com and stun.l.google.com. The IP risk check requires you to trigger it manually, at which point Cloudflare Turnstile loads for bot verification first, then your exit IP is sent to proxycheck.io and StopForumSpam.",
   },
 
   errors: {

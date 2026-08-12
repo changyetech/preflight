@@ -7,17 +7,19 @@ export type CompareOwner = "web" | "cli";
 export type CompareExecution = "auto" | "onDemand" | "none";
 
 export type CompareRow = {
-  id: "O1" | "O2" | "O3" | "O4" | "C1" | "C2" | "C3" | "C4";
+  id: "O1" | "O2" | "O3" | "O4" | "O5" | "O6" | "C1" | "C2" | "C3" | "C4";
   owner: CompareOwner;
   execution: CompareExecution;
 };
 
-/** 顺序与契约第 1 节总表逐行一致：O1, O2, O3, O4, C1, C2, C3, C4。 */
+/** 顺序与契约第 1 节总表逐行一致：O1, O2, O3, O4, O5, O6, C1, C2, C3, C4。 */
 export const COMPARE_TABLE: readonly CompareRow[] = [
   { id: "O1", owner: "web", execution: "auto" },
   { id: "O2", owner: "web", execution: "auto" },
   { id: "O3", owner: "web", execution: "auto" },
   { id: "O4", owner: "web", execution: "onDemand" },
+  { id: "O5", owner: "web", execution: "auto" },
+  { id: "O6", owner: "web", execution: "auto" },
   { id: "C1", owner: "cli", execution: "none" },
   { id: "C2", owner: "cli", execution: "none" },
   { id: "C3", owner: "cli", execution: "none" },

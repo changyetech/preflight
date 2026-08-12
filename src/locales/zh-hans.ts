@@ -51,7 +51,7 @@ export const ZH_HANS: Copy = {
     needCli: "需 CLI",
     failed: "检测失败",
     pending: "按需未测",
-    total: "共 8 项",
+    total: "共 10 项",
     hint: "结论只覆盖已完成的项。需 CLI 的项本站结构性做不到，装 CLI 才能测。",
   },
 
@@ -149,6 +149,54 @@ export const ZH_HANS: Copy = {
         "今日额度已用尽。本项按「检测失败」计入覆盖度，明日 UTC 零点后恢复；其余各项与初步结论不受影响。",
       turnstileMissing: "人机验证组件未配置，本项暂不可用。",
     },
+    O5: {
+      title: "DNS 出口泄露",
+      meaning:
+        "如果你的 DNS 查询从跟代理流量不同的国家出网，运营那台 resolver 的人、以及监听这条链路的人，都能看到你在解析哪些域名——即使你的 HTTP/TCP 流量看起来已经走了代理。这是分流泄露最常见的两条漏之一（另一条是 UDP，见 O6）。",
+      scopeNote:
+        "本项测的是你的浏览器实际使用的 DNS 路径。如果浏览器开着 Secure DNS（DoH），结果会与命令行工具不同——后者走的是系统 resolver，属于 CLI 的判定范围。两者不一致时，以 CLI 的结果为准。",
+      resolverLabel: "resolver 归属",
+      resolverNote:
+        "仅供参考，不参与判定：resolver 在哪个国家取决于你选了哪家 DNS 服务商，与流量是否走代理无关。",
+      ecsLabel: "DNS 客户端子网归属国",
+      exitLabel: "出口 IP 归属国",
+      leak: "你的 DNS 查询似乎从与出口 IP 不同的国家出网，DNS 可能正在绕过代理。",
+      noLeak:
+        "你的 DNS 查询似乎与出口 IP 从同一国家出网，未检测到 DNS 出口泄露。",
+      noEcs: "你的 DNS 服务商不发送 ECS，无法判定 DNS 查询是否走代理。",
+      unmappedCountry:
+        "resolver 返回了客户端子网归属地，但我们暂时认不出这个国家名，无法比对。",
+      unknownExitCountry:
+        "出口 IP 的归属国尚未取得（见上方「出口 IP 与归属」），暂时无法比对。",
+      failed: "DNS 出口探测未能完成，本项无法判定。网络恢复后可重试。",
+      thirdPartyNote:
+        "本项由你的浏览器直接访问 ip-api.com（每次用一个新生成的随机子域名）完成，你的出口地址对该服务可见；本站不经手、不存储。",
+      retryLabel: "重试（将再次由浏览器直连 ip-api.com）",
+    },
+    O6: {
+      title: "UDP 出口一致性",
+      meaning:
+        "多数代理只稳定接管 TCP。如果 UDP 流量从另一条路径溜出去，暴露的地址可能与你其他流量展示的不同——包括那些直接用 UDP 的服务（WebRTC、部分游戏与语音客户端，以及一些 AI 工具）。",
+      reflexiveLabel: "UDP 反射地址",
+      exitLabel: "出口 IP",
+      mismatch:
+        "你的 UDP 流量似乎从与出口 IP 不同的地址出网，UDP 可能正在绕过代理。",
+      noMismatch:
+        "你的 UDP 流量似乎与出口 IP 从同一地址出网，未检测到 UDP 出口不一致。",
+      familyMismatch:
+        "UDP 反射地址与出口 IP 不是同一协议族（IPv4/IPv6），无法在同一基准上比较。",
+      unknownExitIp:
+        "出口 IP 尚未取得（见上方「出口 IP 与归属」），暂时无法比对。",
+      stunDisagree:
+        "两个 STUN 服务器给出的地址不一致，没有一个可信的单一值可比——常见于多出口集群或对称 NAT。",
+      webrtcUnavailable:
+        "浏览器禁用了 WebRTC，本项无法判定 UDP 是否走代理；CLI 不受此限制——它直接使用裸 UDP socket，不依赖浏览器的 WebRTC 栈。",
+      stunUnanswered:
+        "两个 STUN 服务器均未在超时前应答，多半是暂时的网络问题，可重试。",
+      thirdPartyNote:
+        "本项通过浏览器的 WebRTC 与 stun.cloudflare.com、stun.l.google.com 两个 STUN 服务器交换请求以取得你的 UDP 反射地址；本站不经手、不存储。",
+      retryLabel: "重试（将再次探测 stun.cloudflare.com 与 stun.l.google.com）",
+    },
     C1: {
       title: "本机真实 IP",
       meaning:
@@ -173,7 +221,7 @@ export const ZH_HANS: Copy = {
 
   sections: {
     online: {
-      title: "网页可测到的（4 项）",
+      title: "网页可测到的（6 项）",
       body: "浏览器与 Cloudflare 边缘就能完成，无需在本机装任何东西。",
     },
     cli: {
@@ -192,8 +240,8 @@ export const ZH_HANS: Copy = {
       body: "AI 工具对访问环境很敏感，最容易踩雷的集中在四类：出口 IP 类型与历史滥用记录过高触发风控、系统与出口 IP 时区不一致露出破绽、IPv6 悄悄绕过代理暴露真实位置、本地 DNS 把你访问过的域名暴露给本地运营商。本站可在线检测前三类；DNS 泄露需要读取本机 DNS 查询日志，网页结构性拿不到，属于仅 CLI 项。",
     },
     install: {
-      title: "安装 CLI 补全全部 8 项",
-      body: "网页版是快速摸底，能测 4 项；CLI 覆盖全部 8 项，包括本机真实 IP、DNS 泄露、代理与 TUN 检测、$TZ 时区一致性。",
+      title: "安装 CLI 补全全部 10 项",
+      body: "网页版是快速摸底，能测 6 项；CLI 覆盖全部 10 项，包括本机真实 IP、DNS 泄露、代理与 TUN 检测、$TZ 时区一致性。",
     },
     compare: {
       title: "Web 与 CLI 完整功能对照表",
@@ -211,7 +259,7 @@ export const ZH_HANS: Copy = {
   footer: {
     privacy: "本站不存储任何检测结果。",
     thirdParty:
-      "IPv6 检测由浏览器直接访问 ipify；IP 风险检测需你手动触发，届时会先加载 Cloudflare Turnstile 人机验证，随后出口 IP 会被发送至 proxycheck.io 与 StopForumSpam。",
+      "页面加载后会自动发起三项检测，均由浏览器直接发出：IPv6 检测访问 ipify，DNS 出口检测访问 ip-api.com，UDP 出口检测访问 stun.cloudflare.com 与 stun.l.google.com。IP 风险检测需你手动触发，届时会先加载 Cloudflare Turnstile 人机验证，随后出口 IP 会被发送至 proxycheck.io 与 StopForumSpam。",
   },
 
   errors: {

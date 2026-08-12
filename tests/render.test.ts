@@ -13,9 +13,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { CheckCard, CliCard } from "../src/components/Card";
-import { O3Card, O4Card } from "../src/components/cards";
+import { O3Card, O4Card, O5Card, O6Card } from "../src/components/cards";
 import { VerdictPanel } from "../src/components/Verdict";
 import { COPY } from "../src/copy";
+import {
+  UDP_EGRESS_STUN_UNANSWERED,
+  UDP_EGRESS_WEBRTC_UNAVAILABLE,
+} from "../src/domain/udpEgress";
+import { DNS_EGRESS_PROBE_FAILED } from "../src/domain/dnsEgress";
 import type { Coverage } from "../src/domain/coverage";
 import type { GeoData } from "../src/domain/types";
 import type { Verdict } from "../src/domain/verdict";
@@ -256,5 +261,205 @@ describe("O3 第三方披露（终审修复波：ipify 无就地披露）", () =
     // 破坏性验证过这条会打红：把 O3Card 的 retryLabel 去掉后，这行会因为
     // 按钮落回通用「重试」而失败（见 --content 计划终审修复波报告）。
     expect(html).not.toContain(`class="retry">${COPY.actions.retry}<`);
+  });
+});
+
+describe("O5 DNS 出口泄露卡（契约 §2.5／§5.5）", () => {
+  it("ECS 缺失时状态是「已完成」，且给出明确说明，不落到「未泄露」", () => {
+    const html = renderToStaticMarkup(
+      createElement(O5Card, {
+        state: {
+          status: "done",
+          data: {
+            resolverGeo: null,
+            comparison: { comparable: false, reason: "noEcs" },
+          },
+        },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain(esc(COPY.cardStatus.done));
+    expect(html).not.toContain(esc(COPY.cardStatus.failed));
+    expect(html).toContain(esc(COPY.checks.O5.noEcs));
+    expect(html).not.toContain(esc(COPY.checks.O5.leak));
+    expect(html).not.toContain(esc(COPY.checks.O5.noLeak));
+  });
+
+  it("三种「无从比对」渲染出各自的说明，互不混用", () => {
+    const reasonOf = (
+      reason: "noEcs" | "unmappedCountry" | "unknownExitCountry",
+    ) =>
+      renderToStaticMarkup(
+        createElement(O5Card, {
+          state: {
+            status: "done",
+            data: {
+              resolverGeo: "Japan - Google LLC",
+              comparison: { comparable: false, reason },
+            },
+          },
+          onRetry: () => {},
+        }),
+      );
+
+    expect(reasonOf("noEcs")).toContain(esc(COPY.checks.O5.noEcs));
+    expect(reasonOf("unmappedCountry")).toContain(
+      esc(COPY.checks.O5.unmappedCountry),
+    );
+    expect(reasonOf("unknownExitCountry")).toContain(
+      esc(COPY.checks.O5.unknownExitCountry),
+    );
+  });
+
+  it("展示 resolver 归属，且卡内注明它不参与判定", () => {
+    const html = renderToStaticMarkup(
+      createElement(O5Card, {
+        state: {
+          status: "done",
+          data: {
+            resolverGeo: "Japan - Google LLC",
+            comparison: {
+              comparable: true,
+              leak: false,
+              ecsCountry: "CN",
+              exitCountry: "CN",
+            },
+          },
+        },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain("Japan - Google LLC");
+    expect(html).toContain(esc(COPY.checks.O5.resolverNote));
+  });
+
+  it("卡内写明本项测的是浏览器 DNS（契约 §5.5，缺了这句 CLI 用户会误以为命令行已被检查）", () => {
+    const html = renderToStaticMarkup(
+      createElement(O5Card, {
+        state: { status: "running" },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain(esc(COPY.checks.O5.scopeNote));
+  });
+
+  it("探测失败给出重试入口，不渲染成泄露或未泄露的结论", () => {
+    const html = renderToStaticMarkup(
+      createElement(O5Card, {
+        state: { status: "failed", reason: DNS_EGRESS_PROBE_FAILED },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain('class="retry"');
+    expect(html).toContain(esc(COPY.checks.O5.failed));
+    expect(html).not.toContain(esc(COPY.checks.O5.leak));
+    expect(html).not.toContain(esc(COPY.checks.O5.noLeak));
+  });
+});
+
+describe("O6 UDP 出口一致性卡（契约 §2.6／§5.6）", () => {
+  it("WebRTC 被禁用 ⇒ 检测失败，且不渲染为绿色（tone-ok 不出现）", () => {
+    const html = renderToStaticMarkup(
+      createElement(O6Card, {
+        state: { status: "failed", reason: UDP_EGRESS_WEBRTC_UNAVAILABLE },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain(esc(COPY.cardStatus.failed));
+    expect(html).toContain(esc(COPY.checks.O6.webrtcUnavailable));
+    expect(html).not.toContain("tone-ok");
+    expect(html).not.toContain(esc(COPY.checks.O6.stunUnanswered));
+  });
+
+  it("STUN 未应答与 WebRTC 被禁用文案不同（可恢复性相反，契约 §5.6）", () => {
+    const html = renderToStaticMarkup(
+      createElement(O6Card, {
+        state: { status: "failed", reason: UDP_EGRESS_STUN_UNANSWERED },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain(esc(COPY.checks.O6.stunUnanswered));
+    expect(html).not.toContain(esc(COPY.checks.O6.webrtcUnavailable));
+  });
+
+  it("「无从比对」（stunDisagree）与「未命中」文案可区分，且不落到绿色", () => {
+    const disagree = renderToStaticMarkup(
+      createElement(O6Card, {
+        state: {
+          status: "done",
+          data: { comparable: false, reason: "stunDisagree" },
+        },
+        onRetry: () => {},
+      }),
+    );
+    const noMismatch = renderToStaticMarkup(
+      createElement(O6Card, {
+        state: {
+          status: "done",
+          data: {
+            comparable: true,
+            mismatch: false,
+            reflexiveIp: "203.0.113.7",
+            exitIp: "203.0.113.7",
+          },
+        },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(disagree).toContain(esc(COPY.checks.O6.stunDisagree));
+    expect(disagree).not.toContain(esc(COPY.checks.O6.noMismatch));
+    expect(disagree).not.toContain("tone-ok");
+    expect(noMismatch).toContain(esc(COPY.checks.O6.noMismatch));
+  });
+
+  it("命中（mismatch）时展示反射地址与出口 IP 两个字段", () => {
+    const html = renderToStaticMarkup(
+      createElement(O6Card, {
+        state: {
+          status: "done",
+          data: {
+            comparable: true,
+            mismatch: true,
+            reflexiveIp: "203.0.113.7",
+            exitIp: "198.51.100.20",
+          },
+        },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain(esc(COPY.checks.O6.mismatch));
+    expect(html).toContain("203.0.113.7");
+    expect(html).toContain("198.51.100.20");
+  });
+});
+
+describe("O5／O6 第三方披露（ADR-0008）", () => {
+  it("自动执行、无触发控件——披露文案必须始终渲染在卡片说明位", () => {
+    const o5 = renderToStaticMarkup(
+      createElement(O5Card, {
+        state: { status: "running" },
+        onRetry: () => {},
+      }),
+    );
+    const o6 = renderToStaticMarkup(
+      createElement(O6Card, {
+        state: { status: "running" },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(o5).toContain(esc(COPY.checks.O5.thirdPartyNote));
+    expect(o5).toContain("ip-api.com");
+    expect(o6).toContain(esc(COPY.checks.O6.thirdPartyNote));
+    expect(o6).toContain("stun.cloudflare.com");
+    expect(o6).toContain("stun.l.google.com");
   });
 });

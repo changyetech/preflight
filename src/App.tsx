@@ -4,7 +4,14 @@
 import "./App.css";
 
 import { CliCard } from "./components/Card";
-import { O1Card, O2Card, O3Card, O4Card } from "./components/cards";
+import {
+  O1Card,
+  O2Card,
+  O3Card,
+  O4Card,
+  O5Card,
+  O6Card,
+} from "./components/cards";
 import { CLI_CHECK_IDS } from "./domain/checks";
 import { langFromPathname, localeOf, type Lang } from "./copy";
 import { BackToTop } from "./components/BackToTop";
@@ -16,8 +23,17 @@ import { usePanel } from "./usePanel";
 
 function AppShell({ lang }: { lang: Lang }) {
   const COPY = useCopy();
-  const { panel, coverage, verdict, runGeo, runIpv6, runRisk, failRisk } =
-    usePanel();
+  const {
+    panel,
+    coverage,
+    verdict,
+    runGeo,
+    runIpv6,
+    runRisk,
+    failRisk,
+    runDnsEgress,
+    runUdpEgress,
+  } = usePanel();
 
   return (
     <>
@@ -63,6 +79,8 @@ function AppShell({ lang }: { lang: Lang }) {
               onRun={(token) => void runRisk(token)}
               onFail={failRisk}
             />
+            <O5Card state={panel.o5} onRetry={() => void runDnsEgress()} />
+            <O6Card state={panel.o6} onRetry={() => void runUdpEgress()} />
           </div>
         </section>
 

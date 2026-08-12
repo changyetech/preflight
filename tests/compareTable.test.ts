@@ -1,5 +1,5 @@
 // 功能对照表数据一致性（--content 计划步骤 3 / 验收标准）：
-// COMPARE_TABLE 必须恰好 8 行，顺序、归属与规格第 2 节总表当前的取值逐项一致。
+// COMPARE_TABLE 必须恰好 10 行，顺序、归属与规格第 2 节总表当前的取值逐项一致。
 //
 // 这只是数据层回归锁，锁的是「改动 compareTable.ts 时是否还跟规格总表对得上」，
 // 不是规格与代码的机械双向绑定——规格文档改了，这些测试不会自动变红，也测不出
@@ -13,16 +13,18 @@ import { COMPARE_TABLE } from "../src/domain/compareTable";
 import { COPY } from "../src/copy";
 
 describe("Web 与 CLI 完整功能对照表", () => {
-  it("恰好 8 行", () => {
-    expect(COMPARE_TABLE).toHaveLength(8);
+  it("恰好 10 行", () => {
+    expect(COMPARE_TABLE).toHaveLength(10);
   });
 
-  it("行顺序与规格第 2 节总表一致：O1, O2, O3, O4, C1, C2, C3, C4", () => {
+  it("行顺序与规格第 2 节总表一致：O1, O2, O3, O4, O5, O6, C1, C2, C3, C4", () => {
     expect(COMPARE_TABLE.map((row) => row.id)).toEqual([
       "O1",
       "O2",
       "O3",
       "O4",
+      "O5",
+      "O6",
       "C1",
       "C2",
       "C3",
@@ -49,6 +51,8 @@ describe("Web 与 CLI 完整功能对照表", () => {
     expect(byId.O2.execution).toBe("auto");
     expect(byId.O3.execution).toBe("auto");
     expect(byId.O4.execution).toBe("onDemand");
+    expect(byId.O5.execution).toBe("auto");
+    expect(byId.O6.execution).toBe("auto");
     for (const id of ["C1", "C2", "C3", "C4"] as const) {
       expect(byId[id].execution).toBe("none");
     }
