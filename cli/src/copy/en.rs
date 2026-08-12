@@ -151,7 +151,7 @@ pub const EN: Text = Text {
         exit_label: "Exit IP",
         mismatch: "Your UDP traffic appears to exit from a different address than your exit IP — UDP may be bypassing the proxy.",
         no_mismatch: "Your UDP traffic appears to exit from the same address as your exit IP — no UDP egress mismatch detected.",
-        family_mismatch: "The UDP reflexive address and your exit IP are different address families (IPv4/IPv6), so they can't be compared on equal terms.",
+        family_mismatch: "Fewer than two reflexive addresses in the same address family as your exit IP (IPv4/IPv6) came back, so there's nothing to compare on equal terms.",
         unknown_exit_ip: "The exit IP isn't available yet (see the Exit IP check above), so this can't be compared.",
         stun_disagree: "The two STUN servers reported different addresses, so there's no single reliable value to compare — this can happen with multi-exit clusters or symmetric NAT.",
     },

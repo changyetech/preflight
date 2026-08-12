@@ -184,7 +184,7 @@ export const ZH_HANS: Copy = {
       noMismatch:
         "你的 UDP 流量似乎与出口 IP 从同一地址出网，未检测到 UDP 出口不一致。",
       familyMismatch:
-        "UDP 反射地址与出口 IP 不是同一协议族（IPv4/IPv6），无法在同一基准上比较。",
+        "与出口 IP 同协议族（IPv4/IPv6）的可比对反射地址不足两个，没有可以在同一基准上比较的对象。",
       unknownExitIp:
         "出口 IP 尚未取得（见上方「出口 IP 与归属」），暂时无法比对。",
       stunDisagree:

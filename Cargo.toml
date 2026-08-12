@@ -16,9 +16,9 @@ rust-version = "1.90"
 #    （它才会生成 .github/workflows/*-release.yml）。前置条件见
 #    docs/plans/2026-08-12-cli-rust-rewrite--release.md。
 #
-# tag 用**斜杠形式** `cli/v0.1.0`：dist 文档化的解析规则会忽略 `/` 之前非 package 名的
+# tag 用**斜杠形式** `cli/v0.2.0`：dist 文档化的解析规则会忽略 `/` 之前非 package 名的
 # 前缀，因此 tag 前缀与应用最终叫什么完全解耦——名字还没定，tag 却已经可以定了。
-# 落地前必须用 `dist plan --tag=cli/v0.1.0` 实测确认。
+# 落地前必须用 `dist plan --tag=cli/v0.2.0` 实测确认。
 [workspace.metadata.dist]
 cargo-dist-version = "0.32.0"
 ci = ["github"]

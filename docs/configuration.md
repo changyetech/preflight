@@ -21,7 +21,7 @@
 | `HOMEBREW_TAP_TOKEN` | **secret** | GitHub Secret | CLI 发版时推 tap 失败 |
 | CLI 的 `proxycheck_key` | **secret** | 用户本机 | CLI 配额 100 次/天而非 1000 |
 
-**只有 CLI 是零配置可用的**——不配任何东西也能跑完 8 项，只是 proxycheck 走无 key 的 100 次/天。Web 侧则必须配齐 Turnstile 与 proxycheck 才有完整功能。
+**只有 CLI 是零配置可用的**——不配任何东西也能跑完 10 项，只是 proxycheck 走无 key 的 100 次/天。Web 侧则必须配齐 Turnstile 与 proxycheck 才有完整功能。
 
 ---
 
@@ -141,11 +141,11 @@ pnpm deploy    # = build + wrangler deploy -c dist/ipcheck/wrangler.json
 
 ```bash
 dist init                        # 生成 release workflow（首次）
-dist plan --tag=cli/v0.1.0       # 必须先实测解析通过
-git tag cli/v0.1.0 && git push --tags
+dist plan --tag=cli/v0.2.0       # 必须先实测解析通过
+git tag cli/v0.2.0 && git push --tags
 ```
 
-**tag 用斜杠形式 `cli/v0.1.0`**：dist 文档化的解析规则会忽略 `/` 之前非 package 名的前缀，因此 tag 前缀与应用最终叫什么**完全解耦**。
+**tag 用斜杠形式 `cli/v0.2.0`**：dist 文档化的解析规则会忽略 `/` 之前非 package 名的前缀，因此 tag 前缀与应用最终叫什么**完全解耦**。
 
 `Cargo.toml` 的 `[workspace.metadata.dist]` 里 `tap = "OWNER/homebrew-tap"` 目前是**占位**，定了 owner 要改。
 
@@ -206,7 +206,7 @@ ipcheck config set proxycheck-key    # 交互式、不回显，写入后权限�
 **CLI 发布**
 - [ ] 应用最终名已定（这是最后的免费改名窗口）
 - [ ] `Cargo.toml` 里的 `tap` 占位已替换
-- [ ] `dist plan --tag=cli/v0.1.0` 解析通过
+- [ ] `dist plan --tag=cli/v0.2.0` 解析通过
 - [ ] 发版后 `brew install <owner>/tap/ipcheck` 与 installer 一行命令实测可用
 
 ---

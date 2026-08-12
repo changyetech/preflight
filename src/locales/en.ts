@@ -211,7 +211,7 @@ export const EN = {
         "Your UDP traffic appears to exit from the same address as your exit IP — no UDP egress mismatch detected.",
       /** 三种「无从比对」各一条，且必须与命中／未命中在措辞上可区分（契约 §2.6 判定表第 2/3/4 行）。 */
       familyMismatch:
-        "The UDP reflexive address and your exit IP are different address families (IPv4/IPv6), so they can't be compared on equal terms.",
+        "Fewer than two reflexive addresses in the same address family as your exit IP (IPv4/IPv6) came back, so there's nothing to compare on equal terms.",
       unknownExitIp:
         "The exit IP isn't available yet (see the Exit IP check above), so this can't be compared.",
       stunDisagree:
@@ -285,7 +285,7 @@ export const EN = {
       auto: "Automatic",
       onDemand: "On demand",
       /**
-       * CLI 覆盖全部 8 项（CLI README 功能表），这一列没有「—」的取值（C1 修复）。
+       * CLI 覆盖全部 10 项（CLI README 功能表），这一列没有「—」的取值（C1 修复）。
        * 用带文字的「支持」而不是裸符号「✓」——屏幕阅读器对孤立符号的朗读不稳定（N3）。
        */
       available: "Yes",
