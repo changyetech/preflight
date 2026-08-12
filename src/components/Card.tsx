@@ -69,10 +69,11 @@ export function CheckCard({
 
       {children ? <div className="card-body">{children}</div> : null}
 
-      <p className="meaning">
-        <span className="meaning-label">{COPY.actions.meaningLabel}</span>
+      {/* 默认折叠：结论与字段优先，解释文案点开即读。文案始终在 DOM 内，爬虫与读屏都拿得到。 */}
+      <details className="meaning">
+        <summary className="meaning-label">{COPY.actions.meaningLabel}</summary>
         {meaning}
-      </p>
+      </details>
 
       {onRetry ? (
         <button type="button" className="retry" onClick={onRetry}>
