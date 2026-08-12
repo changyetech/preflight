@@ -40,9 +40,10 @@ describe.each(
     expect(copy.footer.thirdParty).toContain("Turnstile");
   });
 
-  it("O2 文案必须区分 Claude 桌面版与 Claude Code CLI 的时区来源（验收标准 2）", () => {
-    expect(copy.checks.O2.scopeNote).toContain("Claude Code CLI");
+  // 契约 §5.1 呈现约束：缺了这句，CLI 用户会误以为自己的 $TZ 已被检查。
+  it("O2 文案必须说明本项测的是系统时区、并指向 C4（契约 5.1 / 验收标准 2）", () => {
     expect(copy.checks.O2.scopeNote).toContain("$TZ");
+    expect(copy.checks.O2.scopeNote).toContain("C4");
   });
 
   it("覆盖度四档各有独立文案，检测失败与需 CLI 不共用措辞（ADR-0004）", () => {
@@ -67,8 +68,9 @@ describe("受 ADR 约束的措辞 · 英文（源语言）", () => {
     expect(COPY.verdict.preliminaryBadge).toContain("not included");
   });
 
-  it("O2 文案必须点出桌面版这一侧的时区来源（验收标准 2）", () => {
-    expect(COPY.checks.O2.scopeNote).toContain("desktop app");
+  it("O2 文案必须点出图形界面这一侧的时区来源（验收标准 2）", () => {
+    expect(COPY.checks.O2.scopeNote).toContain("GUI apps");
+    expect(COPY.checks.O2.scopeNote).toContain("Command-line tools");
   });
 
   it("滥用收录不可用时显示「未知」而非「无收录」（docs/api.md 3.1）", () => {
@@ -92,8 +94,9 @@ describe("受 ADR 约束的措辞 · 简体中文", () => {
     );
   });
 
-  it("O2 文案必须点出桌面版这一侧的时区来源（验收标准 2）", () => {
-    expect(COPY_ZH_HANS.checks.O2.scopeNote).toContain("桌面版");
+  it("O2 文案必须点出图形界面这一侧的时区来源（验收标准 2）", () => {
+    expect(COPY_ZH_HANS.checks.O2.scopeNote).toContain("图形界面应用");
+    expect(COPY_ZH_HANS.checks.O2.scopeNote).toContain("命令行工具");
   });
 
   it("初步结论标注必须写明未含 IP 风险评分（ADR-0005 / 验收标准 4）", () => {

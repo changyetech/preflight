@@ -8,7 +8,7 @@ import type { Copy } from "./en";
 export const ZH_HANS: Copy = {
   site: {
     title: "ipcheck · 网络环境体检",
-    tagline: "开跑 Claude 之前，先看清自己的网络长什么样",
+    tagline: "开跑 AI 命令行工具之前，先看清自己的网络长什么样",
   },
 
   nav: {
@@ -51,7 +51,7 @@ export const ZH_HANS: Copy = {
     needCli: "需 CLI",
     failed: "检测失败",
     pending: "按需未测",
-    total: "共 9 项",
+    total: "共 8 项",
     hint: "结论只覆盖已完成的项。需 CLI 的项本站结构性做不到，装 CLI 才能测。",
   },
 
@@ -75,7 +75,7 @@ export const ZH_HANS: Copy = {
     O1: {
       title: "出口 IP 与归属",
       meaning:
-        "这是所有网站（包括 Claude）看到的你。归属地与你实际所在地差得越远，越容易被判为异常流量。",
+        "这是你连上的所有服务看到的你。归属地与你实际所在地差得越远，越容易被判为异常流量。",
       fields: {
         location: "归属地",
         asn: "运营商 / ASN",
@@ -92,7 +92,7 @@ export const ZH_HANS: Copy = {
       meaning:
         "时区对不上是最常见的代理特征之一：IP 显示在美国、系统却是北京时间，风控一眼就能看出来。",
       scopeNote:
-        "本项对应 Claude 桌面版（浏览器时区＝系统时区）。Claude Code CLI 认 $TZ，见 C4。",
+        "本项对应图形界面应用（浏览器时区＝系统时区）。命令行工具认 $TZ，见 C4。",
       browserLabel: "系统（浏览器）时区",
       exitLabel: "出口 IP 时区",
     },
@@ -165,14 +165,9 @@ export const ZH_HANS: Copy = {
         "需要读取本机环境变量与系统代理配置。CLI 能看出「你以为开了代理其实没生效」这种情况。",
     },
     C4: {
-      title: "Claude Code CLI 时区一致性",
+      title: "$TZ 时区一致性",
       meaning:
-        "CC CLI 认的是环境变量 $TZ，与系统时区可以不同。网页读不到 $TZ——上面的 O2 测的是系统时区，覆盖不了这一项。",
-    },
-    C5: {
-      title: "Claude 端点检测",
-      meaning:
-        "官方直连 / 国产大模型 / 中转站及黑名单命中。需要读取本机的 ANTHROPIC_BASE_URL 配置，网页读不到。这是 CLI 里唯一能判「高风险」的项。",
+        "命令行工具认的是环境变量 $TZ，与系统时区可以不同。网页读不到 $TZ——上面的 O2 测的是系统时区，覆盖不了这一项。",
     },
   },
 
@@ -182,8 +177,8 @@ export const ZH_HANS: Copy = {
       body: "浏览器与 Cloudflare 边缘就能完成，无需在本机装任何东西。",
     },
     cli: {
-      title: "需要 CLI 才能测（5 项）",
-      body: "这 5 项必须读取本机环境（本地 DNS、系统代理与 TUN、$TZ、Claude Code 配置），网页结构性拿不到，只能由 CLI 在你本机完成。",
+      title: "需要 CLI 才能测（4 项）",
+      body: "这 4 项必须读取本机环境（本地 DNS、系统代理与 TUN、$TZ），网页结构性拿不到，只能由 CLI 在你本机完成。",
     },
   },
 
@@ -197,8 +192,8 @@ export const ZH_HANS: Copy = {
       body: "AI 工具对访问环境很敏感，最容易踩雷的集中在四类：出口 IP 类型与历史滥用记录过高触发风控、系统与出口 IP 时区不一致露出破绽、IPv6 悄悄绕过代理暴露真实位置、本地 DNS 把你访问过的域名暴露给本地运营商。本站可在线检测前三类；DNS 泄露需要读取本机 DNS 查询日志，网页结构性拿不到，属于仅 CLI 项。",
     },
     install: {
-      title: "安装 CLI 补全全部 9 项",
-      body: "网页版是快速摸底，能测 4 项；CLI 覆盖全部 9 项，包括本机真实 IP、DNS 泄露、代理与 TUN 检测、Claude Code 时区一致性与端点检测。",
+      title: "安装 CLI 补全全部 8 项",
+      body: "网页版是快速摸底，能测 4 项；CLI 覆盖全部 8 项，包括本机真实 IP、DNS 泄露、代理与 TUN 检测、$TZ 时区一致性。",
     },
     compare: {
       title: "Web 与 CLI 完整功能对照表",

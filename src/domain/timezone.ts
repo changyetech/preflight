@@ -81,7 +81,7 @@ function matches(local: string, exit: string | null): boolean | null {
   return localOffset === exitOffset;
 }
 
-/** 浏览器时区跟随系统时区——这正是本项只覆盖 Claude 桌面版、覆盖不到 CC CLI 的原因（契约 §5.1）。 */
+/** 浏览器时区跟随系统时区——这正是本项只覆盖图形界面应用、覆盖不到 `$TZ` 的原因（契约 §5.1）。 */
 export function browserTimezone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }

@@ -13,10 +13,11 @@ import {
 } from "../src/domain/checks";
 
 describe("检测项状态模型", () => {
-  it("可在线 4 项 + 仅 CLI 5 项 = 覆盖度分母 9", () => {
+  it("可在线 4 项 + 仅 CLI 4 项 = 覆盖度分母 8", () => {
     expect(ONLINE_CHECK_IDS).toEqual(["O1", "O2", "O3", "O4"]);
-    expect(CLI_CHECK_IDS).toEqual(["C1", "C2", "C3", "C4", "C5"]);
-    expect(TOTAL_CHECKS).toBe(9);
+    // C5（原厂商端点检测）已移除，编号废弃不复用（ADR-0013）。
+    expect(CLI_CHECK_IDS).toEqual(["C1", "C2", "C3", "C4"]);
+    expect(TOTAL_CHECKS).toBe(8);
   });
 
   it("仅 CLI 项无法处于「检测中」等非终态", () => {

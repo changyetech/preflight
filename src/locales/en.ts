@@ -6,7 +6,7 @@
 export const EN = {
   site: {
     title: "ipcheck · Network Environment Checkup",
-    tagline: "Know your network before you launch Claude",
+    tagline: "Know your network before you launch your AI CLI",
   },
 
   nav: {
@@ -59,7 +59,7 @@ export const EN = {
     needCli: "Needs CLI",
     failed: "Check failed",
     pending: "Not run yet",
-    total: "9 items total",
+    total: "8 items total",
     hint: "The verdict only covers completed items. Items that need the CLI are structurally out of reach for a webpage — install the CLI to test them.",
   },
 
@@ -83,7 +83,7 @@ export const EN = {
     O1: {
       title: "Exit IP Info",
       meaning:
-        "This is what every website — including Claude — sees as you. The further this location is from where you actually are, the more likely your traffic gets flagged as anomalous.",
+        "This is what every service you connect to sees as you. The further this location is from where you actually are, the more likely your traffic gets flagged as anomalous.",
       fields: {
         location: "Location",
         asn: "ISP / ASN",
@@ -105,7 +105,7 @@ export const EN = {
        * CLI 那一侧的完整说明归 C4 卡，这里只留最小限定 + 指路，避免两张卡讲同一段话。
        */
       scopeNote:
-        "Covers the Claude desktop app (browser = system timezone). Claude Code CLI reads $TZ — see C4.",
+        "Covers GUI apps (browser = system timezone). Command-line tools read $TZ — see C4.",
       browserLabel: "System (browser) timezone",
       exitLabel: "Exit IP timezone",
     },
@@ -185,14 +185,9 @@ export const EN = {
         'Requires reading local environment variables and the system proxy configuration. The CLI can catch cases like "you think your proxy is on but it isn\'t actually taking effect."',
     },
     C4: {
-      title: "Claude Code CLI Timezone Consistency",
+      title: "$TZ Timezone Consistency",
       meaning:
-        "Claude Code CLI honors the $TZ environment variable, which can differ from the system timezone. A webpage can't read $TZ — the O2 check above only tests the system timezone and doesn't cover this item.",
-    },
-    C5: {
-      title: "Claude Endpoint Check",
-      meaning:
-        'Official direct / domestic LLM / relay, plus a known-endpoint blacklist match. Requires reading the local ANTHROPIC_BASE_URL configuration, which a webpage can\'t read. This is the only CLI item that can produce a "high risk" verdict on its own.',
+        "Command-line tools inherit the $TZ environment variable, which can differ from the system timezone. A webpage can't read $TZ — the O2 check above only tests the system timezone and doesn't cover this item.",
     },
   },
 
@@ -203,8 +198,8 @@ export const EN = {
       body: "Your browser and the Cloudflare edge cover these — nothing to install locally.",
     },
     cli: {
-      title: "What only the CLI can check (5)",
-      body: "These five require reading your local environment (local DNS, system proxy and TUN, $TZ, Claude Code configuration). A webpage structurally cannot reach them — only the CLI, running on your machine, can.",
+      title: "What only the CLI can check (4)",
+      body: "These four require reading your local environment (local DNS, system proxy and TUN, $TZ). A webpage structurally cannot reach them — only the CLI, running on your machine, can.",
     },
   },
 
@@ -220,8 +215,8 @@ export const EN = {
       body: "AI tools are sensitive to your network environment. The most common pitfalls fall into four categories: exit IP type or abuse history that triggers anti-abuse controls; a mismatch between system and exit IP timezone; IPv6 quietly bypassing the proxy and exposing your real location; and local DNS exposing the domains you visit to your local ISP. This site can check the first three online; a DNS leak requires reading local DNS query logs, which a webpage structurally cannot access — it's a CLI-only item.",
     },
     install: {
-      title: "Install the CLI for all 9 checks",
-      body: "The web version is a quick first look — it covers 4 items. The CLI covers all 9, including your real public IP, DNS leaks, proxy/TUN detection, and Claude Code timezone and endpoint checks.",
+      title: "Install the CLI for all 8 checks",
+      body: "The web version is a quick first look — it covers 4 items. The CLI covers all 8, including your real public IP, DNS leaks, proxy/TUN detection, and the $TZ timezone check.",
     },
     compare: {
       title: "Web vs. CLI: Full Feature Comparison",
@@ -232,7 +227,7 @@ export const EN = {
       auto: "Automatic",
       onDemand: "On demand",
       /**
-       * CLI 覆盖全部 9 项（CLI README 功能表），这一列没有「—」的取值（C1 修复）。
+       * CLI 覆盖全部 8 项（CLI README 功能表），这一列没有「—」的取值（C1 修复）。
        * 用带文字的「支持」而不是裸符号「✓」——屏幕阅读器对孤立符号的朗读不稳定（N3）。
        */
       available: "Yes",

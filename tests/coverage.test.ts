@@ -1,8 +1,8 @@
 // 覆盖度计算（规格 3.4，ADR-0004）。
 //
-// 分母恒为 9。规格 3.4 只列了「已完成 / 需 CLI / 检测失败」三档，但按需项 O4 在被触发前
+// 分母恒为 8。规格 3.4 只列了「已完成 / 需 CLI / 检测失败」三档，但按需项 O4 在被触发前
 // 既没完成、也没失败、更不是需 CLI——三档装不下它。故模型多留一档「按需未测」，
-// 由 done + needCli + failed + pending ≡ 9 这条不变量兜底；pending 归零时三档之和自然恒为 9。
+// 由 done + needCli + failed + pending ≡ 8 这条不变量兜底；pending 归零时三档之和自然恒为 8。
 // 把未触发的 O4 塞进「检测失败」会谎报故障，塞进「需 CLI」会与永久性状态混计（ADR-0004 明令禁止）。
 
 import { describe, expect, it } from "vitest";
@@ -43,7 +43,7 @@ const FIRST_SCREEN: PanelState = {
 };
 
 describe("computeCoverage", () => {
-  it("四档之和恒为 9，需 CLI 恒为 5", () => {
+  it("四档之和恒为 8，需 CLI 恒为 4", () => {
     const panels: PanelState[] = [
       {
         o1: { status: "running" },
@@ -72,20 +72,20 @@ describe("computeCoverage", () => {
     for (const panel of panels) {
       const c = computeCoverage(panel);
       expect(c.done + c.needCli + c.failed + c.pending).toBe(TOTAL_CHECKS);
-      expect(c.needCli).toBe(5);
+      expect(c.needCli).toBe(4);
     }
   });
 
-  it("首屏：已完成 3 · 需 CLI 5 · 检测失败 0 · 按需未测 1", () => {
+  it("首屏：已完成 3 · 需 CLI 4 · 检测失败 0 · 按需未测 1", () => {
     expect(computeCoverage(FIRST_SCREEN)).toEqual({
       done: 3,
-      needCli: 5,
+      needCli: 4,
       failed: 0,
       pending: 1,
     });
   });
 
-  it("点击 O4 后已完成由 3 变 4，pending 归零，三档之和恒为 9（验收标准 5）", () => {
+  it("点击 O4 后已完成由 3 变 4，pending 归零，三档之和恒为 8（验收标准 5）", () => {
     const c = computeCoverage({
       ...FIRST_SCREEN,
       o4: {
@@ -106,7 +106,7 @@ describe("computeCoverage", () => {
       },
     });
 
-    expect(c).toEqual({ done: 4, needCli: 5, failed: 0, pending: 0 });
+    expect(c).toEqual({ done: 4, needCli: 4, failed: 0, pending: 0 });
     expect(c.done + c.needCli + c.failed).toBe(TOTAL_CHECKS);
   });
 
@@ -117,7 +117,7 @@ describe("computeCoverage", () => {
     });
 
     expect(c.failed).toBe(1);
-    expect(c.needCli).toBe(5);
+    expect(c.needCli).toBe(4);
     expect(c.done).toBe(2);
   });
 
@@ -127,12 +127,12 @@ describe("computeCoverage", () => {
       o4: { status: "done", data: { status: "quotaExhausted" } },
     });
 
-    expect(c).toEqual({ done: 3, needCli: 5, failed: 1, pending: 0 });
+    expect(c).toEqual({ done: 3, needCli: 4, failed: 1, pending: 0 });
   });
 
   it("检测中计入 pending，不预支为已完成", () => {
     expect(
       computeCoverage({ ...FIRST_SCREEN, o2: { status: "running" } }),
-    ).toEqual({ done: 2, needCli: 5, failed: 0, pending: 2 });
+    ).toEqual({ done: 2, needCli: 4, failed: 0, pending: 2 });
   });
 });

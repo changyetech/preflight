@@ -9,10 +9,10 @@ import type { GeoData, Ipv6Result, RiskData, TimezoneResult } from "./types";
 
 /** 可在线检测项。 */
 export const ONLINE_CHECK_IDS = ["O1", "O2", "O3", "O4"] as const;
-/** 仅 CLI 项。 */
-export const CLI_CHECK_IDS = ["C1", "C2", "C3", "C4", "C5"] as const;
+/** 仅 CLI 项。C5（原厂商端点检测）已移除，编号废弃不复用（ADR-0013）。 */
+export const CLI_CHECK_IDS = ["C1", "C2", "C3", "C4"] as const;
 
-/** 覆盖度的分母恒为 9（规格第 2 节）。 */
+/** 覆盖度的分母恒为 8（契约第 1 节）。 */
 export const TOTAL_CHECKS = ONLINE_CHECK_IDS.length + CLI_CHECK_IDS.length;
 
 /** 可在线项的四态。「需 CLI」不在其取值域内。 */

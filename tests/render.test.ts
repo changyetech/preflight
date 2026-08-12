@@ -47,7 +47,7 @@ function esc(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
-const COVERAGE: Coverage = { done: 3, needCli: 5, failed: 0, pending: 1 };
+const COVERAGE: Coverage = { done: 3, needCli: 4, failed: 0, pending: 1 };
 
 function renderVerdict(
   verdict: Verdict,
@@ -80,7 +80,7 @@ describe("结论区渲染", () => {
     const html = renderVerdict({ stage: "preliminary", level: "low" });
 
     expect(html).toContain(`${COPY.coverage.done} 3`);
-    expect(html).toContain(`${COPY.coverage.needCli} 5`);
+    expect(html).toContain(`${COPY.coverage.needCli} 4`);
     expect(html).toContain(`${COPY.coverage.failed} 0`);
     expect(html).toContain(`${COPY.coverage.pending} 1`);
     expect(html).toContain(esc(COPY.coverage.total));

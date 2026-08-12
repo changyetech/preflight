@@ -8,7 +8,7 @@ import type { RiskData } from "./types";
  * 覆盖度分档。规格 3.4 列的是三档，这里多一档 `pending`：
  * 按需项 O4 在被触发前不属于任何一档，硬塞进「检测失败」是谎报故障，
  * 塞进「需 CLI」则把可解决的临时状态与永久状态混计（ADR-0004 明令禁止）。
- * 不变量：done + needCli + failed + pending ≡ 9。
+ * 不变量：done + needCli + failed + pending ≡ 8。
  */
 export type Coverage = {
   done: number;
