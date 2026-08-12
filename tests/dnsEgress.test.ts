@@ -148,6 +148,26 @@ describe("probeDnsEgress · 取消路径", () => {
     vi.restoreAllMocks();
   });
 
+  it("子域标签恒为 32 位十六进制，且每次重试都换新的", async () => {
+    // 32 是 edns.ip-api.com 的外部契约（实测 31／33 位一律 404），此前发的是 16 位，
+    // 于是三次请求全部 404 ⇒ O5 在生产环境永远落「检测失败」。两轮评审都没抓到，
+    // 正是因为没有任何断言约束过标签的形状——这条测试补的就是那个缺口。
+    // 换新前缀则是绕 DNS 缓存的前提：重试同一个前缀等于在打自己刚种下的缓存。
+    const urls: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      urls.push(String(input));
+      return Promise.resolve(new Response("Not Found", { status: 404 }));
+    });
+
+    await expect(probeDnsEgress()).resolves.toEqual({ ok: false });
+
+    expect(urls).toHaveLength(3);
+    for (const url of urls) {
+      expect(url).toMatch(/^https:\/\/[0-9a-f]{32}\.edns\.ip-api\.com\/json$/);
+    }
+    expect(new Set(urls).size).toBe(3);
+  });
+
   it("已中止的 signal（组件已卸载）不再发请求，直接按探测失败收场", async () => {
     // 没有这条，卸载后最长 15s（3 次 × 5s 重试）还在打第三方——与 O6 的处理不对称。
     const fetchSpy = vi.spyOn(globalThis, "fetch");

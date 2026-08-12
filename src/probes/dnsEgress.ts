@@ -26,11 +26,18 @@ function geoOf(section: { geo?: unknown } | undefined): string | null {
 }
 
 /**
+ * 标签长度是 `edns.ip-api.com` 的**外部契约**，不是我们能选的：实测只接受**恰好 32 位**
+ * 十六进制，31 位与 33 位一律 404（2026-08-13 curl 实测）。这个数字只能靠人工实测保证，
+ * 单测能钉住的只是「我们确实发了 32 位」——见 tests/dnsEgress.test.ts。
+ */
+const LABEL_BYTES = 16;
+
+/**
  * 唯一子域是为了绕开各级 DNS 缓存——命中缓存拿到的是**别人**的观测值。
  * 因此每次重试都必须换新前缀，重试同一个前缀等于在打自己刚种下的缓存。
  */
 function randomLabel(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  const bytes = crypto.getRandomValues(new Uint8Array(LABEL_BYTES));
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
     "",
   );
