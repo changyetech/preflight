@@ -3,8 +3,10 @@
   "about": "docs/verdict.md 第 2-3 节的可执行形式。ipcheck Web（vitest）与 ipcheck CLI（cargo test）必须各写一个参数化测试消费本文件。改判级规则的顺序恒为：verdict.md -> 本文件 -> 两端实现。",
   "conventions": {
     "signals": "输入是原始观测值而非派生布尔量（如给 riskScore 数值而不是 riskScoreHigh），以便阈值本身也被测到。",
-    "unknown": "null 表示未知——该检测项未执行、进行中或已失败。未知一律不贡献信号（verdict.md 2.3）。",
-    "applies": "该用例适用的实现。仅列出该端可测的信号；某信号在该端结构性不可测时不出现在 signals 里。",
+    "unknown": "null 表示未知——该检测项未执行、进行中或已失败。未知一律不贡献信号（verdict.md 2.3）。字段整体缺省等同于 null。",
+    "applies": "该用例适用的实现，取值只有 web 与 cli。仅列出该端可测的信号；某信号在该端结构性不可测时不出现在 signals 里。同时列出两端的用例因此只能声明**两端都可测**的信号（即不含 tzMismatchCliEnv 与 tunOff）——这类用例钉的正是两端平价：同一组原始观测值，两端必须给出同一个结论。",
+    "dnsEgress": "dnsEcsCountry 与 exitCountry 是 ISO2 国家代码，派生出 dnsEgressLeak（verdict.md 2.5）。任一为 null 即无从比对，不贡献信号——这与「两者相同」在综合结论上等价，两者的用例成对存在正是为了锁住这一点。",
+    "udpEgress": "stunReflexiveIps 是各 STUN 报出的反射地址数组，exitIp 是出口 IP，二者派生出 udpEgressMismatch（verdict.md 2.6）。数组为 null 表示 O6 检测失败；数组内地址互不一致、或与 exitIp 协议族不同，均为无从比对而非未命中。",
     "expect": "stage 为 insufficient 时没有 level 字段——这与类型层面的设计一致，不是省略。",
     "aiIpcheckDiverges": "标记该输入下 ipcheck CLI 与已归档的 ai-ipcheck 结论不同。平价比对（见实现计划 --output）遇到这些用例应按新契约判定，不得当作回归。",
     "pairing": "riskScore 与 anonymous 必须成对：两者同为数值/布尔，或同为 null。只给其中一个是契约禁止的状态（verdict.md 2.3）。"
@@ -588,6 +590,208 @@
         "level": "low"
       },
       "note": "70 是二维判定之前的旧阈值。非匿名 IP 在 70 分现在判低（阈值 76）——这条专门锁住阈值确实改了，防止有人把旧常量改回来还全绿。分项颜色在 70 仍是红，那是另一把尺子（verdict.md 6）。"
+    },
+    {
+      "id": "both-full-medium-dns-egress-leak",
+      "applies": [
+        "web",
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": false,
+        "dnsEcsCountry": "US",
+        "exitCountry": "JP"
+      },
+      "expect": {
+        "stage": "full",
+        "level": "medium"
+      },
+      "note": "分流泄露的典型形态：TCP 走代理出到日本，DNS 查询却从美国出去。ECS 反映的是「出口 resolver 眼里客户端在哪」，与出口国不符即命中（verdict.md 2.5）。"
+    },
+    {
+      "id": "both-full-low-dns-ecs-missing",
+      "applies": [
+        "web",
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": false,
+        "dnsEcsCountry": null,
+        "exitCountry": "JP"
+      },
+      "expect": {
+        "stage": "full",
+        "level": "low"
+      },
+      "note": "resolver 不发 ECS（Cloudflare 1.1.1.1 是明确不发的一家）。无从比对不贡献信号，结论必须与 both-full-low-dns-ecs-matches-exit 完全相同——两条成对存在，是为了锁住「未知不冒充命中」。注意 O5 此时仍记「已完成」，那是覆盖度层面的事，本文件不覆盖。"
+    },
+    {
+      "id": "both-full-low-dns-ecs-matches-exit",
+      "applies": [
+        "web",
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": false,
+        "dnsEcsCountry": "JP",
+        "exitCountry": "JP"
+      },
+      "expect": {
+        "stage": "full",
+        "level": "low"
+      },
+      "note": "DNS 与 TCP 从同一国出网：代理确实接管了解析路径。与 both-full-low-dns-ecs-missing 成对。"
+    },
+    {
+      "id": "both-preliminary-medium-dns-leak-only",
+      "applies": [
+        "web",
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": null,
+        "anonymous": null,
+        "abuseListed": null,
+        "dnsEcsCountry": "CN",
+        "exitCountry": "US"
+      },
+      "expect": {
+        "stage": "preliminary",
+        "level": "medium"
+      },
+      "note": "O4 未知、只有新信号命中。验证新信号不破坏形态规则：它是「中」档，因此风险分缺席时结论仍是「初步 · 中」，而不是被抬进 full，也没有把「高」带进 preliminary（verdict.md 3.2 的不变量）。"
+    },
+    {
+      "id": "both-full-medium-udp-egress-mismatch",
+      "applies": [
+        "web",
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": false,
+        "stunReflexiveIps": [
+          "203.0.113.7",
+          "203.0.113.7"
+        ],
+        "exitIp": "198.51.100.20"
+      },
+      "expect": {
+        "stage": "full",
+        "level": "medium"
+      },
+      "note": "两个互相独立的 STUN 报出同一个反射地址，且它不是出口 IP——UDP 绕过了代理。两个 STUN 一致是命中的前提：单个 STUN 分不清「UDP 漏了」与「这个出口是多地址集群」。"
+    },
+    {
+      "id": "both-full-low-udp-egress-matches",
+      "applies": [
+        "web",
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": false,
+        "stunReflexiveIps": [
+          "198.51.100.20",
+          "198.51.100.20"
+        ],
+        "exitIp": "198.51.100.20"
+      },
+      "expect": {
+        "stage": "full",
+        "level": "low"
+      },
+      "note": "UDP 与 TCP 同一个出口：代理确实全局接管。与 both-full-low-udp-stun-disagree 成对。"
+    },
+    {
+      "id": "both-full-low-udp-stun-disagree",
+      "applies": [
+        "web",
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": false,
+        "stunReflexiveIps": [
+          "203.0.113.7",
+          "203.0.113.8"
+        ],
+        "exitIp": "198.51.100.20"
+      },
+      "expect": {
+        "stage": "full",
+        "level": "low"
+      },
+      "note": "两个 STUN 各报各的（多出口集群或对称 NAT）：无从比对，不贡献信号。这条必须与 both-full-low-udp-egress-matches 得出同一个结论——「不一致」是未知，不是未命中，更不是命中。误报源用对照法自曝，比用 /24 启发式去猜诚实（verdict.md 2.6）。"
+    },
+    {
+      "id": "both-full-low-udp-srflx-ipv6-exit-ipv4",
+      "applies": [
+        "web",
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": false,
+        "stunReflexiveIps": [
+          "2001:db8::1",
+          "2001:db8::1"
+        ],
+        "exitIp": "198.51.100.20"
+      },
+      "expect": {
+        "stage": "full",
+        "level": "low"
+      },
+      "note": "反射地址是 IPv6、出口 IP 是 IPv4：跨协议族不得判命中，那是 O3（IPv6 泄露）已经在管的事，在这里再算一次等于同一个事实进两次判级。只比同协议族（verdict.md 2.6）。"
+    },
+    {
+      "id": "both-insufficient-split-tunnel-checks-failed",
+      "applies": [
+        "web",
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchSystem": null,
+        "ipv6Leak": null,
+        "riskScore": null,
+        "anonymous": null,
+        "abuseListed": null,
+        "dnsEcsCountry": null,
+        "exitCountry": null,
+        "stunReflexiveIps": null,
+        "exitIp": null
+      },
+      "expect": {
+        "stage": "insufficient"
+      },
+      "note": "O5 与 O6 双双失败、其余全未知。新增两项不得把「没测成」变成「低」——多两个检测项就多两条落进 insufficient 的路，这条锁住它们确实落进去了。"
     }
   ]
 }
