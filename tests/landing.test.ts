@@ -53,14 +53,18 @@ describe("落地内容三段", () => {
     }
   });
 
-  it("「为什么需要」段落不得声称本站能检测 DNS 泄露（规格非目标 / --content 步骤 1）", () => {
+  // O5 上线后本站确实能在线检测 DNS 出口泄露（契约 §2.5），「不得声称能检测 DNS 泄露」这条
+  // 旧断言的方向已经反了——它会拦下对 O5 的如实描述。仍然成立的边界是另一件事：
+  // C2（本地 DNS 服务器配置）网页结构性读不到，正文不该把这个边界安在「DNS 泄露」这个
+  // 已经被 O5 接管的措辞上（评审 I1／I2）。
+  it("「为什么需要」段落不得把「DNS 泄露」判定说成仅 CLI 项，只有「本地 DNS 服务器配置」才是", () => {
     const html = renderLanding("zh-hans");
-    const whyIndex = html.indexOf(COPY_ZH_HANS.landing.why.body);
+    const body = COPY_ZH_HANS.landing.why.body;
+    const whyIndex = html.indexOf(body);
 
     expect(whyIndex).toBeGreaterThanOrEqual(0);
-    // 「为什么需要」正文不应声称本站能检测 DNS 泄露——DNS 泄露判定是 O5 的能力（契约 §2.5），
-    // 与 C2（本地 DNS 服务器配置）是两回事，这句话不该在两者之间混用。
-    expect(COPY_ZH_HANS.landing.why.body).not.toContain("检测 DNS 泄露");
+    expect(body).not.toMatch(/DNS 泄露.{0,20}仅 CLI/);
+    expect(body).toContain("本地 DNS 服务器配置");
   });
 
   it("简体中文版渲染的是中文文案，不停留在英文源", () => {

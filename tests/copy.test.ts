@@ -72,12 +72,6 @@ describe.each(
     expect(copy.checks.O5.scopeNote.toUpperCase()).toContain("CLI");
   });
 
-  // 契约 §2.1／§2.5 硬约束 1：resolver 归属只展示不判定。
-  it("O5 展示 resolver 归属，但必须标明它不参与判定", () => {
-    expect(copy.checks.O5.resolverNote).toBeTruthy();
-    expect(copy.checks.O5.resolverNote.length).toBeGreaterThan(0);
-  });
-
   // ECS 缺失时状态是「已完成」而非「失败」，卡片必须点明是 DNS 服务商不发 ECS（brief 硬约束）。
   it("O5 的 ECS 缺失说明必须点出 ECS／EDNS 相关字样", () => {
     const text = copy.checks.O5.noEcs.toUpperCase();
@@ -137,9 +131,11 @@ describe.each(
   });
 
   // 覆盖度分母改为 10 后，总数文案不得停留在旧的 8（呈现层随分母变化联动）。
-  it("覆盖度总数文案与 TOTAL_CHECKS 一致，不停留在旧的 8", () => {
-    expect(copy.coverage.total).toContain(String(TOTAL_CHECKS));
-    expect(copy.coverage.total).not.toContain("8");
+  // 断言串里唯一出现的数字就是 TOTAL_CHECKS，而不是「不许出现字符 8」——
+  // 后者一旦分母哪天变成 8／18／28 会跟前一行自相矛盾（评审 M2）。
+  it("覆盖度总数文案与 TOTAL_CHECKS 一致，串里没有另一个数字", () => {
+    const digits = copy.coverage.total.match(/\d+/g) ?? [];
+    expect(digits).toEqual([String(TOTAL_CHECKS)]);
   });
 });
 
@@ -165,6 +161,12 @@ describe("受 ADR 约束的措辞 · 英文（源语言）", () => {
 
   it("页脚声明零留存（ADR-0008）", () => {
     expect(COPY.footer.privacy).toContain("stores none");
+  });
+
+  // 契约 §2.1／§2.5 硬约束 1：resolver 归属只展示不判定。空断言（`toBeTruthy`）证明不了
+  // 这句话说了什么，必须匹配到「不影响判定结论」这层意思本身（评审 M3）。
+  it("O5 的 resolverNote 必须写明它不参与判定", () => {
+    expect(COPY.checks.O5.resolverNote).toContain("doesn't affect the verdict");
   });
 });
 
@@ -209,5 +211,10 @@ describe("受 ADR 约束的措辞 · 简体中文", () => {
     });
 
     expect(webCopy).not.toContain("真实 IP");
+  });
+
+  // 契约 §2.1／§2.5 硬约束 1：resolver 归属只展示不判定，中文版同样要匹配到这层意思本身。
+  it("O5 的 resolverNote 必须写明它不参与判定", () => {
+    expect(COPY_ZH_HANS.checks.O5.resolverNote).toContain("不参与判定");
   });
 });

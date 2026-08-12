@@ -235,7 +235,7 @@ export const EN = {
       /** 契约 §1 收缩：DNS 泄露判定拆到 O5，本项只剩「本地 DNS 服务器配置」（ADR-0014）。 */
       title: "Local DNS Server Configuration",
       meaning:
-        "Which server handles your DNS queries — a webpage can't get query logs, so this is structurally untestable online. A DNS leak exposes the domains you've visited to your local ISP.",
+        "Which server handles your DNS queries, and how it's configured — a webpage structurally can't read this. Whether those queries are actually leaving through the proxy is a separate check, see O5.",
     },
     C3: {
       title: "Proxy Detection (env vars / system proxy / TUN)",
@@ -270,11 +270,11 @@ export const EN = {
   landing: {
     why: {
       title: "Why you need a checkup",
-      body: "AI tools are sensitive to your network environment. The most common pitfalls fall into four categories: exit IP type or abuse history that triggers anti-abuse controls; a mismatch between system and exit IP timezone; IPv6 quietly bypassing the proxy and exposing your real location; and local DNS exposing the domains you visit to your local ISP. This site can check the first three online; a DNS leak requires reading local DNS query logs, which a webpage structurally cannot access — it's a CLI-only item.",
+      body: "AI tools are sensitive to your network environment. The most common pitfalls fall into four categories: exit IP type or abuse history that triggers anti-abuse controls; a mismatch between system and exit IP timezone; IPv6 quietly bypassing the proxy and exposing your real location; and local DNS exposing the domains you visit to your local ISP. This site can check the first three online; your local DNS server's configuration requires reading your local environment, which a webpage structurally cannot access — that's a CLI-only item.",
     },
     install: {
       title: "Install the CLI for all 10 checks",
-      body: "The web version is a quick first look — it covers 6 items. The CLI covers all 10, including your real public IP, DNS leaks, proxy/TUN detection, and the $TZ timezone check.",
+      body: "The web version is a quick first look — it covers 6 items. The CLI covers all 10, including your real public IP, local DNS configuration, proxy/TUN detection, and the $TZ timezone check.",
     },
     compare: {
       title: "Web vs. CLI: Full Feature Comparison",
