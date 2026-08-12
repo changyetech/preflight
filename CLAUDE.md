@@ -21,6 +21,8 @@ Web application
 - **有状态资源**：Durable Object `QuotaCounter`（proxycheck 日配额，SQLite 后端，见 ADR-0002）、Rate Limit 绑定 `RISK_RATE_LIMITER`（仅 `/api/risk`）。
 - **测试**：Vitest + `@cloudflare/vitest-pool-workers`（miniflare 内跑真实 Worker）。
 - **Lint / Format**：oxlint + Prettier。
+- **CLI**：Rust（crate 在 `cli/`，与前端 `src/` 隔离）。HTTP 走 `ureq` + rustls + **平台信任库**（目标用户全都开着代理，编译期内置根证书会让 TLS 中间人代理下的探测全挂）；并发用 `std::thread::scope`，**不引 tokio**。发布由 dist 负责，tag 为 `cli/v*`。
+- **CLI 直连第三方，不走本站 Worker**（ADR-0012）——避免 CLI 流量吃掉网页版的共享 proxycheck 配额。
 - **无数据库、无用户态、不存储任何检测结果**（ADR-0008）。
 
 ## Build & Test
@@ -34,7 +36,10 @@ Web application
 | `make preview` | 构建后在 workerd 中预览生产产物（默认 :4173） |
 | `make test` | `pnpm vitest run` |
 | `make lint` / `make fmt` | oxlint / Prettier |
-| `make check` | fmt + lint + build + test |
+| `make check` | fmt + lint + build + test（**只管 Web**——改一行 CSS 不该等 Rust 编译） |
+| `make cli-build` / `cli-test` / `cli-lint` / `cli-fmt` | CLI 的 cargo 对应命令 |
+| `make check-cli` | CLI 的 fmt + clippy + build + test |
+| `make check-all` | Web 与 CLI 都跑 |
 | `make clean` | 删除 `dist`、`.wrangler` 等产物 |
 
 **构建产物布局**（由 `@cloudflare/vite-plugin` 决定）：
@@ -50,6 +55,9 @@ Web application
 
 This repo documents its own **contracts** and **specs** under `docs/` (contract documents live directly under `docs/`, not in sub-directories):
 
+- Domain contract: 判级规则 → `docs/` — **[docs/verdict.md](docs/verdict.md)**：检测项注册表、信号域、三档判级与三形态、覆盖度、两端差异登记表、CLI 配置键白名单。**Web 与 CLI 两个实现共同的判据**，判级规则只在此文件修改
+- Configuration: 仓库所需的全部配置 → `docs/` — **[docs/configuration.md](docs/configuration.md)**：环境变量、Worker Secret 与绑定、GitHub 仓库与 Secrets、三条 workflow 的触发条件、CLI 的用户配置与键白名单、上线检查清单、绝不入库的清单
+- Third-party integration reference: proxycheck.io → `docs/` — **[docs/proxycheck.md](docs/proxycheck.md)**：风险分基准分表与官方分档建议、必带的 `p=0`/`tag=0`（`tag=0` 是隐私要求）、配额规则、响应字段、「HTTP 200 也可能不是合法 JSON」这个坑、v2 与 v3 的差异。**带核实日期**——第三方会改
 - API interface specifications (endpoints, request/response schemas) → `docs/` — **[docs/api.md](docs/api.md)**：`/api/geo` 与 `/api/risk` 的请求/响应 schema、响应信封、错误码注册表、隐私约束
 - Error format and error code registry → `docs/` — 见 [docs/api.md](docs/api.md) 第 1 / 4 节
 - Response envelope format, retry/backoff strategies, auth contracts → `docs/` — 见 [docs/api.md](docs/api.md) 第 1 节
@@ -166,6 +174,14 @@ ipcheck/
 │   ├── components/    # Card / Verdict / Landing / LangSwitch
 │   ├── domain/        # 纯逻辑：结论判级、覆盖度、时区比对、IPv6、对照表
 │   └── probes/        # 浏览器直连的第三方探测（ipify）
+├── Cargo.toml         # 纯 workspace（members = ["cli"]）+ dist 发布配置
+├── cli/               # ipcheck CLI（Rust）——判级契约的**全集实现**，9 项全测
+│   └── src/
+│       ├── domain/    # 纯逻辑：检测项、覆盖度、判级（golden 向量在此消费）
+│       ├── probe/     # 9 项探测 + 第三方调用；不碰终端
+│       ├── copy/      # 文案：en 为源语言，其余语种是 partial 补丁、字段级回落
+│       ├── render.rs  # 人读报告（参考 Web 的视觉结构，无表格边框）
+│       └── json.rs    # `--json`：机器可读，也是平价验收唯一的 oracle
 ├── worker/            # Cloudflare Worker
 │   ├── index.ts       # 入口：/api/* 路由，其余交给 env.ASSETS
 │   ├── geo.ts risk.ts # 两个接口的处理器（契约见 docs/api.md）
@@ -174,6 +190,10 @@ ipcheck/
 ├── tests/             # Vitest（vitest-pool-workers，miniflare 内跑真实 Worker）
 ├── refs/ipcheck/      # Reference: the published ipcheck CLI repo (read-only source material)
 └── docs/
+    ├── verdict.md     # 判级契约（normative）：Web 与 CLI 共同的判据
+    ├── verdict-cases.json  # 判级契约的 golden 向量，两端参数化测试共吃同一份
+    ├── configuration.md  # 配置清单：环境变量、Secret、绑定、CI、检查清单
+    ├── proxycheck.md  # proxycheck.io 集成参考：基准分表、配额、必带参数、已知坑
     ├── api.md         # API contract: /api/geo & /api/risk schemas, error code registry
     ├── adr/           # Architecture Decision Records (0001-*.md, sequentially numbered)
     ├── specs/         # Feature / design specifications (the "what")
