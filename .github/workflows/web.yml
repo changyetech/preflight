@@ -1,7 +1,8 @@
 # ipcheck Web 的部署。
 #
-# 与 cli.yml 的 paths 互不重叠，唯一的例外是 docs/verdict-cases.json——判级契约的
-# 可执行形式，两端共吃，改它必须两侧同时验证（docs/verdict.md 第 7 节）。
+# 与 cli.yml 的 paths 互不重叠，例外是两份两端共吃的数据文件——改它们必须两侧同时验证：
+# docs/verdict-cases.json（判级契约的可执行形式，docs/verdict.md 第 7 节）与
+# docs/country-codes.json（O5 判定用的国家名 → ISO2 映射，Web 侧打进 bundle）。
 #
 # **本仓库只有 CLI 发 GitHub Release**：安装命令用的 `releases/latest` 依赖这条约束，
 # Web 走 Cloudflare 部署，不发 Release。
@@ -26,6 +27,7 @@ on:
       - "pnpm-lock.yaml"
       - "tsconfig*.json"
       - "docs/verdict-cases.json"
+      - "docs/country-codes.json"
       - ".github/workflows/web.yml"
 
 concurrency:
