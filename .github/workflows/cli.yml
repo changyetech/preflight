@@ -1,7 +1,9 @@
 # ipcheck CLI 的质量门。
 #
-# 与 web.yml 的 paths 互不重叠，唯一的例外是 docs/verdict-cases.json——那是判级契约的
-# 可执行形式，两端共吃同一份文件，改它必须两侧同时验证（docs/verdict.md 第 7 节）。
+# 与 web.yml 的 paths 互不重叠，例外是 docs/ 下两份两端共吃的数据文件：
+# - docs/verdict-cases.json——判级契约的可执行形式，改它必须两侧同时验证（docs/verdict.md 第 7 节）
+# - docs/country-codes.json——O5 判定用的国家名 → ISO2 映射，CLI 用 include_str! 编译期内联，
+#   不列进来的话单独改它不触发 CLI 验证（docs/verdict.md 2.5）
 #
 # 发布走 tag `cli/v*`，由 dist 生成的 workflow 负责，与本文件零交集。
 #
@@ -18,6 +20,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "docs/verdict-cases.json"
+      - "docs/country-codes.json"
       - ".github/workflows/cli.yml"
   pull_request:
     paths:
@@ -25,6 +28,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "docs/verdict-cases.json"
+      - "docs/country-codes.json"
       - ".github/workflows/cli.yml"
 
 concurrency:

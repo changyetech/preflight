@@ -4,4 +4,6 @@
 //! 判级契约（docs/verdict.md）是 Web 与 CLI 共同的判据，本层是它的 CLI 侧实现。
 
 pub mod checks;
+pub mod dns_egress;
+pub mod udp_egress;
 pub mod verdict;

@@ -546,6 +546,8 @@ mod tests {
             o2: Outcome::Failed(Failure::Upstream),
             o3: Outcome::Failed(Failure::Upstream),
             o4: Outcome::Failed(Failure::Upstream),
+            o5: Outcome::Failed(Failure::Upstream),
+            o6: Outcome::Failed(Failure::Upstream),
             c1: Outcome::Failed(Failure::Upstream),
             c2: Outcome::Failed(Failure::Local),
             c3: Outcome::Failed(Failure::Local),
@@ -591,7 +593,7 @@ mod tests {
         let text = copy::text(Lang::En);
         let out = render(&blank(), false, false);
         assert!(out.contains(&format!("{} 0", text.coverage.done)));
-        assert!(out.contains(&format!("{} 8", text.coverage.failed)));
+        assert!(out.contains(&format!("{} 10", text.coverage.failed)));
     }
 
     #[test]

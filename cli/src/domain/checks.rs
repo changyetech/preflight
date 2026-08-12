@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-/// 8 个检测项。ID 是跨端稳定标识，**不得复用、不得改号**——
+/// 10 个检测项。ID 是跨端稳定标识，**不得复用、不得改号**——
 /// 这条对已删除的 ID 同样成立：`C5`（原厂商端点检测）是废弃编号，不得复用（ADR-0013）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CheckId {
@@ -14,9 +14,13 @@ pub enum CheckId {
     O3,
     /// IP 类型与风险。
     O4,
+    /// DNS 出口泄露（DNS 查询是不是与出口 IP 从同一处出网）。
+    O5,
+    /// UDP 出口一致性（UDP 流量的出口是不是与 TCP 观测到的出口 IP 一致）。
+    O6,
     /// 本机真实 IP。
     C1,
-    /// 本地 DNS 服务器与 DNS 泄露。
+    /// 本地 DNS 服务器配置。**只读本机配置，不做泄露判定**——泄露判定是 O5（ADR-0014）。
     C2,
     /// 代理检测（环境变量 / 系统代理 / TUN）。
     C3,
@@ -24,14 +28,16 @@ pub enum CheckId {
     C4,
 }
 
-/// 覆盖度的分母恒为 8。
-pub const TOTAL_CHECKS: usize = 8;
+/// 覆盖度的分母恒为 10。
+pub const TOTAL_CHECKS: usize = 10;
 
 pub const ALL_CHECKS: [CheckId; TOTAL_CHECKS] = [
     CheckId::O1,
     CheckId::O2,
     CheckId::O3,
     CheckId::O4,
+    CheckId::O5,
+    CheckId::O6,
     CheckId::C1,
     CheckId::C2,
     CheckId::C3,
@@ -45,6 +51,8 @@ impl CheckId {
             CheckId::O2 => "O2",
             CheckId::O3 => "O3",
             CheckId::O4 => "O4",
+            CheckId::O5 => "O5",
+            CheckId::O6 => "O6",
             CheckId::C1 => "C1",
             CheckId::C2 => "C2",
             CheckId::C3 => "C3",
@@ -102,7 +110,7 @@ impl<T> Outcome<T> {
     }
 }
 
-/// 覆盖度。CLI 侧的不变量是 `done + failed == 8`。
+/// 覆盖度。CLI 侧的不变量是 `done + failed == 10`。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Coverage {
     pub done: usize,
@@ -122,7 +130,7 @@ impl Coverage {
         coverage
     }
 
-    /// 不变量：两档之和恒为 8。呈现层在打印前断言它。
+    /// 不变量：两档之和恒为 10。呈现层在打印前断言它。
     pub const fn is_complete(&self) -> bool {
         self.done + self.failed == TOTAL_CHECKS
     }
@@ -133,7 +141,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn there_are_exactly_eight_checks_with_distinct_ids() {
+    fn there_are_exactly_ten_checks_with_distinct_ids() {
         assert_eq!(ALL_CHECKS.len(), TOTAL_CHECKS);
         let mut seen: Vec<&str> = ALL_CHECKS.iter().map(|id| id.as_str()).collect();
         seen.sort_unstable();
@@ -143,7 +151,7 @@ mod tests {
 
     #[test]
     fn coverage_invariant_holds_for_any_mix() {
-        // 全成功 / 全失败 / 混合，两档之和恒为 8。
+        // 全成功 / 全失败 / 混合，两档之和恒为 10。
         for failed_count in 0..=TOTAL_CHECKS {
             let outcomes = (0..TOTAL_CHECKS).map(|i| i >= failed_count);
             let coverage = Coverage::tally(outcomes);

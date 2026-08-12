@@ -58,6 +58,14 @@ pub struct Signals {
     pub anonymous: Option<bool>,
     /// StopForumSpam 有滥用收录（O4）。
     pub abuse_listed: Option<bool>,
+    /// ECS 客户端子网归属国 ≠ 出口 IP 归属国（O5，契约 2.5）。
+    ///
+    /// **`None` 同时表示「检测失败」与「已完成但无从比对」**——后者是 O5 的常态
+    /// （resolver 不发 ECS）。两者在判级上等价：都不贡献信号。差别只在覆盖度归档，
+    /// 而覆盖度不在本层。
+    pub dns_egress_leak: Option<bool>,
+    /// ≥2 个 STUN 报出同一 srflx IP 且该 IP ≠ 出口 IP（O6，契约 2.6）。同上。
+    pub udp_egress_mismatch: Option<bool>,
     /// TUN／VPN 未开启（C3）。
     pub tun_off: Option<bool>,
 }
@@ -126,10 +134,19 @@ pub const fn risk_level(score: u32) -> Level {
 pub fn compute(signals: &Signals) -> Verdict {
     // 「有没有任何贡献信号产出结果」——注意 `tz_mismatch_system` 不在其中：
     // 它在 CLI 侧不贡献综合结论，因此它单独已知不足以让我们给出结论。
+    //
+    // O5／O6 把「检测项已完成」与「产出了信号」的区别放大成了常态：它们的「无从比对」
+    // 正是已完成，而按契约 2.3 不贡献任何信号。因此这里看的恒为**信号是否已知**，
+    // 绝不能改成看检测项状态——那会让「O1 失败 ⇒ O5／O6 无从比对」这条常见路径
+    // 给出绿色的「初步 · 低」，即把没测成说成没问题（契约 3.2 的红线）。
+    // 反向也别过头：**可比对且未命中**（`Some(false)`）必须仍算产出了信号，
+    // 否则一次正常测完、干干净净的体检会被误判成「数据不足」。
     let any_contributing_signal = signals.tz_mismatch_cli_env.is_some()
         || signals.ipv6_leak.is_some()
         || signals.risk_score.is_some()
         || signals.abuse_listed.is_some()
+        || signals.dns_egress_leak.is_some()
+        || signals.udp_egress_mismatch.is_some()
         || signals.tun_off.is_some();
 
     if !any_contributing_signal {
@@ -139,6 +156,11 @@ pub fn compute(signals: &Signals) -> Verdict {
     let medium = signals.tz_mismatch_cli_env == Some(true)
         || signals.ipv6_leak == Some(true)
         || signals.abuse_listed == Some(true)
+        // 两个新信号均为**中**档（契约 3.2）。给成「高」会当场打破「高只出现在 full 形态」
+        // 这条不变量——它们不来自 O4，一个确定的分流泄露会在 proxycheck 失败时
+        // 被压成「初步 · 中」。
+        || signals.dns_egress_leak == Some(true)
+        || signals.udp_egress_mismatch == Some(true)
         || signals.tun_off == Some(true);
 
     let Some(score) = signals.risk_score else {
@@ -241,6 +263,47 @@ mod tests {
     }
 
     #[test]
+    fn a_split_tunnel_leak_contributes_medium_never_high() {
+        // 契约 3.2 的不变量：唯一的高档信号是 riskScoreHigh，它来自 O4。
+        // 两个新信号来自 O5／O6，风险分缺席时结论必须停在「初步 · 中」。
+        for signals in [
+            Signals {
+                dns_egress_leak: Some(true),
+                ..Default::default()
+            },
+            Signals {
+                udp_egress_mismatch: Some(true),
+                ..Default::default()
+            },
+        ] {
+            assert_eq!(
+                compute(&signals),
+                Verdict::Preliminary(PreliminaryLevel::Medium)
+            );
+        }
+    }
+
+    #[test]
+    fn a_comparable_miss_still_counts_as_a_signal() {
+        // 「可比对且未命中」是产出了信号。把它也算成「没产出」，一次正常测完、
+        // 干干净净的体检就会被误判成「数据不足」——那是反向过头的那一侧。
+        assert_eq!(
+            compute(&Signals {
+                dns_egress_leak: Some(false),
+                ..Default::default()
+            }),
+            Verdict::Preliminary(PreliminaryLevel::Low)
+        );
+        assert_eq!(
+            compute(&Signals {
+                udp_egress_mismatch: Some(false),
+                ..Default::default()
+            }),
+            Verdict::Preliminary(PreliminaryLevel::Low)
+        );
+    }
+
+    #[test]
     fn insufficient_carries_no_level() {
         assert_eq!(Verdict::Insufficient.level(), None);
         assert_eq!(Verdict::Insufficient.stage(), "insufficient");
@@ -255,7 +318,9 @@ mod tests {
 #[cfg(test)]
 mod golden {
     use super::*;
+    use crate::domain::{dns_egress, udp_egress};
     use serde::Deserialize;
+    use std::net::IpAddr;
 
     const CASES: &str = include_str!("../../../docs/verdict-cases.json");
 
@@ -265,11 +330,16 @@ mod golden {
     }
 
     #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
     struct Case {
         id: String,
         applies: Vec<String>,
         signals: CaseSignals,
         expect: Expect,
+        /// 指向一条**未命中**的基准用例，含义是「本条与它的结论必须完全相同」
+        /// （见 verdict-cases.json 的 conventions）。
+        #[serde(default)]
+        pairs_with: Option<String>,
     }
 
     /// `deny_unknown_fields`：用例里写错一个信号名必须让测试红，
@@ -291,6 +361,16 @@ mod golden {
         abuse_listed: Option<bool>,
         #[serde(default)]
         tun_off: Option<bool>,
+        // O5／O6 给的是**原始观测值**而非派生布尔量（用例文件的 conventions.signals），
+        // 因此这里是四个观测字段，两个信号由判定层从它们推出来。
+        #[serde(default)]
+        dns_ecs_country: Option<String>,
+        #[serde(default)]
+        exit_country: Option<String>,
+        #[serde(default)]
+        stun_reflexive_ips: Option<Vec<String>>,
+        #[serde(default)]
+        exit_ip: Option<String>,
     }
 
     #[derive(Deserialize)]
@@ -298,6 +378,107 @@ mod golden {
         stage: String,
         #[serde(default)]
         level: Option<String>,
+    }
+
+    /// 用例的扁平观测值 → 判级信号。
+    ///
+    /// O5／O6 的观测值**过真正的判定层**（`dns_egress::compare` / `udp_egress::judge`），
+    /// 不在这里另写一套推导——否则向量测的就是 harness 自己，实现漂移了也照样绿。
+    fn signals_of(case: &CaseSignals) -> Signals {
+        Signals {
+            tz_mismatch_cli_env: case.tz_mismatch_cli_env,
+            tz_mismatch_system: case.tz_mismatch_system,
+            ipv6_leak: case.ipv6_leak,
+            risk_score: case.risk_score,
+            anonymous: case.anonymous,
+            abuse_listed: case.abuse_listed,
+            dns_egress_leak: dns_egress_of(case),
+            udp_egress_mismatch: udp_egress_of(case),
+            tun_off: case.tun_off,
+        }
+    }
+
+    /// `None` = **没有产出可用信号**：检测失败与「已完成但无从比对」在判级上等价
+    /// （契约 2.3／2.5），差别只在覆盖度归档，而覆盖度不由本文件覆盖。
+    ///
+    /// 向量给的 `dnsEcsCountry` 已经是 ISO2，因此这里直接构造 `Known`——
+    /// 国家名 → ISO2 的映射发生在探测层之前，由 `dns_egress` 的单测覆盖。
+    fn dns_egress_of(case: &CaseSignals) -> Option<bool> {
+        let ecs = match &case.dns_ecs_country {
+            Some(iso2) => dns_egress::EcsCountry::Known(iso2.clone()),
+            None => dns_egress::EcsCountry::NoEcs,
+        };
+        dns_egress::compare(&ecs, case.exit_country.as_deref()).leak()
+    }
+
+    /// 同上。`null` 与空数组同义 ⇒ `N_ok = 0` ⇒ 检测失败 ⇒ 没有产出（用例文件的 conventions）。
+    fn udp_egress_of(case: &CaseSignals) -> Option<bool> {
+        let reflexive: Vec<IpAddr> = case
+            .stun_reflexive_ips
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            // 解析失败**响亮报错**：向量里写错一个地址不该被静默丢成「没答上来」。
+            .map(|ip| {
+                ip.parse()
+                    .unwrap_or_else(|_| panic!("向量里的 IP 无法解析：{ip}"))
+            })
+            .collect();
+        let exit = case.exit_ip.as_deref().map(|ip| {
+            ip.parse()
+                .unwrap_or_else(|_| panic!("向量里的 IP 无法解析：{ip}"))
+        });
+
+        udp_egress::judge(&reflexive, exit)
+            .value()
+            .and_then(udp_egress::UdpEgress::mismatch)
+    }
+
+    /// 两条用例的 signals 中取值不同的字段名。
+    ///
+    /// 字段缺省与显式 `null` 在这里天然同义——两者都反序列化成 `None`
+    /// （用例文件的 conventions.unknown 明写「字段整体缺省等同于 null」）。
+    fn differing_signals(a: &CaseSignals, b: &CaseSignals) -> Vec<&'static str> {
+        [
+            (
+                "tzMismatchCliEnv",
+                a.tz_mismatch_cli_env != b.tz_mismatch_cli_env,
+            ),
+            (
+                "tzMismatchSystem",
+                a.tz_mismatch_system != b.tz_mismatch_system,
+            ),
+            ("ipv6Leak", a.ipv6_leak != b.ipv6_leak),
+            ("riskScore", a.risk_score != b.risk_score),
+            ("anonymous", a.anonymous != b.anonymous),
+            ("abuseListed", a.abuse_listed != b.abuse_listed),
+            ("tunOff", a.tun_off != b.tun_off),
+            ("dnsEcsCountry", a.dns_ecs_country != b.dns_ecs_country),
+            ("exitCountry", a.exit_country != b.exit_country),
+            (
+                "stunReflexiveIps",
+                a.stun_reflexive_ips != b.stun_reflexive_ips,
+            ),
+            ("exitIp", a.exit_ip != b.exit_ip),
+        ]
+        .into_iter()
+        .filter_map(|(name, differs)| differs.then_some(name))
+        .collect()
+    }
+
+    /// 解析 `pairsWith` 指向的基准用例。
+    ///
+    /// **悬空引用必须响亮失败**：那是数据错误，静默跳过会让配对断言整条失效——
+    /// 一条改错了 id 的用例从此再也证明不了任何事，而它看起来仍然是绿的。
+    fn baseline_of<'a>(case: &Case, cases: &'a [Case]) -> &'a Case {
+        let target = case
+            .pairs_with
+            .as_deref()
+            .expect("调用方已筛出带 pairsWith 的用例");
+        cases
+            .iter()
+            .find(|c| c.id == target)
+            .unwrap_or_else(|| panic!("用例 {} 的 pairsWith 指向不存在的用例 {target}", case.id))
     }
 
     #[test]
@@ -320,17 +501,7 @@ mod golden {
             }
             ran += 1;
 
-            let signals = Signals {
-                tz_mismatch_cli_env: case.signals.tz_mismatch_cli_env,
-                tz_mismatch_system: case.signals.tz_mismatch_system,
-                ipv6_leak: case.signals.ipv6_leak,
-                risk_score: case.signals.risk_score,
-                anonymous: case.signals.anonymous,
-                abuse_listed: case.signals.abuse_listed,
-                tun_off: case.signals.tun_off,
-            };
-
-            let got = compute(&signals);
+            let got = compute(&signals_of(&case.signals));
             assert_eq!(got.stage(), case.expect.stage, "用例 {}: 形态不符", case.id);
             assert_eq!(
                 got.level(),
@@ -341,6 +512,89 @@ mod golden {
         }
 
         assert!(ran > 0, "没有跑到任何 CLI 用例，说明筛选逻辑坏了");
+    }
+
+    /// `pairsWith`：证明某个取值是**无从比对**而不是**未命中**。
+    ///
+    /// 单看一条用例分不出这两者——只有让它与一条已知未命中的用例算出**同一个结论**
+    /// 才说得清。断言的是两条各自**算出来**的 verdict 相等，而不是各自等于某个硬编码值：
+    /// 后者会退化成把同一个期望写两遍，那样一条写错 `expect` 的新用例照样能全绿。
+    ///
+    /// 这与 Web 侧 `tests/verdict-cases.test.ts` 里的同名断言是对称的一份。
+    #[test]
+    fn paired_cases_reach_the_same_verdict_as_their_baseline() {
+        let file: CaseFile = serde_json::from_str(CASES).unwrap();
+        let mut ran = 0;
+
+        for case in &file.cases {
+            if case.pairs_with.is_none() || !case.applies.iter().any(|s| s == "cli") {
+                continue;
+            }
+            ran += 1;
+
+            let baseline = baseline_of(case, &file.cases);
+            // 基准必须同样适用于本端，否则拿它作对照不成立。
+            assert!(
+                baseline.applies.iter().any(|s| s == "cli"),
+                "用例 {} 的基准 {} 不适用于 cli",
+                case.id,
+                baseline.id
+            );
+
+            // 除被比对的那一个字段外其余 signals 必须逐一相同，否则「结论相同」证明不了
+            // 是那个字段不贡献信号——可能是别处的差异把结论又拉了回来。
+            assert_eq!(
+                differing_signals(&case.signals, &baseline.signals).len(),
+                1,
+                "用例 {} 与基准 {} 只应差一个被比对的字段，实际差 {:?}",
+                case.id,
+                baseline.id,
+                differing_signals(&case.signals, &baseline.signals)
+            );
+
+            assert_eq!(
+                compute(&signals_of(&case.signals)),
+                compute(&signals_of(&baseline.signals)),
+                "用例 {} 与基准 {} 的结论必须相同——「无从比对」不是「未命中」，\
+                 但两者在综合结论上等价",
+                case.id,
+                baseline.id
+            );
+        }
+
+        assert!(
+            ran > 0,
+            "没有跑到任何带 pairsWith 的 CLI 用例，说明筛选逻辑坏了"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "no-such-case")]
+    fn a_dangling_pairs_with_fails_loudly_instead_of_being_skipped() {
+        let dangling = Case {
+            id: "dangling".into(),
+            applies: vec!["cli".into()],
+            signals: CaseSignals {
+                tz_mismatch_cli_env: None,
+                tz_mismatch_system: None,
+                ipv6_leak: None,
+                risk_score: None,
+                anonymous: None,
+                abuse_listed: None,
+                tun_off: None,
+                dns_ecs_country: None,
+                exit_country: None,
+                stun_reflexive_ips: None,
+                exit_ip: None,
+            },
+            expect: Expect {
+                stage: "insufficient".into(),
+                level: None,
+            },
+            pairs_with: Some("no-such-case".into()),
+        };
+
+        baseline_of(&dangling, &[]);
     }
 
     #[test]

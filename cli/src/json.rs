@@ -53,7 +53,7 @@ pub fn report(report: &Report) -> Value {
     let coverage = report.coverage();
     let signals = report.signals();
 
-    // 按 ALL_CHECKS 迭代而不是写 9 个字面量键：新增检测项时这里编译不过，
+    // 按 ALL_CHECKS 迭代而不是写 10 个字面量键：新增检测项时这里编译不过，
     // 而不是悄悄少一个键。
     let mut checks = serde_json::Map::new();
     for id in ALL_CHECKS {
@@ -124,6 +124,17 @@ fn check_json(id: CheckId, report: &Report) -> Value {
                 "abuseLastSeen": risk.abuse.as_ref().and_then(|a| a.last_seen.clone()),
             })
         }),
+        // TODO(--cli 第 5 步)：O5／O6 的完整 schema（ECS 与出口两个国家、resolver 归属、
+        // 反射地址、无从比对的原因）由输出层那一步落地。这里先给出可比对性与信号本身，
+        // 好让覆盖度与 `signals` 段现在就自洽。
+        CheckId::O5 => check(
+            &report.o5,
+            |result| json!({ "leak": result.comparison.leak() }),
+        ),
+        CheckId::O6 => check(
+            &report.o6,
+            |result| json!({ "mismatch": result.mismatch() }),
+        ),
         CheckId::C1 => check(&report.c1, |ip| json!({ "ip": ip })),
         CheckId::C2 => check(&report.c2, |servers| {
             json!({
@@ -171,6 +182,8 @@ mod tests {
             o2: Outcome::Failed(Failure::Upstream),
             o3: Outcome::Failed(Failure::Upstream),
             o4: Outcome::Failed(Failure::QuotaExhausted),
+            o5: Outcome::Failed(Failure::Upstream),
+            o6: Outcome::Failed(Failure::Upstream),
             c1: Outcome::Failed(Failure::Upstream),
             c2: Outcome::Failed(Failure::Local),
             c3: Outcome::Failed(Failure::Local),
@@ -196,7 +209,7 @@ mod tests {
     }
 
     #[test]
-    fn all_nine_checks_are_present_with_a_status() {
+    fn all_ten_checks_are_present_with_a_status() {
         let out = report(&blank());
         // 用 ALL_CHECKS 迭代而不是写死字面量：JSON 的键因此被钉在枚举上，
         // 新增检测项时这条会红。
