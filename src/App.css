@@ -2,7 +2,7 @@
    明确拒绝深色广告风与高密度无解释表格。移动端优先：首屏结论区与覆盖度必须在小视口内完整可见（验收标准 10）。 */
 
 .page {
-  max-width: 80rem;
+  max-width: 76rem;
   margin: 0 auto;
   padding: 1.25rem 1rem 3rem;
 }
@@ -23,14 +23,23 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  max-width: 80rem;
+  /* 导航比内容容器宽一档，形成「导航通栏、内容聚焦」的层次 */
+  max-width: 90rem;
   margin: 0 auto;
   padding: 0.55rem 1rem;
 }
 
 .site-nav-brand {
-  font: 600 0.95rem var(--mono);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font: 600 1rem var(--mono);
   color: var(--text-h);
+  text-decoration: none;
+}
+
+.site-nav-brand:hover {
+  opacity: 0.75;
 }
 
 .site-nav-links {
@@ -48,7 +57,8 @@
 }
 
 .site-nav-links a {
-  font-size: 0.85rem;
+  /* 导航链接比正文小半档，避免顶栏被撑得过重 */
+  font-size: 0.875rem;
   color: var(--text);
   text-decoration: none;
 }
@@ -62,6 +72,55 @@
   scroll-margin-top: 4rem;
 }
 
+/* ---------- 回顶按钮 ---------- */
+
+.back-to-top {
+  position: fixed;
+  /* 逻辑属性：RTL（阿拉伯语）下自动落到左下角 */
+  inset-inline-end: 1rem;
+  /* iOS 底部手势条：安全区之上再留一档 */
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  z-index: 15;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  cursor: pointer;
+  /* 隐藏态不占 tab 序也不可点；visibility 可过渡，比 display:none 少一次跳变 */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(0.5rem);
+  transition:
+    opacity 0.2s,
+    visibility 0.2s,
+    transform 0.2s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.back-to-top.is-shown {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+
+.back-to-top:hover {
+  border-color: var(--accent-border);
+  color: var(--text-h);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .back-to-top {
+    transition: none;
+  }
+}
+
 /* ---------- 站头 ---------- */
 
 .site-header {
@@ -70,14 +129,15 @@
 
 .site-header h1 {
   margin: 0;
-  font-size: 1.05rem;
+  /* 正文抬档后同步上调，保持与卡片标题的层级差 */
+  font-size: 1.15rem;
   font-weight: 600;
   color: var(--text-h);
 }
 
 .site-header p {
   margin: 0.25rem 0 0;
-  font-size: 0.85rem;
+  font-size: 0.9375rem;
 }
 
 /* ---------- 语言切换 ---------- */
@@ -111,7 +171,7 @@
   display: block;
   padding: 0.35rem 0.6rem;
   border-radius: 6px;
-  font-size: 0.82rem;
+  font-size: 0.875rem;
   color: var(--text);
   text-decoration: none;
   white-space: nowrap;
@@ -140,7 +200,7 @@
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--muted-bg);
-  font-size: 0.78rem;
+  font-size: 0.875rem;
   line-height: 1;
   color: var(--text);
   text-decoration: none;
@@ -185,7 +245,7 @@
 .field-label,
 .meaning-label,
 .card-id {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   letter-spacing: 0.02em;
   color: var(--text);
 }
@@ -203,13 +263,13 @@
 
 .exit-location {
   margin: 0.15rem 0 0;
-  font-size: 0.95rem;
+  font-size: 1rem;
   color: var(--text-h);
 }
 
 .exit-ip-note {
   margin: 0.35rem 0 0;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .level {
@@ -247,14 +307,14 @@
   padding: 0.15rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--text);
 }
 
 .summary {
   margin: 0.4rem 0 0;
-  font-size: 0.9rem;
+  font-size: 0.9375rem;
 }
 
 /* ---------- 覆盖度（永远与结论同屏，ADR-0004） ---------- */
@@ -269,7 +329,7 @@
 .chip {
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   background: var(--chip-bg);
   color: var(--text-h);
 }
@@ -289,7 +349,7 @@
 
 .coverage-hint {
   margin: 0.5rem 0 0;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 /* ---------- 检测分区 ---------- */
@@ -306,10 +366,8 @@
 }
 
 .checks-group-head p {
-  /* 与落地内容同一行长上限，保持正文可读 */
-  max-width: 46rem;
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.9375rem;
   line-height: 1.6;
 }
 
@@ -330,6 +388,10 @@
 }
 
 .card {
+  /* 列布局是为了让「这意味着什么」能贴到卡底：同行卡片等高拉伸多出的空白
+     被吸收到卡片中间，折叠标题在一行内横向对齐，而不是各自吊在内容尾巴上。 */
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--border);
   border-inline-start: 3px solid var(--border);
   border-radius: 10px;
@@ -362,19 +424,19 @@
 .card header h3 {
   flex: 1;
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text-h);
 }
 
 .card-id {
-  font: 600 0.7rem var(--mono);
+  font: 600 0.75rem var(--mono);
 }
 
 .badge {
   padding: 0.1rem 0.45rem;
   border-radius: 999px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   background: var(--chip-bg);
 }
 
@@ -392,7 +454,7 @@
 
 .conclusion {
   margin: 0 0 0.4rem;
-  font-size: 0.9rem;
+  font-size: 0.9375rem;
   color: var(--text-h);
 }
 
@@ -400,11 +462,12 @@
   display: flex;
   gap: 0.5rem;
   margin: 0.15rem 0;
-  font-size: 0.85rem;
+  font-size: 0.9375rem;
 }
 
 .field-label {
-  flex: 0 0 6.5rem;
+  /* 随字号抬档一并放宽，否则「System (browser) timezone」这类长标签会折成三行 */
+  flex: 0 0 8rem;
 }
 
 .field-value {
@@ -414,7 +477,7 @@
 
 .failure {
   margin: 0 0 0.4rem;
-  font-size: 0.85rem;
+  font-size: 0.9375rem;
   color: var(--text-h);
 }
 
@@ -422,18 +485,25 @@
 .consent-note,
 .cli-hint {
   margin: 0.5rem 0 0;
-  font-size: 0.78rem;
+  font-size: 0.875rem;
 }
 
 .meaning {
-  margin: 0.7rem 0 0;
-  font-size: 0.8rem;
+  /* auto 吃掉等高拉伸的余量把自己推到卡底，padding 兜住与上一块的最小间距 */
+  margin-top: auto;
+  padding-top: 0.7rem;
+  font-size: 0.875rem;
 }
 
+/* summary 保留浏览器原生的展开三角——它是这里唯一的可点击提示 */
 .meaning-label {
-  display: block;
+  cursor: pointer;
   font-weight: 600;
   color: var(--text-h);
+}
+
+.meaning[open] .meaning-label {
+  margin-bottom: 0.35rem;
 }
 
 /* ---------- 控件 ---------- */
@@ -450,7 +520,7 @@ button {
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg);
-  font-size: 0.78rem;
+  font-size: 0.875rem;
   color: var(--text-h);
 }
 
@@ -466,7 +536,7 @@ button {
   border: 1px solid var(--accent-border);
   border-radius: 8px;
   background: var(--accent-bg);
-  font-size: 0.85rem;
+  font-size: 0.9375rem;
   line-height: 1.35;
   color: var(--text-h);
   text-align: start;
@@ -487,7 +557,7 @@ button {
   padding: 0.25rem 0.5rem;
   border-radius: 6px;
   background: var(--code-bg);
-  font: 0.8rem var(--mono);
+  font: 0.875rem var(--mono);
 }
 
 .turnstile:not(:empty) {
@@ -510,10 +580,8 @@ button {
 }
 
 .landing-section p {
-  /* 页宽放大后正文行长仍需可读，限制在约 80 字符 */
-  max-width: 46rem;
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.9375rem;
   line-height: 1.6;
 }
 
@@ -525,7 +593,7 @@ button {
 .compare-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.8rem;
+  font-size: 0.875rem;
 }
 
 .compare-table th,
@@ -551,7 +619,7 @@ button {
   margin-top: 2rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .site-footer p {
@@ -571,5 +639,13 @@ button {
 
   .cards {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ---------- 超宽视口 ---------- */
+
+@media (min-width: 64rem) {
+  .cards {
+    grid-template-columns: repeat(3, 1fr);
   }
 }

@@ -19,6 +19,8 @@ export const EN = {
     why: "Why",
     install: "Install CLI",
     compare: "Comparison",
+    /** 回顶按钮只有图标，标签给读屏用。 */
+    backToTop: "Back to top",
   },
 
   verdict: {
@@ -98,9 +100,12 @@ export const EN = {
         "The edge didn't return a timezone for the exit IP — can't compare.",
       meaning:
         "A timezone mismatch is one of the most common proxy tells: the IP says United States, but the system clock says Beijing time — anti-abuse controls catch that instantly.",
-      /** 必须显式区分两个时区来源（规格 2.2 / 验收标准 2）。 */
+      /**
+       * 必须显式区分两个时区来源（规格 2.2 / 验收标准 2）。
+       * CLI 那一侧的完整说明归 C4 卡，这里只留最小限定 + 指路，避免两张卡讲同一段话。
+       */
       scopeNote:
-        "This item reads the browser timezone, which follows the system timezone — so it corresponds to the Claude desktop app. Claude Code CLI honors the $TZ environment variable, which a webpage cannot read — that's C4, and it needs the CLI installed to test.",
+        "Covers the Claude desktop app (browser = system timezone). Claude Code CLI reads $TZ — see C4.",
       browserLabel: "System (browser) timezone",
       exitLabel: "Exit IP timezone",
     },

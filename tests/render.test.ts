@@ -151,6 +151,38 @@ describe("卡片重试入口（规格 4.1）", () => {
   });
 });
 
+describe("「这意味着什么」折叠（规格 4.2）", () => {
+  // 折叠只应改变默认可见性，不得把解释文案从 DOM 里拿掉——
+  // 拿掉就等于删了规格 4.2 要求的每卡解释，且爬虫也读不到。
+  it("渲染为 details/summary，解释文案仍在 HTML 内", () => {
+    const html = renderToStaticMarkup(
+      createElement(CliCard, {
+        id: "C1",
+        title: COPY.checks.C1.title,
+        meaning: COPY.checks.C1.meaning,
+      }),
+    );
+
+    expect(html).toContain('<details class="meaning"');
+    expect(html).toContain(`<summary class="meaning-label">`);
+    expect(html).toContain(esc(COPY.checks.C1.meaning));
+  });
+
+  // ADR-0008：第三方披露挂在触发它的控件旁，必须默认可见，不能跟着一起折叠。
+  it("O3 的 ipify 披露不在折叠块内", () => {
+    const html = renderToStaticMarkup(
+      createElement(O3Card, {
+        state: { status: "done", data: { leak: false, ipv6: null } },
+        onRetry: () => {},
+      }),
+    );
+
+    const disclosure = html.indexOf(esc(COPY.checks.O3.thirdPartyNote));
+    expect(disclosure).toBeGreaterThan(-1);
+    expect(disclosure).toBeLessThan(html.indexOf("<details"));
+  });
+});
+
 describe("O4 第三方披露（ADR-0008）", () => {
   it("未触发时按钮上写明 proxycheck.io", () => {
     const html = renderToStaticMarkup(
