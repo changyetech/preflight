@@ -15,12 +15,18 @@ export default defineConfig({
   environments: {
     client: {
       build: {
-        // 多页构建：中英两个入口各产出一份独立的 index.html（<html lang> / <title> / meta description
-        // 各自正确），而不是让 /en 复用同一份中文 HTML 壳（--content 计划 I1 / I2 修复）。
+        // 多页构建：每个语种各产出一份独立的 index.html（<html lang> / dir / <title> /
+        // meta description / canonical 各自正确），而不是共用一份 HTML 壳（--content 计划 I1 / I2 修复）。
+        // 语种清单的单一事实来源是 src/copy.ts 的 LOCALES 表；这里的入口要与它逐条对应。
         rollupOptions: {
           input: {
             main: resolve(import.meta.dirname, "index.html"),
+            // /en 是根路径的别名（旧链接兼容），内容与 main 相同、canonical 指向 /。
             en: resolve(import.meta.dirname, "en/index.html"),
+            zhHans: resolve(import.meta.dirname, "zh-hans/index.html"),
+            zhHant: resolve(import.meta.dirname, "zh-hant/index.html"),
+            ru: resolve(import.meta.dirname, "ru/index.html"),
+            ar: resolve(import.meta.dirname, "ar/index.html"),
           },
         },
       },

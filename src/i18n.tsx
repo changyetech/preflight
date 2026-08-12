@@ -24,8 +24,3 @@ export function CopyProvider({
 export function useCopy(): Copy {
   return useContext(CopyContext);
 }
-
-/** `/en` 是唯一的英文入口，其余路径一律中文——不做 Accept-Language 自动跳转（规格第 7 节）。 */
-export function langFromPathname(pathname: string): Lang {
-  return pathname === "/en" || pathname.startsWith("/en/") ? "en" : "zh";
-}

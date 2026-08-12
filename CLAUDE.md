@@ -15,7 +15,7 @@ Web application
 
 ## Tech Stack
 
-- **前端**：React 19 + TypeScript + Vite 8。多页构建（`index.html` / `en/index.html` 两个入口），不是 SPA——语言由路径决定，未知路径必须真 404，不做 SPA 回退（软 404 是明确的红线）。
+- **前端**：React 19 + TypeScript + Vite 8。多页构建（每个语种一个入口：`index.html` = 英文，另有 `en/`、`zh-hans/`、`zh-hant/`、`ru/`、`ar/`），不是 SPA——语言由路径决定，未知路径必须真 404，不做 SPA 回退（软 404 是明确的红线）。默认与源语言为英语，五语种见 ADR-0009。
 - **后端**：单个 Cloudflare Worker（`worker/index.ts`）。`/api/*` 由 Worker 处理，其余路径交给 Static Assets（`env.ASSETS`）。
 - **构建集成**：`@cloudflare/vite-plugin`。开发期 Worker 跑在真实 workerd 里，与前端共用一个 Vite dev server，HMR 与 `/api/*` 同进程可用。
 - **有状态资源**：Durable Object `QuotaCounter`（proxycheck 日配额，SQLite 后端，见 ADR-0002）、Rate Limit 绑定 `RISK_RATE_LIMITER`（仅 `/api/risk`）。
@@ -160,7 +160,8 @@ ipcheck/
 ├── wrangler.jsonc     # Worker 输入配置（绑定、DO、限流）；输出配置由插件生成
 ├── src/               # 前端
 │   ├── App.tsx        # 页面骨架：顶部 sticky 导航 + 首屏结论区 + 检测卡 + 落地内容
-│   ├── copy.ts        # 全站文案（中英双语，EN 结构由类型约束对齐 ZH）
+│   ├── copy.ts        # 语种注册表 LOCALES + 文案聚合（未译字段按字段回落英文源）
+│   ├── locales/       # 分语种文案：en.ts（源语言，推导 Copy 类型）/ zh-hans / zh-hant / ru / ar
 │   ├── usePanel.ts    # 检测面板状态机（O1-O4 的编排）
 │   ├── components/    # Card / Verdict / Landing / LangSwitch
 │   ├── domain/        # 纯逻辑：结论判级、覆盖度、时区比对、IPv6、对照表

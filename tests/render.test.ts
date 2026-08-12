@@ -35,6 +35,18 @@ const GEO: GeoData = {
   colo: "SHA",
 };
 
+/**
+ * renderToStaticMarkup 会把 `'` 与 `"` 转义成实体，而英文源文案里两者都很常见。
+ * 断言前对期望值做同样转义——否则 not.toContain 会因为「转义后本就匹配不上」永远通过，
+ * 变成一条假绿的断言（多语化把默认语言从中文换成英文后才暴露出来）。
+ */
+function esc(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/'/g, "&#x27;")
+    .replace(/"/g, "&quot;");
+}
+
 const COVERAGE: Coverage = { done: 3, needCli: 5, failed: 0, pending: 1 };
 
 function renderVerdict(
@@ -54,14 +66,14 @@ describe("结论区渲染", () => {
   it("初步结论必须渲染出「初步 · 未含 IP 风险评分」标注（验收标准 4 / ADR-0005）", () => {
     const html = renderVerdict({ stage: "preliminary", level: "low" });
 
-    expect(html).toContain(COPY.verdict.preliminaryBadge);
+    expect(html).toContain(esc(COPY.verdict.preliminaryBadge));
   });
 
   it("完整结论渲染的是完整标注，不是初步标注", () => {
     const html = renderVerdict({ stage: "full", level: "high" });
 
-    expect(html).toContain(COPY.verdict.fullBadge);
-    expect(html).not.toContain(COPY.verdict.preliminaryBadge);
+    expect(html).toContain(esc(COPY.verdict.fullBadge));
+    expect(html).not.toContain(esc(COPY.verdict.preliminaryBadge));
   });
 
   it("覆盖度四档与分母都必须渲染在结论旁（ADR-0004）", () => {
@@ -71,22 +83,22 @@ describe("结论区渲染", () => {
     expect(html).toContain(`${COPY.coverage.needCli} 5`);
     expect(html).toContain(`${COPY.coverage.failed} 0`);
     expect(html).toContain(`${COPY.coverage.pending} 1`);
-    expect(html).toContain(COPY.coverage.total);
+    expect(html).toContain(esc(COPY.coverage.total));
   });
 
   it("数据不足时不得出现「低风险」字样与低风险配色（C-1）", () => {
     const html = renderVerdict({ stage: "insufficient" });
 
-    expect(html).toContain(COPY.verdict.insufficientLabel);
-    expect(html).toContain(COPY.verdict.summary.insufficient);
-    expect(html).not.toContain(COPY.verdict.level.low);
-    expect(html).not.toContain(COPY.verdict.summary.preliminaryLow);
+    expect(html).toContain(esc(COPY.verdict.insufficientLabel));
+    expect(html).toContain(esc(COPY.verdict.summary.insufficient));
+    expect(html).not.toContain(esc(COPY.verdict.level.low));
+    expect(html).not.toContain(esc(COPY.verdict.summary.preliminaryLow));
     // 配色类名也不许落到低风险绿——用户读色块的速度快过读字。
     expect(html).not.toContain("verdict-low");
     expect(html).not.toContain("level-low");
     // 还没有结论，就不该挂「初步 / 完整」这种描述结论成色的标注。
-    expect(html).not.toContain(COPY.verdict.preliminaryBadge);
-    expect(html).not.toContain(COPY.verdict.fullBadge);
+    expect(html).not.toContain(esc(COPY.verdict.preliminaryBadge));
+    expect(html).not.toContain(esc(COPY.verdict.fullBadge));
   });
 
   it("数据不足时覆盖度照常呈现（ADR-0004 不因无结论而豁免）", () => {
@@ -106,7 +118,9 @@ describe("结论区渲染", () => {
 });
 
 describe("卡片重试入口（规格 4.1）", () => {
-  it("灰卡是终态，没有重试入口，但有安装命令可复制", () => {
+  // 安装命令全站只在落地内容「安装 CLI」段出现一次（规格第 4 节第 2 项），
+  // 灰卡内不再重复，因此这里断言灰卡内不含它。
+  it("灰卡是终态，没有重试入口，也不重复安装命令", () => {
     const html = renderToStaticMarkup(
       createElement(CliCard, {
         id: "C1",
@@ -116,8 +130,9 @@ describe("卡片重试入口（规格 4.1）", () => {
     );
 
     expect(html).not.toContain('class="retry"');
-    expect(html).toContain(COPY.actions.installCommand);
-    expect(html).toContain(COPY.cardStatus.needCli);
+    expect(html).not.toContain(esc(COPY.actions.installCommand));
+    expect(html).toContain(esc(COPY.cli.hint));
+    expect(html).toContain(esc(COPY.cardStatus.needCli));
   });
 
   it("失败卡有重试入口", () => {
@@ -132,7 +147,7 @@ describe("卡片重试入口（规格 4.1）", () => {
     );
 
     expect(html).toContain('class="retry"');
-    expect(html).toContain(COPY.actions.retry);
+    expect(html).toContain(esc(COPY.actions.retry));
   });
 });
 
@@ -146,9 +161,9 @@ describe("O4 第三方披露（ADR-0008）", () => {
       }),
     );
 
-    expect(html).toContain(COPY.checks.O4.consentButton);
+    expect(html).toContain(esc(COPY.checks.O4.consentButton));
     expect(html).toContain("proxycheck.io");
-    expect(html).toContain(COPY.checks.O4.consentNote);
+    expect(html).toContain(esc(COPY.checks.O4.consentNote));
   });
 
   it("失败后的重试入口同样写明 proxycheck.io——重试就是那个触发控件", () => {
@@ -161,9 +176,9 @@ describe("O4 第三方披露（ADR-0008）", () => {
     );
 
     expect(html).toContain('class="retry"');
-    expect(html).toContain(COPY.checks.O4.consentButton);
+    expect(html).toContain(esc(COPY.checks.O4.consentButton));
     expect(html).toContain("proxycheck.io");
-    expect(html).toContain(COPY.checks.O4.consentNote);
+    expect(html).toContain(esc(COPY.checks.O4.consentNote));
     // 光写「重试」二字就等于把披露藏了起来。
     expect(html).not.toContain(`class="retry">${COPY.actions.retry}<`);
   });
@@ -177,8 +192,8 @@ describe("O4 第三方披露（ADR-0008）", () => {
       }),
     );
 
-    expect(html).toContain(COPY.cardStatus.failed);
-    expect(html).toContain(COPY.checks.O4.quotaExhausted);
+    expect(html).toContain(esc(COPY.cardStatus.failed));
+    expect(html).toContain(esc(COPY.checks.O4.quotaExhausted));
     expect(html).not.toContain('class="retry"');
   });
 });
@@ -192,7 +207,7 @@ describe("O3 第三方披露（终审修复波：ipify 无就地披露）", () =
       }),
     );
 
-    expect(html).toContain(COPY.checks.O3.thirdPartyNote);
+    expect(html).toContain(esc(COPY.checks.O3.thirdPartyNote));
     expect(html).toContain("ipify");
   });
 
@@ -205,7 +220,7 @@ describe("O3 第三方披露（终审修复波：ipify 无就地披露）", () =
     );
 
     expect(html).toContain('class="retry"');
-    expect(html).toContain(COPY.checks.O3.retryLabel);
+    expect(html).toContain(esc(COPY.checks.O3.retryLabel));
     // 破坏性验证过这条会打红：把 O3Card 的 retryLabel 去掉后，这行会因为
     // 按钮落回通用「重试」而失败（见 --content 计划终审修复波报告）。
     expect(html).not.toContain(`class="retry">${COPY.actions.retry}<`);

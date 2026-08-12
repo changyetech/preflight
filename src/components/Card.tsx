@@ -83,7 +83,7 @@ export function CheckCard({
   );
 }
 
-/** 仅 CLI 项的灰卡：终态、无重试入口，带一键复制安装命令（规格第 4 节）。 */
+/** 仅 CLI 项的灰卡：终态、无重试入口。安装命令只在落地内容「安装 CLI」段出现一次（规格第 4 节）。 */
 export function CliCard({
   id,
   title,
@@ -104,10 +104,6 @@ export function CliCard({
       meaning={meaning}
     >
       <p className="cli-hint">{COPY.cli.hint}</p>
-      <p className="install">
-        <code>{COPY.actions.installCommand}</code>
-        <CopyButton text={COPY.actions.installCommand} />
-      </p>
     </CheckCard>
   );
 }
