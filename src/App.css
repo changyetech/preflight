@@ -2,9 +2,64 @@
    明确拒绝深色广告风与高密度无解释表格。移动端优先：首屏结论区与覆盖度必须在小视口内完整可见（验收标准 10）。 */
 
 .page {
-  max-width: 56rem;
+  max-width: 80rem;
   margin: 0 auto;
   padding: 1.25rem 1rem 3rem;
+}
+
+/* ---------- 顶部 sticky 导航 ---------- */
+
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--border);
+  /* 半透明毛玻璃；不支持 backdrop-filter 时退化为上面的实色背景 */
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.site-nav-inner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 0.55rem 1rem;
+}
+
+.site-nav-brand {
+  font: 600 0.95rem var(--mono);
+  color: var(--text-h);
+}
+
+.site-nav-links {
+  display: flex;
+  flex: 1;
+  gap: 1rem;
+  /* 窄屏放不下四个锚点时横向滚动，而不是换行把顶栏撑高 */
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+
+.site-nav-links::-webkit-scrollbar {
+  display: none;
+}
+
+.site-nav-links a {
+  font-size: 0.85rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.site-nav-links a:hover {
+  color: var(--text-h);
+}
+
+/* 吸顶条会盖住锚点目标，锚点滚动时预留出它的高度 */
+:target {
+  scroll-margin-top: 4rem;
 }
 
 /* ---------- 站头 ---------- */
@@ -345,6 +400,8 @@ button {
 }
 
 .landing-section p {
+  /* 页宽放大后正文行长仍需可读，限制在约 80 字符 */
+  max-width: 46rem;
   margin: 0;
   font-size: 0.85rem;
   line-height: 1.6;
@@ -396,6 +453,10 @@ button {
 @media (min-width: 48rem) {
   .page {
     padding: 2rem 1.5rem 4rem;
+  }
+
+  .site-nav-inner {
+    padding: 0.6rem 1.5rem;
   }
 
   .cards {

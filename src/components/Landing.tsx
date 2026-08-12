@@ -11,12 +11,12 @@ export function Landing() {
 
   return (
     <section className="landing">
-      <article className="landing-section">
+      <article className="landing-section" id="why">
         <h2>{why.title}</h2>
         <p>{why.body}</p>
       </article>
 
-      <article className="landing-section">
+      <article className="landing-section" id="install">
         <h2>{install.title}</h2>
         <p>{install.body}</p>
         <p className="install">
@@ -25,7 +25,7 @@ export function Landing() {
         </p>
       </article>
 
-      <article className="landing-section">
+      <article className="landing-section" id="compare">
         <h2>{compare.title}</h2>
         <div className="compare-table-wrap">
           <table className="compare-table">

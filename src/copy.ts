@@ -13,6 +13,12 @@ const ZH = {
   nav: {
     /** 右上角语言切换（规格第 7 节）：链接文案是目标语言的自称，不是当前语言。 */
     switchTo: "English",
+    /** 顶栏品牌名与锚点标签：短于 landing 各段标题，顶栏放不下长标题。 */
+    brand: "ipcheck",
+    checks: "检测",
+    why: "为什么",
+    install: "安装 CLI",
+    compare: "对照表",
   },
 
   verdict: {
@@ -255,6 +261,11 @@ const EN: Copy = {
 
   nav: {
     switchTo: "中文",
+    brand: "ipcheck",
+    checks: "Checks",
+    why: "Why",
+    install: "Install CLI",
+    compare: "Comparison",
   },
 
   verdict: {
