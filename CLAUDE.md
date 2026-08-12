@@ -192,6 +192,7 @@ ipcheck/
 └── docs/
     ├── verdict.md     # 判级契约（normative）：Web 与 CLI 共同的判据
     ├── verdict-cases.json  # 判级契约的 golden 向量，两端参数化测试共吃同一份
+    ├── country-codes.json  # 英文国家名 → ISO2，O5 判定所需；两端共吃（Web 打进 bundle，CLI include_str!）
     ├── configuration.md  # 配置清单：环境变量、Secret、绑定、CI、检查清单
     ├── proxycheck.md  # proxycheck.io 集成参考：基准分表、配额、必带参数、已知坑
     ├── api.md         # API contract: /api/geo & /api/risk schemas, error code registry
