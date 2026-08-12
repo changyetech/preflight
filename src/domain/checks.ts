@@ -5,14 +5,21 @@
 // 因此用两个互不相交的类型分别建模，让「仅 CLI 项处于检测中」这类非法状态在类型层面无法构造，
 // 而不是用一个 status 枚举加可选字段去约定。
 
-import type { GeoData, Ipv6Result, RiskData, TimezoneResult } from "./types";
+import type {
+  DnsEgressResult,
+  GeoData,
+  Ipv6Result,
+  RiskData,
+  TimezoneResult,
+  UdpEgressResult,
+} from "./types";
 
-/** 可在线检测项。 */
-export const ONLINE_CHECK_IDS = ["O1", "O2", "O3", "O4"] as const;
+/** 可在线检测项。O5／O6 是分流泄露两项，均为可在线（ADR-0014）。 */
+export const ONLINE_CHECK_IDS = ["O1", "O2", "O3", "O4", "O5", "O6"] as const;
 /** 仅 CLI 项。C5（原厂商端点检测）已移除，编号废弃不复用（ADR-0013）。 */
 export const CLI_CHECK_IDS = ["C1", "C2", "C3", "C4"] as const;
 
-/** 覆盖度的分母恒为 8（契约第 1 节）。 */
+/** 覆盖度的分母恒为 10（契约第 1 节），由两张 ID 表派生，不写死。 */
 export const TOTAL_CHECKS = ONLINE_CHECK_IDS.length + CLI_CHECK_IDS.length;
 
 /** 可在线项的四态。「需 CLI」不在其取值域内。 */
@@ -33,6 +40,8 @@ export type PanelState = {
   o2: OnlineCheck<TimezoneResult>;
   o3: OnlineCheck<Ipv6Result>;
   o4: OnlineCheck<RiskData>;
+  o5: OnlineCheck<DnsEgressResult>;
+  o6: OnlineCheck<UdpEgressResult>;
 };
 
 export const INITIAL_PANEL: PanelState = {
@@ -41,4 +50,7 @@ export const INITIAL_PANEL: PanelState = {
   o3: { status: "running" },
   // O4 是按需检测项，未经用户显式触发不会执行（ADR-0008）。
   o4: { status: "idle" },
+  // O5／O6 首屏自动执行：按需的唯一理由是消耗本站共享的第三方配额，这两项都不消耗（契约 §1）。
+  o5: { status: "running" },
+  o6: { status: "running" },
 };

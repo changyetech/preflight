@@ -5,9 +5,9 @@ import type { PanelState } from "./checks";
 /**
  * 综合结论的输入信号。
  *
- * `signals` 为 `null` 表示 O2、O3 都还没产出结果（都在检测中，或都失败了）——
- * 此时手里一个信号都没有。它必须与「两个信号都为 false」区分开：后者是「查过了，没问题」，
- * 前者是「根本没查成」。用可空对象而不是两个 boolean 平铺，正是为了让
+ * `signals` 为 `null` 表示 O2、O3、O5、O6 都还没产出结果（都在检测中，或都失败了）——
+ * 此时手里一个信号都没有。它必须与「信号全为 false」区分开：后者是「查过了，没问题」，
+ * 前者是「根本没查成」。用可空对象而不是几个 boolean 平铺，正是为了让
  * 「没有任何证据却报低风险」这个状态在类型层面构造不出来。
  *
  * `risk` 为 `null` 表示 O4 尚未产出可用结果（未触发 / 检测中 / 失败 / 配额耗尽），
@@ -18,7 +18,17 @@ import type { PanelState } from "./checks";
  * 网络类型 Hosting、代理检出等只是分项提醒（规格 3.2），刻意不出现在这里。
  */
 export type VerdictInput = {
-  signals: { timezoneMismatch: boolean; ipv6Leak: boolean } | null;
+  signals: {
+    timezoneMismatch: boolean;
+    ipv6Leak: boolean;
+    /**
+     * O5／O6 的两个信号都是**中**档（契约 §3.2）。给成「高」会当场打破
+     * 「高只出现在 full 形态」这条不变量——它们不来自 O4，一个确定的分流泄露
+     * 会在 proxycheck 失败时被压成「初步 · 中」。
+     */
+    dnsEgressLeak: boolean;
+    udpEgressMismatch: boolean;
+  } | null;
   risk: {
     riskScore: number;
     /**
@@ -70,7 +80,9 @@ export function computeVerdict(input: VerdictInput): Verdict {
 
   const medium =
     input.signals?.timezoneMismatch === true ||
-    input.signals?.ipv6Leak === true;
+    input.signals?.ipv6Leak === true ||
+    input.signals?.dnsEgressLeak === true ||
+    input.signals?.udpEgressMismatch === true;
 
   if (input.risk === null) {
     return { stage: "preliminary", level: medium ? "medium" : "low" };
@@ -91,16 +103,27 @@ export function verdictInputFrom(panel: PanelState): VerdictInput {
   const timezone = panel.o2.status === "done" ? panel.o2.data : null;
   const ipv6 = panel.o3.status === "done" ? panel.o3.data : null;
   const risk = panel.o4.status === "done" ? panel.o4.data : null;
+  const dnsEgress = panel.o5.status === "done" ? panel.o5.data : null;
+  const udpEgress = panel.o6.status === "done" ? panel.o6.data : null;
 
   return {
-    // O2、O3 一个都没产出结果时给 null，让 computeVerdict 判「数据不足」。
+    // O2、O3、O5、O6 一个都没产出结果时给 null，让 computeVerdict 判「数据不足」。
     signals:
-      timezone === null && ipv6 === null
+      timezone === null &&
+      ipv6 === null &&
+      dnsEgress === null &&
+      udpEgress === null
         ? null
         : {
             // match 为 null 表示无从比对，不算不一致：检测不出来不等于有问题。
             timezoneMismatch: timezone?.match === false,
             ipv6Leak: ipv6?.leak === true,
+            // 同理，`comparable: false` 是无从比对，不贡献信号——绝不能当成未命中。
+            dnsEgressLeak:
+              dnsEgress?.comparison.comparable === true &&
+              dnsEgress.comparison.leak,
+            udpEgressMismatch:
+              udpEgress?.comparable === true && udpEgress.mismatch,
           },
     risk:
       risk?.status === "ok"

@@ -31,6 +31,57 @@ export type TimezoneResult = {
 export type Ipv6Result =
   { leak: true; ipv6: string } | { leak: false; ipv6: null };
 
+/**
+ * O5 的比对结果（判级契约 §2.5 判定表）。
+ *
+ * 「无从比对」与「未命中」是两回事，因此**不是** `boolean | null` 加注释，而是判别式联合：
+ * 没有 ECS、国家名查不到表、出口国未知，三者都不得回退成「两国不同」（§2.5 硬约束 3），
+ * 而把它们表达成一个可空布尔量，迟早有人写出 `!leak` 就当成绿色。
+ */
+export type DnsEgressComparison =
+  | {
+      comparable: true;
+      leak: boolean;
+      /** ECS 客户端子网归属国，ISO2 */
+      ecsCountry: string;
+      /** 出口 IP 归属国，ISO2。两个国家都必须呈现（契约 §5.4 呈现约束） */
+      exitCountry: string;
+    }
+  | {
+      comparable: false;
+      reason: "noEcs" | "unmappedCountry" | "unknownExitCountry";
+    };
+
+/** O5 DNS 出口泄露（判级契约 §2.5）。 */
+export type DnsEgressResult = {
+  /**
+   * 出口 resolver 自身的归属（ip-api 的 `dns.geo` 原样字符串）。
+   * **只展示，不判定**（契约 §2.1／§2.5 硬约束 1）：resolver 在哪个国家取决于用户选了哪家
+   * DNS 服务商，与流量走没走代理无关，拿它判定是系统性误报。
+   */
+  resolverGeo: string | null;
+  comparison: DnsEgressComparison;
+};
+
+/**
+ * O6 UDP 出口一致性（判级契约 §2.6 判定表第 2–6 行；第 1 行是检测失败，不在此类型内）。
+ *
+ * 同样是判别式联合而非可空布尔量：两个 STUN 各报各的（多出口集群、对称 NAT）是
+ * **无从比对**，与「UDP 与 TCP 同一个出口」的未命中必须在类型层面就分得开。
+ */
+export type UdpEgressResult =
+  | {
+      comparable: true;
+      mismatch: boolean;
+      /** 两个 STUN 一致报出的反射地址 */
+      reflexiveIp: string;
+      exitIp: string;
+    }
+  | {
+      comparable: false;
+      reason: "familyMismatch" | "unknownExitIp" | "stunDisagree";
+    };
+
 /** O4 IP 类型与风险，见 docs/api.md 第 3 节。 */
 export type RiskData =
   | {

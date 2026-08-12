@@ -25,9 +25,23 @@ const GEO: GeoData = {
   colo: "SHA",
 };
 
+/** 四个中档信号全未命中。 */
+const NO_SIGNALS = {
+  timezoneMismatch: false,
+  ipv6Leak: false,
+  dnsEgressLeak: false,
+  udpEgressMismatch: false,
+} as const;
+
+/** O5／O6 尚未产出结果时的面板片段——它们不参与那几条用例，故恒为检测中。 */
+const SPLIT_TUNNEL_PENDING = {
+  o5: { status: "running" },
+  o6: { status: "running" },
+} as const;
+
 /** 全清的基线输入：无任何风险信号，且未含 O4。 */
 const CLEAN: VerdictInput = {
-  signals: { timezoneMismatch: false, ipv6Leak: false },
+  signals: { ...NO_SIGNALS },
   risk: null,
 };
 
@@ -96,7 +110,7 @@ describe("computeVerdict", () => {
     expect(
       computeVerdict({
         ...WITH_RISK,
-        signals: { timezoneMismatch: true, ipv6Leak: false },
+        signals: { ...NO_SIGNALS, timezoneMismatch: true },
       }),
     ).toEqual({
       stage: "full",
@@ -108,12 +122,45 @@ describe("computeVerdict", () => {
     expect(
       computeVerdict({
         ...WITH_RISK,
-        signals: { timezoneMismatch: false, ipv6Leak: true },
+        signals: { ...NO_SIGNALS, ipv6Leak: true },
       }),
     ).toEqual({
       stage: "full",
       level: "medium",
     });
+  });
+
+  it("DNS 出口泄露 → 中（契约 §2.5，ADR-0014）", () => {
+    expect(
+      computeVerdict({
+        ...WITH_RISK,
+        signals: { ...NO_SIGNALS, dnsEgressLeak: true },
+      }),
+    ).toEqual({ stage: "full", level: "medium" });
+  });
+
+  it("UDP 出口不一致 → 中（契约 §2.6，ADR-0014）", () => {
+    expect(
+      computeVerdict({
+        ...WITH_RISK,
+        signals: { ...NO_SIGNALS, udpEgressMismatch: true },
+      }),
+    ).toEqual({ stage: "full", level: "medium" });
+  });
+
+  it("分流泄露两项都只是「中」，风险分缺席时也带不出「高」（契约 §3.2 不变量）", () => {
+    // 「高只出现在 full 形态」靠「唯一的高档信号来自 O4」维持。两个新信号若给成「高」，
+    // 一个确定的分流泄露会在 proxycheck 失败时被压成「初步 · 中」。
+    expect(
+      computeVerdict({
+        signals: {
+          ...NO_SIGNALS,
+          dnsEgressLeak: true,
+          udpEgressMismatch: true,
+        },
+        risk: null,
+      }),
+    ).toEqual({ stage: "preliminary", level: "medium" });
   });
 
   it("StopForumSpam 有滥用收录 → 中", () => {
@@ -136,7 +183,7 @@ describe("computeVerdict", () => {
 
   it("未含 O4 时永不为高：即便中风险信号全中，也只到中", () => {
     const allMedium: VerdictInput = {
-      signals: { timezoneMismatch: true, ipv6Leak: true },
+      signals: { ...NO_SIGNALS, timezoneMismatch: true, ipv6Leak: true },
       risk: null,
     };
 
@@ -153,7 +200,7 @@ describe("computeVerdict", () => {
   it("高风险优先于中风险信号", () => {
     expect(
       computeVerdict({
-        signals: { timezoneMismatch: true, ipv6Leak: true },
+        signals: { ...NO_SIGNALS, timezoneMismatch: true, ipv6Leak: true },
         risk: { riskScore: 100, anonymous: false, abuseListed: true },
       }),
     ).toEqual({ stage: "full", level: "high" });
@@ -161,11 +208,13 @@ describe("computeVerdict", () => {
 
   it("Hosting / 代理检出只是分项提醒，不拉高综合结论（规格 3.2）", () => {
     // 分项颜色由 networkType 与 proxy/vpn 决定，它们根本不进 VerdictInput——
-    // 这条断言守的是「输入面只有四个信号」这个设计。
+    // 这条断言守的是「输入面只有这几个信号」这个设计。
     expect(Object.keys(WITH_RISK).sort()).toEqual(["risk", "signals"]);
     expect(Object.keys(WITH_RISK.signals!).sort()).toEqual([
+      "dnsEgressLeak",
       "ipv6Leak",
       "timezoneMismatch",
+      "udpEgressMismatch",
     ]);
   });
 
@@ -208,21 +257,21 @@ describe("verdictInputFrom", () => {
       },
       o3: { status: "done", data: { leak: false, ipv6: null } },
       o4: { status: "idle" },
+      ...SPLIT_TUNNEL_PENDING,
     });
 
-    expect(input).toEqual({
-      signals: { timezoneMismatch: false, ipv6Leak: false },
-      risk: null,
-    });
+    expect(input).toEqual({ signals: { ...NO_SIGNALS }, risk: null });
     expect(computeVerdict(input).stage).toBe("preliminary");
   });
 
-  it("O1–O3 全部失败 → 数据不足，绝不是低风险", () => {
+  it("自动检测项全部失败 → 数据不足，绝不是低风险", () => {
     const input = verdictInputFrom({
       o1: { status: "failed", reason: "network" },
       o2: { status: "failed", reason: "network" },
       o3: { status: "failed", reason: "ipify unreachable" },
       o4: { status: "failed", reason: "upstream unavailable" },
+      o5: { status: "failed", reason: "dns-egress-probe-failed" },
+      o6: { status: "failed", reason: "udp-egress-stun-unanswered" },
     });
 
     expect(input).toEqual({ signals: null, risk: null });
@@ -248,9 +297,10 @@ describe("verdictInputFrom", () => {
       },
       o3: { status: "failed", reason: "ipify unreachable" },
       o4: { status: "idle" },
+      ...SPLIT_TUNNEL_PENDING,
     });
 
-    expect(input.signals).toEqual({ timezoneMismatch: true, ipv6Leak: false });
+    expect(input.signals).toEqual({ ...NO_SIGNALS, timezoneMismatch: true });
     expect(computeVerdict(input)).toEqual({
       stage: "preliminary",
       level: "medium",
@@ -270,6 +320,7 @@ describe("verdictInputFrom", () => {
       },
       o3: { status: "done", data: { leak: false, ipv6: null } },
       o4: { status: "done", data: { status: "quotaExhausted" } },
+      ...SPLIT_TUNNEL_PENDING,
     });
 
     expect(input.risk).toBeNull();
@@ -307,11 +358,76 @@ describe("verdictInputFrom", () => {
           abuseListed: true,
         },
       },
+      ...SPLIT_TUNNEL_PENDING,
     });
 
     expect(input).toEqual({
-      signals: { timezoneMismatch: true, ipv6Leak: true },
+      signals: { ...NO_SIGNALS, timezoneMismatch: true, ipv6Leak: true },
       risk: { riskScore: 100, anonymous: false, abuseListed: true },
+    });
+  });
+
+  it("O5／O6 的「无从比对」不贡献信号，与「未命中」同一个结论", () => {
+    // 这是本功能最容易做错的一格：把「没测出来」渲染成绿色是本产品的红线，
+    // 但在**综合结论**上，无从比对与未命中确实必须一致——差别只在该项自己的呈现。
+    const incomparable = verdictInputFrom({
+      o1: { status: "done", data: GEO },
+      o2: { status: "running" },
+      o3: { status: "running" },
+      o4: { status: "idle" },
+      o5: {
+        status: "done",
+        data: {
+          resolverGeo: "China - Alibaba",
+          comparison: { comparable: false, reason: "noEcs" },
+        },
+      },
+      o6: {
+        status: "done",
+        data: { comparable: false, reason: "stunDisagree" },
+      },
+    });
+
+    expect(incomparable.signals).toEqual({ ...NO_SIGNALS });
+    expect(computeVerdict(incomparable)).toEqual({
+      stage: "preliminary",
+      level: "low",
+    });
+  });
+
+  it("O5／O6 命中时信号为真，两个新信号各自独立", () => {
+    const input = verdictInputFrom({
+      o1: { status: "done", data: GEO },
+      o2: { status: "running" },
+      o3: { status: "running" },
+      o4: { status: "idle" },
+      o5: {
+        status: "done",
+        data: {
+          resolverGeo: null,
+          comparison: {
+            comparable: true,
+            leak: true,
+            ecsCountry: "US",
+            exitCountry: "JP",
+          },
+        },
+      },
+      o6: {
+        status: "done",
+        data: {
+          comparable: true,
+          mismatch: false,
+          reflexiveIp: "1.2.3.4",
+          exitIp: "1.2.3.4",
+        },
+      },
+    });
+
+    expect(input.signals).toEqual({ ...NO_SIGNALS, dnsEgressLeak: true });
+    expect(computeVerdict(input)).toEqual({
+      stage: "preliminary",
+      level: "medium",
     });
   });
 
@@ -328,6 +444,7 @@ describe("verdictInputFrom", () => {
       },
       o3: { status: "running" },
       o4: { status: "idle" },
+      ...SPLIT_TUNNEL_PENDING,
     });
 
     expect(input.signals?.timezoneMismatch).toBe(false);

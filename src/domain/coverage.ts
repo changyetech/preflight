@@ -8,7 +8,7 @@ import type { RiskData } from "./types";
  * 覆盖度分档。规格 3.4 列的是三档，这里多一档 `pending`：
  * 按需项 O4 在被触发前不属于任何一档，硬塞进「检测失败」是谎报故障，
  * 塞进「需 CLI」则把可解决的临时状态与永久状态混计（ADR-0004 明令禁止）。
- * 不变量：done + needCli + failed + pending ≡ 8。
+ * 不变量：done + needCli + failed + pending ≡ 10。
  */
 export type Coverage = {
   done: number;
@@ -58,6 +58,10 @@ export function computeCoverage(panel: PanelState): Coverage {
     bucketOf(panel.o2),
     bucketOf(panel.o3),
     bucketOfRisk(panel.o4),
+    // O5 的「无从比对」是**已完成**：探测成功了，只是回答里不含可判定的信息（契约 §2.5）。
+    // 它落在 status 上，因此不需要像 O4 那样开特例。O6 同理（契约 §2.6 第 2–4 行）。
+    bucketOf(panel.o5),
+    bucketOf(panel.o6),
   ];
 
   for (const bucket of buckets) {

@@ -11,6 +11,8 @@
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
+    // O5 判定要读 docs/country-codes.json（国家名 → ISO2），两端共吃、Web 打进 bundle。
+    "resolveJsonModule": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,

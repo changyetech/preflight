@@ -8,6 +8,8 @@
 import { describe, expect, it } from "vitest";
 
 import { riskLevelOf } from "../worker/proxycheck";
+import { compareDnsEgress } from "../src/domain/dnsEgress";
+import { judgeUdpEgress } from "../src/domain/udpEgress";
 import type { Verdict, VerdictInput } from "../src/domain/verdict";
 import { computeVerdict } from "../src/domain/verdict";
 import casesFile from "../docs/verdict-cases.json";
@@ -21,6 +23,12 @@ const KNOWN_SIGNALS = [
   "anonymous",
   "abuseListed",
   "tunOff",
+  // O5／O6 给的是**原始观测值**而非派生布尔量（本文件 conventions.signals），
+  // 因此这里出现的是四个观测字段，两个新信号由判定层从它们推出来。
+  "dnsEcsCountry",
+  "exitCountry",
+  "stunReflexiveIps",
+  "exitIp",
 ] as const;
 
 const KNOWN_SIDES = ["web", "cli"] as const;
@@ -33,6 +41,10 @@ type CaseSignals = {
   anonymous?: boolean | null;
   abuseListed?: boolean | null;
   tunOff?: boolean | null;
+  dnsEcsCountry?: string | null;
+  exitCountry?: string | null;
+  stunReflexiveIps?: string[] | null;
+  exitIp?: string | null;
 };
 
 type Case = {
@@ -53,17 +65,29 @@ const CASES = (casesFile as unknown as { cases: Case[] }).cases;
  * - `riskScore` 未知 ⇒ `risk` 整体为 null；`riskScore` 已知而 `abuseListed` 未知 ⇒
  *   `risk` 存在、`abuseListed` 为 null（StopForumSpam 挂了不该连累 proxycheck 的结果）
  * - `riskScore` 与 `anonymous` **必定成对**（契约 §2.3）：判「高」的阈值由后者决定
+ * - O5／O6 的观测值**过真正的判定层**（`compareDnsEgress` / `judgeUdpEgress`），不在这里
+ *   另写一套推导——否则向量测的就是 harness 自己，两端实现漂移了也照样绿
  */
 function toVerdictInput(signals: CaseSignals): VerdictInput {
   const timezone = signals.tzMismatchSystem ?? null;
   const ipv6 = signals.ipv6Leak ?? null;
   const riskScore = signals.riskScore ?? null;
+  const dnsEgress = dnsEgressOf(signals);
+  const udpEgress = udpEgressOf(signals);
 
   return {
     signals:
-      timezone === null && ipv6 === null
+      timezone === null &&
+      ipv6 === null &&
+      dnsEgress === null &&
+      udpEgress === null
         ? null
-        : { timezoneMismatch: timezone === true, ipv6Leak: ipv6 === true },
+        : {
+            timezoneMismatch: timezone === true,
+            ipv6Leak: ipv6 === true,
+            dnsEgressLeak: dnsEgress === true,
+            udpEgressMismatch: udpEgress === true,
+          },
     risk:
       riskScore === null
         ? null
@@ -73,6 +97,43 @@ function toVerdictInput(signals: CaseSignals): VerdictInput {
             abuseListed: signals.abuseListed ?? null,
           },
   };
+}
+
+/**
+ * O5 的观测值 → 信号。`null` = 该检测项没产出结果（未执行或失败），与
+ * `verdictInputFrom` 里「`status !== "done"` 就不进 signals」是同一条语义。
+ *
+ * **「无从比对」返回 `false` 而不是 `null`**：探测成功了，只是回答里不含可判定的信息——
+ * 它是一个产出，只不过不贡献信号（契约 §2.5）。
+ */
+function dnsEgressOf(signals: CaseSignals): boolean | null {
+  if (signals.dnsEcsCountry == null && signals.exitCountry == null) return null;
+
+  const ecs =
+    signals.dnsEcsCountry == null
+      ? ({ known: false, reason: "noEcs" } as const)
+      : ({ known: true, iso2: signals.dnsEcsCountry } as const);
+  const comparison = compareDnsEgress(ecs, signals.exitCountry ?? null);
+
+  return comparison.comparable && comparison.leak;
+}
+
+/** O6 同上。`null` 与空数组同义 ⇒ `N_ok = 0` ⇒ 检测失败 ⇒ 没有产出（本文件 conventions）。 */
+function udpEgressOf(signals: CaseSignals): boolean | null {
+  if (signals.stunReflexiveIps == null && signals.exitIp == null) return null;
+
+  const state = judgeUdpEgress(
+    {
+      reflexiveIps: signals.stunReflexiveIps ?? [],
+      // 向量不区分「STUN 没答」与「浏览器禁用 WebRTC」——两者同为检测失败，
+      // 差别只在呈现层的失败原因（契约 §5.6），不进判级。
+      webrtcSupported: true,
+    },
+    signals.exitIp ?? null,
+  );
+  if (state.status !== "done") return null;
+
+  return state.data.comparable && state.data.mismatch;
 }
 
 function levelOf(verdict: Verdict): string | undefined {
@@ -152,6 +213,14 @@ describe("判级契约 · golden 向量", () => {
   }
 });
 
+/** 这一组只关心风险分那把尺子，四个中档信号一律未命中。 */
+const NO_SIGNALS = {
+  timezoneMismatch: false,
+  ipv6Leak: false,
+  dnsEgressLeak: false,
+  udpEgressMismatch: false,
+};
+
 describe("分项分级与综合结论是两把尺子（契约 §6）", () => {
   it("分项分级对齐 proxycheck v3 自己的四档", () => {
     // v3: 0–25 Allow / 26–50、51–75 Challenge / 76–100 Deny，收成三色。
@@ -166,7 +235,7 @@ describe("分项分级与综合结论是两把尺子（契约 §6）", () => {
     expect(
       levelOf(
         computeVerdict({
-          signals: { timezoneMismatch: false, ipv6Leak: false },
+          signals: NO_SIGNALS,
           risk: { riskScore: 75, anonymous: false, abuseListed: false },
         }),
       ),
@@ -176,7 +245,7 @@ describe("分项分级与综合结论是两把尺子（契约 §6）", () => {
     expect(
       levelOf(
         computeVerdict({
-          signals: { timezoneMismatch: false, ipv6Leak: false },
+          signals: NO_SIGNALS,
           risk: { riskScore: 76, anonymous: false, abuseListed: false },
         }),
       ),
@@ -190,7 +259,7 @@ describe("分项分级与综合结论是两把尺子（契约 §6）", () => {
     expect(
       levelOf(
         computeVerdict({
-          signals: { timezoneMismatch: false, ipv6Leak: false },
+          signals: NO_SIGNALS,
           risk: { riskScore: 60, anonymous: true, abuseListed: false },
         }),
       ),
