@@ -11,6 +11,7 @@
 use serde_json::{Value, json};
 
 use crate::domain::checks::{ALL_CHECKS, CheckId, Failure, Outcome, TOTAL_CHECKS};
+use crate::domain::{dns_egress, udp_egress};
 use crate::probe::{Report, TimezoneCheck, ipify, proxy};
 
 fn failure_name(failure: Failure) -> &'static str {
@@ -78,6 +79,8 @@ pub fn report(report: &Report) -> Value {
             "riskScore": signals.risk_score,
             "anonymous": signals.anonymous,
             "abuseListed": signals.abuse_listed,
+            "dnsEgressLeak": signals.dns_egress_leak,
+            "udpEgressMismatch": signals.udp_egress_mismatch,
             "tunOff": signals.tun_off,
         },
         "checks": Value::Object(checks),
@@ -124,17 +127,50 @@ fn check_json(id: CheckId, report: &Report) -> Value {
                 "abuseLastSeen": risk.abuse.as_ref().and_then(|a| a.last_seen.clone()),
             })
         }),
-        // TODO(--cli 第 5 步)：O5／O6 的完整 schema（ECS 与出口两个国家、resolver 归属、
-        // 反射地址、无从比对的原因）由输出层那一步落地。这里先给出可比对性与信号本身，
-        // 好让覆盖度与 `signals` 段现在就自洽。
-        CheckId::O5 => check(
-            &report.o5,
-            |result| json!({ "leak": result.comparison.leak() }),
-        ),
-        CheckId::O6 => check(
-            &report.o6,
-            |result| json!({ "mismatch": result.mismatch() }),
-        ),
+        CheckId::O5 => check(&report.o5, |result| {
+            let (leak, ecs_country, exit_country) = match &result.comparison {
+                dns_egress::Comparison::Comparable {
+                    leak,
+                    ecs_country,
+                    exit_country,
+                } => (
+                    Some(*leak),
+                    Some(ecs_country.clone()),
+                    Some(exit_country.clone()),
+                ),
+                dns_egress::Comparison::NotComparable(_) => (None, None, None),
+            };
+            json!({
+                // resolver 归属只展示、不参与判定（契约 2.1／2.5 硬约束 1）——只有 `leak` 进综合结论。
+                "resolverGeo": result.resolver_geo,
+                "leak": leak,
+                "ecsCountry": ecs_country,
+                "exitCountry": exit_country,
+                // 三种「无从比对」成因分开报，null 表示可比对（契约 2.5 硬约束 3）。
+                "notComparableReason": not_comparable_reason(&result.comparison),
+            })
+        }),
+        CheckId::O6 => check(&report.o6, |result| {
+            let (mismatch, reflexive_ip, exit_ip) = match result {
+                udp_egress::UdpEgress::Comparable {
+                    mismatch,
+                    reflexive_ip,
+                    exit_ip,
+                } => (
+                    Some(*mismatch),
+                    Some(reflexive_ip.to_string()),
+                    Some(exit_ip.to_string()),
+                ),
+                udp_egress::UdpEgress::NotComparable(_) => (None, None, None),
+            };
+            json!({
+                "mismatch": mismatch,
+                "reflexiveIp": reflexive_ip,
+                "exitIp": exit_ip,
+                // 三种「无从比对」成因分开报，null 表示可比对（契约 2.6）。
+                "notComparableReason": udp_not_comparable_reason(result),
+            })
+        }),
         CheckId::C1 => check(&report.c1, |ip| json!({ "ip": ip })),
         CheckId::C2 => check(&report.c2, |servers| {
             json!({
@@ -167,6 +203,28 @@ fn state_name(state: &proxy::State) -> &'static str {
         proxy::State::Disabled => "off",
         // 「没检测」与「检测了、没开」必须分得开。
         proxy::State::Unsupported => "unsupported",
+    }
+}
+
+fn not_comparable_reason(comparison: &dns_egress::Comparison) -> Option<&'static str> {
+    match comparison {
+        dns_egress::Comparison::Comparable { .. } => None,
+        dns_egress::Comparison::NotComparable(reason) => Some(match reason {
+            dns_egress::NotComparable::NoEcs => "noEcs",
+            dns_egress::NotComparable::UnmappedCountry => "unmappedCountry",
+            dns_egress::NotComparable::UnknownExitCountry => "unknownExitCountry",
+        }),
+    }
+}
+
+fn udp_not_comparable_reason(result: &udp_egress::UdpEgress) -> Option<&'static str> {
+    match result {
+        udp_egress::UdpEgress::Comparable { .. } => None,
+        udp_egress::UdpEgress::NotComparable(reason) => Some(match reason {
+            udp_egress::NotComparable::FamilyMismatch => "familyMismatch",
+            udp_egress::NotComparable::UnknownExitIp => "unknownExitIp",
+            udp_egress::NotComparable::StunDisagree => "stunDisagree",
+        }),
     }
 }
 
@@ -239,9 +297,84 @@ mod tests {
             "riskScore",
             "anonymous",
             "abuseListed",
+            "dnsEgressLeak",
+            "udpEgressMismatch",
         ] {
             assert!(out["signals"][key].is_null(), "{key} 应为 null");
         }
+    }
+
+    #[test]
+    fn dns_egress_leak_reports_both_compared_countries_and_the_resolver_geo() {
+        // 契约 5.4：O5 必须把参与比对的两个国家都显示出来；resolver 归属只展示不参与判定。
+        let mut r = blank();
+        r.o5 = Outcome::Done(crate::domain::dns_egress::DnsEgress {
+            resolver_geo: Some("Japan - Google LLC".into()),
+            comparison: dns_egress::Comparison::Comparable {
+                leak: true,
+                ecs_country: "JP".into(),
+                exit_country: "US".into(),
+            },
+        });
+        let out = report(&r);
+        assert_eq!(out["checks"]["O5"]["status"], "done");
+        assert_eq!(out["checks"]["O5"]["leak"], true);
+        assert_eq!(out["checks"]["O5"]["ecsCountry"], "JP");
+        assert_eq!(out["checks"]["O5"]["exitCountry"], "US");
+        assert_eq!(out["checks"]["O5"]["resolverGeo"], "Japan - Google LLC");
+        assert!(out["checks"]["O5"]["notComparableReason"].is_null());
+        assert_eq!(out["signals"]["dnsEgressLeak"], true);
+    }
+
+    #[test]
+    fn dns_egress_not_comparable_reports_the_reason_and_a_null_leak() {
+        // 「无从比对」是已完成，不是检测失败；三种成因分开报（契约 2.5 硬约束 3）。
+        let mut r = blank();
+        r.o5 = Outcome::Done(crate::domain::dns_egress::DnsEgress {
+            resolver_geo: None,
+            comparison: dns_egress::Comparison::NotComparable(
+                crate::domain::dns_egress::NotComparable::NoEcs,
+            ),
+        });
+        let out = report(&r);
+        assert_eq!(out["checks"]["O5"]["status"], "done");
+        assert!(out["checks"]["O5"]["leak"].is_null());
+        assert!(out["checks"]["O5"]["ecsCountry"].is_null());
+        assert!(out["checks"]["O5"]["exitCountry"].is_null());
+        assert_eq!(out["checks"]["O5"]["notComparableReason"], "noEcs");
+        assert!(out["signals"]["dnsEgressLeak"].is_null());
+    }
+
+    #[test]
+    fn udp_egress_mismatch_reports_both_addresses() {
+        let mut r = blank();
+        r.o6 = Outcome::Done(udp_egress::UdpEgress::Comparable {
+            mismatch: true,
+            reflexive_ip: "203.0.113.7".parse().unwrap(),
+            exit_ip: "198.51.100.20".parse().unwrap(),
+        });
+        let out = report(&r);
+        assert_eq!(out["checks"]["O6"]["status"], "done");
+        assert_eq!(out["checks"]["O6"]["mismatch"], true);
+        assert_eq!(out["checks"]["O6"]["reflexiveIp"], "203.0.113.7");
+        assert_eq!(out["checks"]["O6"]["exitIp"], "198.51.100.20");
+        assert!(out["checks"]["O6"]["notComparableReason"].is_null());
+        assert_eq!(out["signals"]["udpEgressMismatch"], true);
+    }
+
+    #[test]
+    fn udp_egress_not_comparable_reports_the_reason_and_a_null_mismatch() {
+        let mut r = blank();
+        r.o6 = Outcome::Done(udp_egress::UdpEgress::NotComparable(
+            udp_egress::NotComparable::StunDisagree,
+        ));
+        let out = report(&r);
+        assert_eq!(out["checks"]["O6"]["status"], "done");
+        assert!(out["checks"]["O6"]["mismatch"].is_null());
+        assert!(out["checks"]["O6"]["reflexiveIp"].is_null());
+        assert!(out["checks"]["O6"]["exitIp"].is_null());
+        assert_eq!(out["checks"]["O6"]["notComparableReason"], "stunDisagree");
+        assert!(out["signals"]["udpEgressMismatch"].is_null());
     }
 
     #[test]

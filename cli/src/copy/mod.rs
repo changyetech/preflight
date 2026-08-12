@@ -156,12 +156,14 @@ copy_leaf! {
 }
 
 copy_node! {
-    /// 8 个检测项。O1–O4 的标题必须与 ipcheck Web 逐字一致（契约 1.1）。
+    /// 10 个检测项。O1–O6 的标题必须与 ipcheck Web 逐字一致（契约 1.1）。
     ChecksText / ChecksTextPatch {
         o1: CheckText / CheckTextPatch,
         o2: CheckText / CheckTextPatch,
         o3: CheckText / CheckTextPatch,
         o4: CheckText / CheckTextPatch,
+        o5: CheckText / CheckTextPatch,
+        o6: CheckText / CheckTextPatch,
         c1: CheckText / CheckTextPatch,
         c2: CheckText / CheckTextPatch,
         c3: CheckText / CheckTextPatch,
@@ -216,6 +218,37 @@ copy_leaf! {
     }
 }
 
+copy_leaf! {
+    /// O5 卡片专属文案。契约 2.5／5.4：resolver 归属与 ECS 判定必须同时展示，
+    /// 且明确标出只有后者进综合结论——与 §5.1 里 CLI 同时展示 `$TZ` 与系统时区同构。
+    DnsEgressText / DnsEgressTextPatch {
+        resolver_label,
+        ecs_label,
+        exit_label,
+        leak,
+        no_leak,
+        /// ECS 缺失时的说明，状态仍是「已完成」而非「检测失败」（契约 2.5）。
+        no_ecs,
+        unmapped_country,
+        unknown_exit_country,
+        /// 标明 resolver 归属只展示、不参与判定。
+        resolver_note,
+    }
+}
+
+copy_leaf! {
+    /// O6 卡片专属文案。「无从比对」的三种成因与「未命中」在措辞上必须可分（契约 2.6）。
+    UdpEgressText / UdpEgressTextPatch {
+        reflexive_label,
+        exit_label,
+        mismatch,
+        no_mismatch,
+        family_mismatch,
+        unknown_exit_ip,
+        stun_disagree,
+    }
+}
+
 copy_node! {
     /// 全部文案。
     Text / TextPatch {
@@ -228,6 +261,8 @@ copy_node! {
         values: ValueText / ValueTextPatch,
         failures: FailureText / FailureTextPatch,
         notes: NoteText / NoteTextPatch,
+        dns_egress: DnsEgressText / DnsEgressTextPatch,
+        udp_egress: UdpEgressText / UdpEgressTextPatch,
     }
 }
 

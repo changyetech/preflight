@@ -2,11 +2,11 @@
 //!
 //! 本文件必须完整：少写一个字段是编译错误，而不是运行时才发现某处掉回英文。
 //!
-//! O1–O4 的标题必须与 ipcheck Web 的 `src/locales/en.ts` **逐字一致**（契约 1.1）。
+//! O1–O6 的标题必须与 ipcheck Web 的 `src/locales/en.ts` **逐字一致**（契约 1.1）。
 
 use super::{
-    CheckText, ChecksText, ConfigText, CoverageText, ErrorText, FailureText, LangText, NoteText,
-    Text, ValueText, VerdictText,
+    CheckText, ChecksText, ConfigText, CoverageText, DnsEgressText, ErrorText, FailureText,
+    LangText, NoteText, Text, UdpEgressText, ValueText, VerdictText,
 };
 
 pub const EN: Text = Text {
@@ -72,13 +72,22 @@ pub const EN: Text = Text {
             title: "IP type and risk",
             description: "Whether the exit IP is residential or a datacenter, whether it is flagged as a proxy, its risk score, and any abuse reports.",
         },
+        o5: CheckText {
+            title: "DNS Egress Leak",
+            description: "Whether your DNS queries leave from the same country as your exit IP, based on the client subnet a public resolver reports back (EDNS Client Subnet).",
+        },
+        o6: CheckText {
+            title: "UDP Egress Consistency",
+            description: "Whether UDP traffic exits through the same address as the exit IP observed over TCP, using two independent STUN probes.",
+        },
         c1: CheckText {
             title: "Real public IP",
             description: "Obtained from a domestic echo service that rule-based proxies route directly, so it reveals your real ISP exit even with a VPN running.",
         },
         c2: CheckText {
-            title: "Local DNS and DNS leak",
-            description: "Which DNS servers this machine uses. Domestic resolvers can reveal your real location.",
+            // 契约收缩：DNS 泄露判定拆到 O5，本项只剩「本地 DNS 服务器配置」（ADR-0014）。
+            title: "Local DNS Server Configuration",
+            description: "Which DNS servers this machine uses. Domestic resolvers can reveal your real location. Whether those queries actually leave through the proxy is a separate check, see O5.",
         },
         c3: CheckText {
             title: "Proxy detection",
@@ -122,5 +131,28 @@ pub const EN: Text = Text {
         geo_source: "Ownership data comes from proxycheck. The website uses Cloudflare's database, so the two can disagree.",
         o2_desktop_only: "This one covers GUI apps, which follow the system timezone. Command-line tools read $TZ instead — that is C4 below.",
         quota_shared: "Without an API key proxycheck allows 100 queries per day, counted per exit IP — you share it with anyone else on the same proxy node. Run `ipcheck config set proxycheck-key` to raise it to 1,000.",
+    },
+
+    dns_egress: DnsEgressText {
+        resolver_label: "Resolver location",
+        ecs_label: "DNS client subnet country",
+        exit_label: "Exit IP country",
+        leak: "Your DNS queries appear to leave from a different country than your exit IP — DNS may be bypassing the proxy.",
+        no_leak: "Your DNS queries appear to leave from the same country as your exit IP — no DNS egress leak detected.",
+        no_ecs: "Your DNS provider doesn't send EDNS Client Subnet data, so this can't determine whether your DNS queries are proxied.",
+        unmapped_country: "Your resolver reported a client-subnet location we don't recognize, so this can't be compared.",
+        unknown_exit_country: "The exit IP's country isn't available yet (see the Exit IP check above), so this can't be compared.",
+        // 契约 2.1／2.5 硬约束 1：resolver 归属只展示，不参与判定——只有 ECS 判定进综合结论。
+        resolver_note: "Shown for reference only — it doesn't affect the verdict. Which country your resolver sits in depends on which DNS provider you picked, not on whether your traffic is proxied.",
+    },
+
+    udp_egress: UdpEgressText {
+        reflexive_label: "UDP reflexive address",
+        exit_label: "Exit IP",
+        mismatch: "Your UDP traffic appears to exit from a different address than your exit IP — UDP may be bypassing the proxy.",
+        no_mismatch: "Your UDP traffic appears to exit from the same address as your exit IP — no UDP egress mismatch detected.",
+        family_mismatch: "The UDP reflexive address and your exit IP are different address families (IPv4/IPv6), so they can't be compared on equal terms.",
+        unknown_exit_ip: "The exit IP isn't available yet (see the Exit IP check above), so this can't be compared.",
+        stun_disagree: "The two STUN servers reported different addresses, so there's no single reliable value to compare — this can happen with multi-exit clusters or symmetric NAT.",
     },
 };

@@ -1,7 +1,7 @@
 //! 呈现层：把一次体检渲染成人读的报告。
 //!
 //! 参考 ipcheck Web 的视觉结构，**不用表格边框**：
-//! 结论区置顶（用户敲完命令第一眼看到结论，不用滚），其下是 9 张检测卡。
+//! 结论区置顶（用户敲完命令第一眼看到结论，不用滚），其下是 10 张检测卡。
 //! 网页的顶部导航与落地内容不移植——终端没有锚点，营销文案对已装用户没有意义。
 //!
 //! 没有固定列宽常量：`ai-ipcheck` 的 `COL_LABEL = 20` 是「多语言不存在」这个假设的化石。
@@ -11,6 +11,7 @@ use std::fmt::Write as _;
 use crate::copy::Text;
 use crate::domain::checks::{CheckId, Coverage, Failure, Outcome};
 use crate::domain::verdict::{self, Level, PreliminaryLevel, Verdict};
+use crate::domain::{dns_egress, udp_egress};
 use crate::probe::{ExitInfo, Report, Risk, TimezoneCheck, dns, ipify, proxy};
 
 /// 分项的颜色语义。与综合结论无关（契约 6）。
@@ -231,6 +232,8 @@ fn cards(report: &Report, text: &Text) -> Vec<Card> {
         card_timezone(CheckId::O2, &report.o2, text, &text.checks.o2, true),
         card_o3(&report.o3, text),
         card_o4(&report.o4, text),
+        card_o5(&report.o5, text),
+        card_o6(&report.o6, text),
         card_c1(&report.c1, text),
         card_c2(&report.c2, text),
         card_c3(&report.c3, text),
@@ -421,6 +424,117 @@ fn card_o4(outcome: &Outcome<Risk>, text: &Text) -> Card {
     }
 }
 
+fn card_o5(outcome: &Outcome<dns_egress::DnsEgress>, text: &Text) -> Card {
+    let meta = &text.checks.o5;
+    let Outcome::Done(result) = outcome else {
+        return failed_card(
+            CheckId::O5,
+            meta.title,
+            meta.description,
+            outcome.failure().unwrap(),
+            text,
+        );
+    };
+
+    let dt = &text.dns_egress;
+    let (tone, mut values) = match &result.comparison {
+        dns_egress::Comparison::Comparable {
+            leak,
+            ecs_country,
+            exit_country,
+        } => {
+            let comparison_line = format!(
+                "{}  {}  →  {}  {}",
+                dt.ecs_label, ecs_country, dt.exit_label, exit_country,
+            );
+            let leak_message = if *leak { dt.leak } else { dt.no_leak };
+            let tone = if *leak { Tone::Warn } else { Tone::Ok };
+            (tone, vec![comparison_line, leak_message.to_string()])
+        }
+        dns_egress::Comparison::NotComparable(reason) => {
+            // 三种「无从比对」各自的说明，绝不回退成「泄露」或「未泄露」（契约 2.5 硬约束 3）。
+            let message = match reason {
+                dns_egress::NotComparable::NoEcs => dt.no_ecs,
+                dns_egress::NotComparable::UnmappedCountry => dt.unmapped_country,
+                dns_egress::NotComparable::UnknownExitCountry => dt.unknown_exit_country,
+            };
+            (Tone::Dim, vec![message.to_string()])
+        }
+    };
+
+    // resolver 归属始终展示（与 §5.1 里 CLI 同时展示 $TZ 与系统时区同构），
+    // 但 notes 明确标出只有上面的 ECS 判定进综合结论。
+    values.push(format!(
+        "{}  {}",
+        dt.resolver_label,
+        result
+            .resolver_geo
+            .as_deref()
+            .unwrap_or(text.values.unknown),
+    ));
+
+    Card {
+        id: CheckId::O5,
+        tone,
+        title: meta.title,
+        values,
+        notes: vec![dt.resolver_note],
+        description: meta.description,
+    }
+}
+
+fn card_o6(outcome: &Outcome<udp_egress::UdpEgress>, text: &Text) -> Card {
+    let meta = &text.checks.o6;
+    let Outcome::Done(result) = outcome else {
+        return failed_card(
+            CheckId::O6,
+            meta.title,
+            meta.description,
+            outcome.failure().unwrap(),
+            text,
+        );
+    };
+
+    let ut = &text.udp_egress;
+    let (tone, values) = match result {
+        udp_egress::UdpEgress::Comparable {
+            mismatch,
+            reflexive_ip,
+            exit_ip,
+        } => {
+            let comparison_line = format!(
+                "{}  {}  →  {}  {}",
+                ut.reflexive_label, reflexive_ip, ut.exit_label, exit_ip,
+            );
+            let mismatch_message = if *mismatch {
+                ut.mismatch
+            } else {
+                ut.no_mismatch
+            };
+            let tone = if *mismatch { Tone::Warn } else { Tone::Ok };
+            (tone, vec![comparison_line, mismatch_message.to_string()])
+        }
+        udp_egress::UdpEgress::NotComparable(reason) => {
+            // 「无从比对」的三种成因与「未命中」文案可分（契约 2.6）。
+            let message = match reason {
+                udp_egress::NotComparable::FamilyMismatch => ut.family_mismatch,
+                udp_egress::NotComparable::UnknownExitIp => ut.unknown_exit_ip,
+                udp_egress::NotComparable::StunDisagree => ut.stun_disagree,
+            };
+            (Tone::Dim, vec![message.to_string()])
+        }
+    };
+
+    Card {
+        id: CheckId::O6,
+        tone,
+        title: meta.title,
+        values,
+        notes: Vec::new(),
+        description: meta.description,
+    }
+}
+
 fn card_c1(outcome: &Outcome<String>, text: &Text) -> Card {
     let meta = &text.checks.c1;
     match outcome {
@@ -575,7 +689,7 @@ mod tests {
     fn every_check_is_rendered_even_when_it_failed() {
         // 覆盖度里数着它们，屏幕上就必须有它们。
         let out = render(&blank(), false, false);
-        for id in ["O1", "O2", "O3", "O4", "C1", "C2", "C3", "C4"] {
+        for id in ["O1", "O2", "O3", "O4", "O5", "O6", "C1", "C2", "C3", "C4"] {
             assert!(out.contains(id), "缺少 {id}：{out}");
         }
     }
@@ -666,6 +780,70 @@ mod tests {
         });
         let text = copy::text(Lang::En);
         assert!(render(&report, false, false).contains(text.values.anonymous_flag));
+    }
+
+    #[test]
+    fn the_o5_card_shows_both_the_ecs_verdict_and_the_resolver_ownership() {
+        // 呈现层硬约束：O5 必须同时展示 ECS 判定结果与 resolver 归属，
+        // 并标明只有前者进综合结论——与 §5.1 里 CLI 同时展示 $TZ 与系统时区同构。
+        let mut report = blank();
+        report.o5 = Outcome::Done(dns_egress::DnsEgress {
+            resolver_geo: Some("Japan - Google LLC".into()),
+            comparison: dns_egress::Comparison::Comparable {
+                leak: true,
+                ecs_country: "JP".into(),
+                exit_country: "US".into(),
+            },
+        });
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+        assert!(out.contains("JP"), "{out}");
+        assert!(out.contains("US"), "{out}");
+        assert!(out.contains("Japan - Google LLC"), "{out}");
+        assert!(out.contains(text.dns_egress.resolver_note), "{out}");
+    }
+
+    #[test]
+    fn the_o5_card_names_the_missing_ecs_and_stays_done() {
+        // 呈现层硬约束：ECS 缺失时明写「你的 DNS 服务商不发送 ECS」，状态仍是「已完成」
+        // 而不是「third-party unavailable」——O5 卡片本身必须不落到失败态的措辞里
+        // （其余卡片仍失败，因此不能对整份输出断言，只看 O5 到 O6 之间那一段）。
+        let mut report = blank();
+        report.o5 = Outcome::Done(dns_egress::DnsEgress {
+            resolver_geo: Some("Japan - Cloudflare, Inc.".into()),
+            comparison: dns_egress::Comparison::NotComparable(dns_egress::NotComparable::NoEcs),
+        });
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+        let o5_start = out.find(" O5  ").expect("必须有 O5 卡片");
+        let o6_start = out.find(" O6  ").expect("必须有 O6 卡片");
+        let o5_card = &out[o5_start..o6_start];
+        assert!(o5_card.contains(text.dns_egress.no_ecs), "{o5_card}");
+        assert!(!o5_card.contains(text.failures.upstream), "{o5_card}");
+    }
+
+    #[test]
+    fn the_o6_card_tells_a_not_comparable_reason_apart_from_a_miss() {
+        // 呈现层硬约束：O6「无从比对」与「未命中」的文案必须可分。
+        let text = copy::text(Lang::En);
+
+        let mut disagree = blank();
+        disagree.o6 = Outcome::Done(udp_egress::UdpEgress::NotComparable(
+            udp_egress::NotComparable::StunDisagree,
+        ));
+        let out = render(&disagree, false, false);
+        assert!(out.contains(text.udp_egress.stun_disagree), "{out}");
+        assert!(!out.contains(text.udp_egress.no_mismatch), "{out}");
+
+        let mut miss = blank();
+        miss.o6 = Outcome::Done(udp_egress::UdpEgress::Comparable {
+            mismatch: false,
+            reflexive_ip: "198.51.100.20".parse().unwrap(),
+            exit_ip: "198.51.100.20".parse().unwrap(),
+        });
+        let out = render(&miss, false, false);
+        assert!(out.contains(text.udp_egress.no_mismatch), "{out}");
+        assert!(!out.contains(text.udp_egress.stun_disagree), "{out}");
     }
 
     #[test]

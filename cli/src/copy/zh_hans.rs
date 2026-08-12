@@ -1,8 +1,9 @@
 //! 简体中文——v1 必须译全（`ai-ipcheck` 的平价比对基线跑在这个语种下）。
 
 use super::{
-    CheckTextPatch, ChecksTextPatch, ConfigTextPatch, CoverageTextPatch, ErrorTextPatch,
-    FailureTextPatch, LangTextPatch, NoteTextPatch, TextPatch, ValueTextPatch, VerdictTextPatch,
+    CheckTextPatch, ChecksTextPatch, ConfigTextPatch, CoverageTextPatch, DnsEgressTextPatch,
+    ErrorTextPatch, FailureTextPatch, LangTextPatch, NoteTextPatch, TextPatch, UdpEgressTextPatch,
+    ValueTextPatch, VerdictTextPatch,
 };
 
 pub const ZH_HANS: TextPatch = TextPatch {
@@ -76,6 +77,18 @@ pub const ZH_HANS: TextPatch = TextPatch {
                 "出口 IP 是住宅还是机房、是否被标记为代理、风险评分，以及滥用举报记录。",
             ),
         },
+        o5: CheckTextPatch {
+            title: Some("DNS 出口泄露"),
+            description: Some(
+                "你的 DNS 查询是否与出口 IP 从同一国家出网，判据是公共 resolver 回传的客户端子网（EDNS Client Subnet）。",
+            ),
+        },
+        o6: CheckTextPatch {
+            title: Some("UDP 出口一致性"),
+            description: Some(
+                "UDP 流量的出口地址是否与 TCP 观测到的出口 IP 一致，用两个独立的 STUN 探测互相印证。",
+            ),
+        },
         c1: CheckTextPatch {
             title: Some("本机真实 IP"),
             description: Some(
@@ -83,8 +96,11 @@ pub const ZH_HANS: TextPatch = TextPatch {
             ),
         },
         c2: CheckTextPatch {
-            title: Some("本地 DNS 与 DNS 泄露"),
-            description: Some("本机在用的 DNS 服务器。国内 DNS 可能暴露真实位置。"),
+            // 契约收缩：DNS 泄露判定拆到 O5，本项只剩「本地 DNS 服务器配置」（ADR-0014）。
+            title: Some("本地 DNS 服务器配置"),
+            description: Some(
+                "本机在用的 DNS 服务器。国内 DNS 可能暴露真实位置。查询是否真的经代理出网是另一项检测，见 O5。",
+            ),
         },
         c3: CheckTextPatch {
             title: Some("代理检测"),
@@ -133,6 +149,38 @@ pub const ZH_HANS: TextPatch = TextPatch {
         ),
         quota_shared: Some(
             "无 key 时 proxycheck 每天 100 次，按出口 IP 计——与同一代理节点上的其他人共享。执行 `ipcheck config set proxycheck-key` 可提升到 1000 次。",
+        ),
+    },
+
+    dns_egress: DnsEgressTextPatch {
+        resolver_label: Some("resolver 归属"),
+        ecs_label: Some("DNS 客户端子网归属国"),
+        exit_label: Some("出口 IP 归属国"),
+        leak: Some("你的 DNS 查询似乎从与出口 IP 不同的国家出网，DNS 可能正在绕过代理。"),
+        no_leak: Some("你的 DNS 查询似乎与出口 IP 从同一国家出网，未检测到 DNS 出口泄露。"),
+        no_ecs: Some("你的 DNS 服务商不发送 ECS，无法判定 DNS 查询是否走代理。"),
+        unmapped_country: Some(
+            "resolver 返回了客户端子网归属地，但我们暂时认不出这个国家名，无法比对。",
+        ),
+        unknown_exit_country: Some(
+            "出口 IP 的归属国尚未取得（见上方「出口 IP 与归属」），暂时无法比对。",
+        ),
+        resolver_note: Some(
+            "仅供参考，不参与判定：resolver 在哪个国家取决于你选了哪家 DNS 服务商，与流量是否走代理无关。",
+        ),
+    },
+
+    udp_egress: UdpEgressTextPatch {
+        reflexive_label: Some("UDP 反射地址"),
+        exit_label: Some("出口 IP"),
+        mismatch: Some("你的 UDP 流量似乎从与出口 IP 不同的地址出网，UDP 可能正在绕过代理。"),
+        no_mismatch: Some("你的 UDP 流量似乎与出口 IP 从同一地址出网，未检测到 UDP 出口不一致。"),
+        family_mismatch: Some(
+            "UDP 反射地址与出口 IP 不是同一协议族（IPv4/IPv6），无法在同一基准上比较。",
+        ),
+        unknown_exit_ip: Some("出口 IP 尚未取得（见上方「出口 IP 与归属」），暂时无法比对。"),
+        stun_disagree: Some(
+            "两个 STUN 服务器给出的地址不一致，没有一个可信的单一值可比——常见于多出口集群或对称 NAT。",
         ),
     },
 };

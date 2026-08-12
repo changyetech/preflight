@@ -3,7 +3,7 @@
 
 [package]
 name = "ipcheck"
-version = "0.1.0"
+version = "0.2.0"
 description = "网络环境体检：出口 IP、DNS、代理、IP 风控与时区一致性"
 edition.workspace = true
 license.workspace = true
