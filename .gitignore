@@ -25,6 +25,7 @@ Thumbs.db
 /output/
 /bin/
 /.wrangler/
+/target/
 
 # Dependencies (add framework-specific entries as needed)
 /node_modules/

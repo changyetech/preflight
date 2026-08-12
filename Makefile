@@ -74,7 +74,35 @@ fmt: ## Format code
 	pnpm exec prettier --write "src/**/*.{ts,tsx,css}" "worker/**/*.ts" "tests/**/*.ts" "*.{ts,json}"
 
 .PHONY: check
-check: fmt lint build test ## Run all quality checks (fmt + lint + build + test)
+check: fmt lint build test ## Run all quality checks, web only (fmt + lint + build + test)
+
+# ==============================================================================
+# CLI (Rust)
+# ==============================================================================
+# 刻意与 Web 的 target 分开：改一行 CSS 不该等 Rust 编译，
+# 反过来改 CLI 也不该等 vite build。两侧各自独立，`check-all` 才跑全部。
+
+.PHONY: cli-build
+cli-build: ## Build the Rust CLI
+	cargo build
+
+.PHONY: cli-test
+cli-test: ## Run Rust tests
+	cargo test
+
+.PHONY: cli-lint
+cli-lint: ## Run clippy
+	cargo clippy --all-targets -- -D warnings
+
+.PHONY: cli-fmt
+cli-fmt: ## Format Rust code
+	cargo fmt --all
+
+.PHONY: check-cli
+check-cli: cli-fmt cli-lint cli-build cli-test ## Run all quality checks, CLI only
+
+.PHONY: check-all
+check-all: check check-cli ## Run all quality checks for both web and CLI
 
 # ==============================================================================
 # HOUSEKEEPING
@@ -82,4 +110,4 @@ check: fmt lint build test ## Run all quality checks (fmt + lint + build + test)
 
 .PHONY: clean
 clean: ## Remove build artifacts and generated files
-	rm -rf dist node_modules/.tmp .wrangler
+	rm -rf dist node_modules/.tmp .wrangler target
