@@ -5,8 +5,8 @@ import type { PanelState } from "./checks";
 /**
  * 综合结论的输入信号。
  *
- * `signals` 为 `null` 表示 O2、O3、O5、O6 都还没产出结果（都在检测中，或都失败了）——
- * 此时手里一个信号都没有。它必须与「信号全为 false」区分开：后者是「查过了，没问题」，
+ * `signals` 为 `null` 表示 O2、O3、O5、O6 一个**可用信号**都没产出——它们要么在检测中／已失败，
+ * 要么已完成但**无从比对**（O5／O6 的常态，见 `verdictInputFrom`）。此时手里一个信号都没有。它必须与「信号全为 false」区分开：后者是「查过了，没问题」，
  * 前者是「根本没查成」。用可空对象而不是几个 boolean 平铺，正是为了让
  * 「没有任何证据却报低风险」这个状态在类型层面构造不出来。
  *
@@ -103,27 +103,34 @@ export function verdictInputFrom(panel: PanelState): VerdictInput {
   const timezone = panel.o2.status === "done" ? panel.o2.data : null;
   const ipv6 = panel.o3.status === "done" ? panel.o3.data : null;
   const risk = panel.o4.status === "done" ? panel.o4.data : null;
-  const dnsEgress = panel.o5.status === "done" ? panel.o5.data : null;
-  const udpEgress = panel.o6.status === "done" ? panel.o6.data : null;
+  // 「检测项 done」与「产出了信号」是**两件事**，O5／O6 把这个区别放大成了常态：
+  // 它们的「无从比对」正是 done（探测成功了，只是回答里不含可判定的信息，契约 §2.5／§2.6），
+  // 而按 §2.3 它不贡献任何信号。用 done 判断有无信号，会让「O1 失败 ⇒ 两项无从比对」
+  // 这条常见路径给出绿色的「初步 · 低」——把没测成说成没问题，正是 §3.2 的红线。
+  // 因此这里取的是**可比对性**，不是状态。null = 没有产出信号。
+  const dnsEgressLeak =
+    panel.o5.status === "done" && panel.o5.data.comparison.comparable
+      ? panel.o5.data.comparison.leak
+      : null;
+  const udpEgressMismatch =
+    panel.o6.status === "done" && panel.o6.data.comparable
+      ? panel.o6.data.mismatch
+      : null;
 
   return {
-    // O2、O3、O5、O6 一个都没产出结果时给 null，让 computeVerdict 判「数据不足」。
+    // 一个信号都没产出时给 null，让 computeVerdict 判「数据不足」。
     signals:
       timezone === null &&
       ipv6 === null &&
-      dnsEgress === null &&
-      udpEgress === null
+      dnsEgressLeak === null &&
+      udpEgressMismatch === null
         ? null
         : {
             // match 为 null 表示无从比对，不算不一致：检测不出来不等于有问题。
             timezoneMismatch: timezone?.match === false,
             ipv6Leak: ipv6?.leak === true,
-            // 同理，`comparable: false` 是无从比对，不贡献信号——绝不能当成未命中。
-            dnsEgressLeak:
-              dnsEgress?.comparison.comparable === true &&
-              dnsEgress.comparison.leak,
-            udpEgressMismatch:
-              udpEgress?.comparable === true && udpEgress.mismatch,
+            dnsEgressLeak: dnsEgressLeak === true,
+            udpEgressMismatch: udpEgressMismatch === true,
           },
     risk:
       risk?.status === "ok"

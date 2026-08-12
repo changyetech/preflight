@@ -78,14 +78,18 @@ function baselineOf(testCase: Case, byId: Map<string, Case>): Case {
   return baseline;
 }
 
-/** 两条用例的 signals 中取值不同的键。 */
+/**
+ * 两条用例的 signals 中取值不同的键。
+ *
+ * **字段缺省与显式 `null` 视为相同**——`conventions.unknown` 明写「字段整体缺省等同于 null」。
+ * 不归一的话，一条按约定省略字段的用例会收到一条误导性的「差了两个字段」失败。
+ */
 function differingSignals(a: CaseSignals, b: CaseSignals): string[] {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  return [...keys].filter(
-    (key) =>
-      JSON.stringify(a[key as keyof CaseSignals]) !==
-      JSON.stringify(b[key as keyof CaseSignals]),
-  );
+  const valueOf = (signals: CaseSignals, key: string) =>
+    JSON.stringify(signals[key as keyof CaseSignals] ?? null);
+
+  return [...keys].filter((key) => valueOf(a, key) !== valueOf(b, key));
 }
 
 /**
@@ -132,28 +136,22 @@ function toVerdictInput(signals: CaseSignals): VerdictInput {
 }
 
 /**
- * O5 的观测值 → 信号。`null` = 该检测项没产出结果（未执行或失败），与
- * `verdictInputFrom` 里「`status !== "done"` 就不进 signals」是同一条语义。
- *
- * **「无从比对」返回 `false` 而不是 `null`**：探测成功了，只是回答里不含可判定的信息——
- * 它是一个产出，只不过不贡献信号（契约 §2.5）。
+ * O5 的观测值 → 信号。`null` = **没有产出可用信号**，与 `verdictInputFrom` 取可比对性
+ * 而非 `status` 是同一条语义：检测失败与「已完成但无从比对」在判级上等价，都不贡献信号
+ * （契约 §2.3／§2.5）。差别只在覆盖度归档，而覆盖度不由本文件覆盖。
  */
 function dnsEgressOf(signals: CaseSignals): boolean | null {
-  if (signals.dnsEcsCountry == null && signals.exitCountry == null) return null;
-
   const ecs =
     signals.dnsEcsCountry == null
       ? ({ known: false, reason: "noEcs" } as const)
       : ({ known: true, iso2: signals.dnsEcsCountry } as const);
   const comparison = compareDnsEgress(ecs, signals.exitCountry ?? null);
 
-  return comparison.comparable && comparison.leak;
+  return comparison.comparable ? comparison.leak : null;
 }
 
 /** O6 同上。`null` 与空数组同义 ⇒ `N_ok = 0` ⇒ 检测失败 ⇒ 没有产出（本文件 conventions）。 */
 function udpEgressOf(signals: CaseSignals): boolean | null {
-  if (signals.stunReflexiveIps == null && signals.exitIp == null) return null;
-
   const state = judgeUdpEgress(
     {
       reflexiveIps: signals.stunReflexiveIps ?? [],
@@ -163,9 +161,10 @@ function udpEgressOf(signals: CaseSignals): boolean | null {
     },
     signals.exitIp ?? null,
   );
-  if (state.status !== "done") return null;
 
-  return state.data.comparable && state.data.mismatch;
+  return state.status === "done" && state.data.comparable
+    ? state.data.mismatch
+    : null;
 }
 
 function levelOf(verdict: Verdict): string | undefined {
@@ -281,6 +280,11 @@ describe("判级契约 · pairsWith 配对（无从比对 ≠ 未命中）", () 
       );
     });
   }
+
+  it("字段缺省与显式 null 是同一个取值，不算差异（conventions.unknown）", () => {
+    expect(differingSignals({ ipv6Leak: null }, {})).toEqual([]);
+    expect(differingSignals({ ipv6Leak: true }, {})).toEqual(["ipv6Leak"]);
+  });
 
   it("pairsWith 指向不存在的用例时响亮失败，不静默跳过", () => {
     const dangling: Case = {

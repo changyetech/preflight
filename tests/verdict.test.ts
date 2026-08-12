@@ -367,14 +367,47 @@ describe("verdictInputFrom", () => {
     });
   });
 
+  it("O1–O3 失败 + O5／O6 已完成但无从比对 → 数据不足，绝不是「初步 · 低」", () => {
+    // O1 失败（/api/geo 不可用或限流）时的**真实**面板形状：O5／O6 自己的探测成功了，
+    // 但没有出口国／出口 IP 可比，因此 status 是 done 而 comparable 是 false。
+    // 「产出了结果」与「产出了信号」是两件事——把 done 当成有信号，会让一条都比不出来的
+    // 面板给出绿色的「未发现异常」，正是契约 §3.2 写在红线上的那类误报。
+    const input = verdictInputFrom({
+      o1: { status: "failed", reason: "network" },
+      o2: { status: "failed", reason: "network" },
+      o3: { status: "failed", reason: "ipify unreachable" },
+      o4: { status: "idle" },
+      o5: {
+        status: "done",
+        data: {
+          resolverGeo: "Japan - Google LLC",
+          comparison: { comparable: false, reason: "unknownExitCountry" },
+        },
+      },
+      o6: {
+        status: "done",
+        data: { comparable: false, reason: "unknownExitIp" },
+      },
+    });
+
+    expect(input.signals).toBeNull();
+    expect(computeVerdict(input)).toEqual({ stage: "insufficient" });
+  });
+
   it("O5／O6 的「无从比对」不贡献信号，与「未命中」同一个结论", () => {
     // 这是本功能最容易做错的一格：把「没测出来」渲染成绿色是本产品的红线，
     // 但在**综合结论**上，无从比对与未命中确实必须一致——差别只在该项自己的呈现。
-    const incomparable = verdictInputFrom({
+    // 用一条真实存在的信号（O3 未泄露）垫底，否则整个面板会落进「数据不足」，
+    // 那测的就是另一件事了。
+    const panel = {
       o1: { status: "done", data: GEO },
       o2: { status: "running" },
-      o3: { status: "running" },
+      o3: { status: "done", data: { leak: false, ipv6: null } },
       o4: { status: "idle" },
+    } as const;
+
+    const incomparable = verdictInputFrom({
+      ...panel,
       o5: {
         status: "done",
         data: {
@@ -388,7 +421,33 @@ describe("verdictInputFrom", () => {
       },
     });
 
+    const notLeaking = verdictInputFrom({
+      ...panel,
+      o5: {
+        status: "done",
+        data: {
+          resolverGeo: "China - Alibaba",
+          comparison: {
+            comparable: true,
+            leak: false,
+            ecsCountry: "CN",
+            exitCountry: "CN",
+          },
+        },
+      },
+      o6: {
+        status: "done",
+        data: {
+          comparable: true,
+          mismatch: false,
+          reflexiveIp: "1.2.3.4",
+          exitIp: "1.2.3.4",
+        },
+      },
+    });
+
     expect(incomparable.signals).toEqual({ ...NO_SIGNALS });
+    expect(incomparable).toEqual(notLeaking);
     expect(computeVerdict(incomparable)).toEqual({
       stage: "preliminary",
       level: "low",
