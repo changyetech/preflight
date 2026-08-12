@@ -438,28 +438,46 @@ mod golden {
     ///
     /// 字段缺省与显式 `null` 在这里天然同义——两者都反序列化成 `None`
     /// （用例文件的 conventions.unknown 明写「字段整体缺省等同于 null」）。
+    ///
+    /// **完整解构（不带 `..`）是有意的守卫**：给 `CaseSignals` 加第 12 个字段时这里会
+    /// 编译不过，而不是静默漏比一个字段——配对断言的全部说服力恰恰建立在
+    /// 「只差一个字段」上，漏比一个就等于让一条再也证明不了任何事的用例继续显绿。
     fn differing_signals(a: &CaseSignals, b: &CaseSignals) -> Vec<&'static str> {
+        let CaseSignals {
+            tz_mismatch_cli_env,
+            tz_mismatch_system,
+            ipv6_leak,
+            risk_score,
+            anonymous,
+            abuse_listed,
+            tun_off,
+            dns_ecs_country,
+            exit_country,
+            stun_reflexive_ips,
+            exit_ip,
+        } = a;
+
         [
             (
                 "tzMismatchCliEnv",
-                a.tz_mismatch_cli_env != b.tz_mismatch_cli_env,
+                *tz_mismatch_cli_env != b.tz_mismatch_cli_env,
             ),
             (
                 "tzMismatchSystem",
-                a.tz_mismatch_system != b.tz_mismatch_system,
+                *tz_mismatch_system != b.tz_mismatch_system,
             ),
-            ("ipv6Leak", a.ipv6_leak != b.ipv6_leak),
-            ("riskScore", a.risk_score != b.risk_score),
-            ("anonymous", a.anonymous != b.anonymous),
-            ("abuseListed", a.abuse_listed != b.abuse_listed),
-            ("tunOff", a.tun_off != b.tun_off),
-            ("dnsEcsCountry", a.dns_ecs_country != b.dns_ecs_country),
-            ("exitCountry", a.exit_country != b.exit_country),
+            ("ipv6Leak", *ipv6_leak != b.ipv6_leak),
+            ("riskScore", *risk_score != b.risk_score),
+            ("anonymous", *anonymous != b.anonymous),
+            ("abuseListed", *abuse_listed != b.abuse_listed),
+            ("tunOff", *tun_off != b.tun_off),
+            ("dnsEcsCountry", *dns_ecs_country != b.dns_ecs_country),
+            ("exitCountry", *exit_country != b.exit_country),
             (
                 "stunReflexiveIps",
-                a.stun_reflexive_ips != b.stun_reflexive_ips,
+                *stun_reflexive_ips != b.stun_reflexive_ips,
             ),
-            ("exitIp", a.exit_ip != b.exit_ip),
+            ("exitIp", *exit_ip != b.exit_ip),
         ]
         .into_iter()
         .filter_map(|(name, differs)| differs.then_some(name))

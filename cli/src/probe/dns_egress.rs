@@ -33,8 +33,15 @@ fn non_empty(value: Option<String>) -> Option<String> {
     value.filter(|geo| !geo.trim().is_empty())
 }
 
-/// `None` = 响应不是合法 JSON。**`edns` 段缺失不算失败**——那是判定表里的一行
-/// 正常输入（「响应中无 ECS 段」），由判定层记「已完成 · 无从比对」。
+/// `None` = 响应不是我们要的那个响应（不是合法 JSON，或形状不对）。
+///
+/// **`edns` 段缺失不算失败**——那是判定表里的一行正常输入（「响应中无 ECS 段」），
+/// 由判定层记「已完成 · 无从比对」。
+///
+/// **但 `dns` 段缺失算失败**：真实响应里它恒存在，缺了说明对方换了 schema 或返回了
+/// 一个 JSON 错误体（父计划把「ip-api 的 HTTPS 口子随时可能被收紧」列为已知风险）。
+/// 那时若把 `{}` 当成「无 ECS 段」，呈现层会打出「你的 DNS 服务商不发送 ECS」——
+/// 一句**假的**解释，比响亮失败难查得多。
 pub fn parse(body: &str) -> Option<Observation> {
     #[derive(serde::Deserialize)]
     struct Section {
@@ -47,9 +54,11 @@ pub fn parse(body: &str) -> Option<Observation> {
     }
 
     let payload: Payload = serde_json::from_str(body).ok()?;
+    let resolver = payload.dns?;
+
     Some(Observation {
         ecs_geo: non_empty(payload.edns.and_then(|section| section.geo)),
-        resolver_geo: non_empty(payload.dns.and_then(|section| section.geo)),
+        resolver_geo: non_empty(resolver.geo),
     })
 }
 
@@ -107,6 +116,16 @@ mod tests {
     fn an_unparsable_body_is_a_probe_failure() {
         // ip-api 的 HTTPS 口子随时可能被收紧，那时拿到的多半是一页 HTML。
         assert_eq!(parse("<html>403</html>"), None);
+    }
+
+    #[test]
+    fn a_json_body_of_the_wrong_shape_fails_loudly_not_as_a_missing_ecs() {
+        // 合法 JSON 但没有 `dns` 段 ⇒ 探测失败。判成「无 ECS 段」的话，
+        // 呈现层会打出「你的 DNS 服务商不发送 ECS」——一句假的解释，
+        // 比响亮失败难查得多，而且用户永远查不出真正的原因。
+        assert_eq!(parse("{}"), None);
+        assert_eq!(parse(r#"{"status":"fail","message":"quota"}"#), None);
+        assert_eq!(parse(r#"{"edns":{"geo":"Japan - Foo"}}"#), None);
     }
 
     #[test]

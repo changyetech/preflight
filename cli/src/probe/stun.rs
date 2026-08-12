@@ -122,16 +122,30 @@ pub fn probe(timeout: Duration) -> Vec<IpAddr> {
     })
 }
 
-fn query(server: &str, timeout: Duration) -> Option<IpAddr> {
-    let address = server.to_socket_addrs().ok()?.next()?;
+/// 从解析结果里挑一个 **IPv4** 端点。
+///
+/// **协议族不能由 resolver 的返回顺序决定。** 比对的另一侧恒为 IPv4——`probe/mod.rs`
+/// 的出口 IP 取自 `ipify::Exposure::ipv4`，`domain/udp_egress.rs` 的同族筛选因此
+/// 只会保留 IPv4 的 srflx。而两个 STUN 域名都同时发布 A 与 AAAA，有全局 IPv6 源地址的
+/// 主机按 RFC 6724 会把 IPv6 排在前面：不筛就会两个 STUN 都拿回 IPv6 srflx ⇒ `N_fam = 0`
+/// ⇒ O6 永远记「已完成 · 无从比对」——什么都没测出来，覆盖度却把它算作已完成。
+/// 而且挑中哪一族由 DNS 顺序决定，同一台机器不同时刻都可能不同，平价验收无从复现。
+///
+/// 将来 O1 若改成双栈观测，这里要跟着改。这个耦合写在明处，好过退回去靠 DNS 顺序碰运气。
+fn first_ipv4(addresses: impl IntoIterator<Item = SocketAddr>) -> Option<SocketAddr> {
+    addresses.into_iter().find(SocketAddr::is_ipv4)
+}
 
-    // 本地端口必须与目标同族，否则 connect 直接失败。
-    let local: SocketAddr = if address.is_ipv4() {
-        (Ipv4Addr::UNSPECIFIED, 0).into()
-    } else {
-        (Ipv6Addr::UNSPECIFIED, 0).into()
-    };
-    let socket = UdpSocket::bind(local).ok()?;
+fn query(server: &str, timeout: Duration) -> Option<IpAddr> {
+    // 已知上限：`to_socket_addrs` 走 getaddrinfo，**不受用户配置的 `timeout` 约束**，
+    // 下面的 deadline 从解析之后才开始算。DNS 不可用时它会按 resolv.conf 自己的
+    // timeout × attempts × nameservers 走完（glibc 默认可到数十秒），期间整个第一拨
+    // `thread::scope` 都不返回。std 没有带超时的解析 API，真要封顶得另起线程 + 通道——
+    // 那笔复杂度换来的只是一个极少触发的边角，这里选择记下来而不是去修。
+    let address = first_ipv4(server.to_socket_addrs().ok()?)?;
+
+    // 目标恒为 IPv4，本地端口也就恒为 IPv4（本地与目标不同族时 connect 直接失败）。
+    let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).ok()?;
     // `connect` 让内核只投递来自该地址的包。它**不能**替代 transaction ID 校验：
     // UDP 的源地址是可伪造的，而 96 bit 的随机 ID 不是。
     socket.connect(address).ok()?;
@@ -164,8 +178,9 @@ mod tests {
         0xb7, 0xe7, 0xa7, 0x01, 0xbc, 0x34, 0xd6, 0x86, 0xfa, 0x87, 0xdf, 0xae,
     ];
 
-    /// RFC 5769 2.1 的样例响应（截取到 XOR-MAPPED-ADDRESS 属性为止）。
-    /// 异或后的 `e1:12:a4:43` 对应 192.0.2.1。
+    /// RFC 5769 §2.2「Sample IPv4 Response」的 XOR-MAPPED-ADDRESS 属性
+    /// （事务 ID 取自 §2.1 的样例请求，两节本就是同一次交换）。
+    /// 异或后的 `e1:12:a6:43` 对应 192.0.2.1。
     fn ipv4_response() -> Vec<u8> {
         let mut message = vec![0x01, 0x01, 0x00, 0x0c];
         message.extend_from_slice(&MAGIC_COOKIE.to_be_bytes());
@@ -175,7 +190,8 @@ mod tests {
         message
     }
 
-    /// RFC 5769 2.4 的样例响应。异或后对应 2001:db8:1234:5678:11:2233:4455:6677。
+    /// RFC 5769 §2.3「Sample IPv6 Response」的同一个属性。
+    /// 异或后对应 2001:db8:1234:5678:11:2233:4455:6677。
     fn ipv6_response() -> Vec<u8> {
         let mut message = vec![0x01, 0x01, 0x00, 0x18];
         message.extend_from_slice(&MAGIC_COOKIE.to_be_bytes());
@@ -186,6 +202,29 @@ mod tests {
             0xf4, 0xb5, 0xbe, 0xd2, 0xb9, 0xd9,
         ]);
         message
+    }
+
+    #[test]
+    fn the_stun_endpoint_is_ipv4_regardless_of_resolver_order() {
+        // 双栈主机上 getaddrinfo 按 RFC 6724 会把 IPv6 排在前面。取 `.next()` 就会
+        // 拿回 IPv6 srflx，而比对的另一侧恒为 IPv4 ⇒ N_fam = 0 ⇒ O6 永远「无从比对」。
+        // 这条钉住：协议族由代码决定，不由 DNS 返回顺序决定。
+        let resolved: Vec<SocketAddr> = vec![
+            "[2606:4700:4700::1111]:3478".parse().unwrap(),
+            "[2001:db8::1]:3478".parse().unwrap(),
+            "162.159.207.1:3478".parse().unwrap(),
+        ];
+        // 对照：旧写法取 `.next()`，在同一份列表上拿回的正是这个 IPv6 地址。
+        assert!(resolved.first().unwrap().is_ipv6());
+        assert_eq!(
+            first_ipv4(resolved.iter().copied()),
+            Some("162.159.207.1:3478".parse().unwrap())
+        );
+
+        // 一个 IPv4 都没有时宁可这个 STUN 不作数（少一个 N_ok），也不发一个
+        // 注定被同族筛选丢掉的查询。
+        let v6_only: Vec<SocketAddr> = vec!["[2001:db8::1]:3478".parse().unwrap()];
+        assert_eq!(first_ipv4(v6_only), None);
     }
 
     #[test]
