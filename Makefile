@@ -38,8 +38,12 @@ build: ## Build for production
 # ==============================================================================
 
 .PHONY: dev
-dev: ## Start dev server (wrangler dev, 单 Worker + Static Assets)
-	pnpm wrangler dev
+dev: ## Start dev server (Vite + @cloudflare/vite-plugin：前端 HMR 与 /api/* 同一进程)
+	pnpm dev
+
+.PHONY: preview
+preview: ## Build then preview the production bundle in workerd
+	pnpm preview
 
 # ==============================================================================
 # DEPENDENCY MANAGEMENT
