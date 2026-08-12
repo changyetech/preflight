@@ -6,7 +6,8 @@ import "./App.css";
 import { CliCard } from "./components/Card";
 import { O1Card, O2Card, O3Card, O4Card } from "./components/cards";
 import { CLI_CHECK_IDS } from "./domain/checks";
-import { langFromPathname, type Lang } from "./copy";
+import { langFromPathname, localeOf, type Lang } from "./copy";
+import { BackToTop } from "./components/BackToTop";
 import { LangSwitch } from "./components/LangSwitch";
 import { Landing } from "./components/Landing";
 import { VerdictPanel } from "./components/Verdict";
@@ -23,10 +24,11 @@ function AppShell({ lang }: { lang: Lang }) {
       {/* 顶部 sticky 导航：品牌 + 各段锚点 + 语言切换。锚点目标靠 CSS scroll-margin-top 避开吸顶条。 */}
       <nav className="site-nav">
         <div className="site-nav-inner">
-          <span className="site-nav-brand">
+          {/* 品牌链回当前语种首页；停在首页时点它就是重新加载，符合 logo 的通行预期。 */}
+          <a className="site-nav-brand" href={localeOf(lang).path}>
             <img src="/favicon.svg" alt="" width="20" height="19" />
             {COPY.nav.brand}
-          </span>
+          </a>
           <div className="site-nav-links">
             <a href="#checks">{COPY.nav.checks}</a>
             <a href="#cli-checks">{COPY.nav.cliChecks}</a>
@@ -88,6 +90,8 @@ function AppShell({ lang }: { lang: Lang }) {
           <p>{COPY.footer.thirdParty}</p>
         </footer>
       </div>
+
+      <BackToTop />
     </>
   );
 }

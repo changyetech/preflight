@@ -35,6 +35,11 @@
   gap: 0.45rem;
   font: 600 1rem var(--mono);
   color: var(--text-h);
+  text-decoration: none;
+}
+
+.site-nav-brand:hover {
+  opacity: 0.75;
 }
 
 .site-nav-links {
@@ -65,6 +70,55 @@
 /* 吸顶条会盖住锚点目标，锚点滚动时预留出它的高度 */
 :target {
   scroll-margin-top: 4rem;
+}
+
+/* ---------- 回顶按钮 ---------- */
+
+.back-to-top {
+  position: fixed;
+  /* 逻辑属性：RTL（阿拉伯语）下自动落到左下角 */
+  inset-inline-end: 1rem;
+  /* iOS 底部手势条：安全区之上再留一档 */
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  z-index: 15;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  cursor: pointer;
+  /* 隐藏态不占 tab 序也不可点；visibility 可过渡，比 display:none 少一次跳变 */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(0.5rem);
+  transition:
+    opacity 0.2s,
+    visibility 0.2s,
+    transform 0.2s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.back-to-top.is-shown {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+
+.back-to-top:hover {
+  border-color: var(--accent-border);
+  color: var(--text-h);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .back-to-top {
+    transition: none;
+  }
 }
 
 /* ---------- 站头 ---------- */

@@ -19,6 +19,7 @@ export const ZH_HANS: Copy = {
     why: "为什么",
     install: "安装 CLI",
     compare: "对照表",
+    backToTop: "回到顶部",
   },
 
   verdict: {

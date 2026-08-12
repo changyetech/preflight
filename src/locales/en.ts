@@ -19,6 +19,8 @@ export const EN = {
     why: "Why",
     install: "Install CLI",
     compare: "Comparison",
+    /** 回顶按钮只有图标，标签给读屏用。 */
+    backToTop: "Back to top",
   },
 
   verdict: {
