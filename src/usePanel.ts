@@ -75,10 +75,14 @@ export function usePanel() {
    * 重试时不带参数，从 geoRef 取最近一次出口国。
    */
   const runDnsEgress = useCallback(
-    async (geo: Promise<GeoData | null> = Promise.resolve(geoRef.current)) => {
+    async (
+      geo: Promise<GeoData | null> = Promise.resolve(geoRef.current),
+      signal?: AbortSignal,
+    ) => {
       setPanel((prev) => ({ ...prev, o5: { status: "running" } }));
 
-      const [probe, exit] = await Promise.all([probeDnsEgress(), geo]);
+      const [probe, exit] = await Promise.all([probeDnsEgress(signal), geo]);
+      if (signal?.aborted) return;
       setPanel((prev) => ({
         ...prev,
         o5: judgeDnsEgress(probe, exit?.country ?? null),
@@ -137,10 +141,10 @@ export function usePanel() {
     const geo = runGeo();
 
     void runIpv6();
-    void runDnsEgress(geo);
+    void runDnsEgress(geo, controller.signal);
     void runUdpEgress(geo, controller.signal);
 
-    // 卸载时关掉全部在途 RTCPeerConnection。
+    // 卸载时关掉全部在途 RTCPeerConnection，并停掉 O5 还没打完的重试。
     return () => controller.abort();
   }, [runGeo, runIpv6, runDnsEgress, runUdpEgress]);
 

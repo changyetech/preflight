@@ -53,6 +53,29 @@ function fakePeerConnection(candidatesOf: (url: string) => string[]) {
   };
 }
 
+/** 永不吐候选、也不收尾的假实现：用来把探测停在「在途」状态，好去测中止路径。 */
+function pendingPeerConnection(instances: { closed: boolean }[]) {
+  return class {
+    closed = false;
+
+    constructor() {
+      instances.push(this);
+    }
+
+    createDataChannel() {}
+    createOffer() {
+      return new Promise<unknown>(() => {});
+    }
+    setLocalDescription() {
+      return new Promise<void>(() => {});
+    }
+    addEventListener() {}
+    close() {
+      this.closed = true;
+    }
+  };
+}
+
 const SRFLX =
   "candidate:842163049 1 udp 1677729535 203.0.113.7 54321 typ srflx raddr 0.0.0.0 rport 0";
 const HOST =
@@ -117,6 +140,26 @@ describe("probeStun", () => {
     );
 
     expect((await probeStun()).reflexiveIps).toEqual(["203.0.113.7"]);
+  });
+
+  it("探测进行中被中止 ⇒ 两个在途 RTCPeerConnection 都被关闭", async () => {
+    // brief 点名的硬约束：组件卸载时必须关闭所有在途连接，否则 ICE 会一直挂着。
+    const instances: { closed: boolean }[] = [];
+    scope.RTCPeerConnection = pendingPeerConnection(instances);
+
+    const controller = new AbortController();
+    const probe = probeStun(controller.signal);
+    // probeStun 在第一个 await 之前已同步建好两条连接并挂上 abort 监听。
+    expect(instances).toHaveLength(2);
+    expect(instances.every((pc) => pc.closed)).toBe(false);
+
+    controller.abort();
+
+    await expect(probe).resolves.toEqual({
+      reflexiveIps: [],
+      webrtcSupported: true,
+    });
+    expect(instances.every((pc) => pc.closed)).toBe(true);
   });
 
   it("已中止的 signal（组件已卸载）不再发起探测", async () => {

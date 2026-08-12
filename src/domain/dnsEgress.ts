@@ -42,8 +42,14 @@ const ISO2_BY_COUNTRY_NAME = new Map<string, string>(
 
 /** ip-api 的 geo 字符串形如 `"<国家名> - <组织名>"`，判定只要前半段（契约 §2.5 步骤 2）。 */
 export function ecsCountryOf(ecsGeo: string | null): EcsCountry {
-  const name = (ecsGeo ?? "").split(" - ")[0].trim();
-  if (name === "") return { known: false, reason: "noEcs" };
+  // `noEcs` 只留给**真的没有 ECS 段**的情形：呈现层据这个 reason 写「你的 DNS 服务商
+  // 不发送 ECS」，而有 ECS 段却切不出国家名（如 `" - Some ISP"`）时那句话是假的。
+  if (ecsGeo === null || ecsGeo.trim() === "") {
+    return { known: false, reason: "noEcs" };
+  }
+
+  const name = ecsGeo.split(" - ")[0].trim();
+  if (name === "") return { known: false, reason: "unmappedCountry" };
 
   const iso2 = ISO2_BY_COUNTRY_NAME.get(name);
   // 查不到一律视为未知（契约 §2.5 硬约束 3）：把「我不认识这个国家名」当成「两国不同」

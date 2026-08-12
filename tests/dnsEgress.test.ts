@@ -1,11 +1,11 @@
-// O5 DNS 出口泄露判定（契约 §2.5 判定表）。
+// O5 DNS 出口泄露：判定层（契约 §2.5 判定表）与探测层的取消路径。
 //
 // 这张表最容易写错的是三种「无从比对」：没有 ECS 段、国家名查不到表、出口国未知。
 // 三者都不得回退成「两国不同」——那会把「我不知道」包装成一次泄露告警（契约 §2.5 硬约束 3）。
 // 判定表第 4 行（国家名映射不出 ISO2）在 golden 向量层不可测：向量给的输入已经是 ISO2，
 // 映射发生在它之前，所以这一行只能由本文件钉住。
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   compareDnsEgress,
@@ -13,6 +13,7 @@ import {
   ecsCountryOf,
   judgeDnsEgress,
 } from "../src/domain/dnsEgress";
+import { probeDnsEgress } from "../src/probes/dnsEgress";
 
 /** ip-api 的 `edns.geo` 实测形状：`"<国家名> - <组织名>"`。 */
 const ECS_JAPAN = "Japan - IT7 Networks Inc";
@@ -40,6 +41,19 @@ describe("ecsCountryOf", () => {
       known: false,
       reason: "unmappedCountry",
     });
+  });
+
+  it("有 ECS 段但切不出国家名 → unmappedCountry，不是 noEcs", () => {
+    // 判级上两者等价，但呈现层据 reason 选文案：报 noEcs 会让用户读到
+    // 「你的 DNS 服务商不发送 ECS」——这里明明发了。
+    expect(ecsCountryOf(" - Some ISP")).toEqual({
+      known: false,
+      reason: "unmappedCountry",
+    });
+  });
+
+  it("空串与纯空白等同于没有 ECS 段", () => {
+    expect(ecsCountryOf("   ")).toEqual({ known: false, reason: "noEcs" });
   });
 });
 
@@ -126,5 +140,21 @@ describe("judgeDnsEgress", () => {
     }
     expect(withAli.data.comparison).toEqual(withGoogle.data.comparison);
     expect(withAli.data.resolverGeo).toBe("China - Alibaba");
+  });
+});
+
+describe("probeDnsEgress · 取消路径", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("已中止的 signal（组件已卸载）不再发请求，直接按探测失败收场", async () => {
+    // 没有这条，卸载后最长 15s（3 次 × 5s 重试）还在打第三方——与 O6 的处理不对称。
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    await expect(probeDnsEgress(AbortSignal.abort())).resolves.toEqual({
+      ok: false,
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

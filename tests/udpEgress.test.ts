@@ -62,6 +62,15 @@ describe("judgeUdpEgress · 契约 §2.6 判定表", () => {
     ).toEqual({ comparable: false, reason: "familyMismatch" });
   });
 
+  it("第 2 行：出口 IP 认不出协议族 → 无从比对，绝不判命中", () => {
+    // 两边都「认不出」不构成同族：否则两个 STUN 报出同一个不可解析的串，
+    // 会一路走到第 6 行判命中——一条凭空造出来的泄露告警。
+    expect(resultOf(supported(["not-an-ip", "not-an-ip"]), "garbage")).toEqual({
+      comparable: false,
+      reason: "familyMismatch",
+    });
+  });
+
   it("第 3 行：出口 IP 未知（O1 未完成）→ 无从比对", () => {
     expect(resultOf(supported(["203.0.113.7", "203.0.113.7"]), null)).toEqual({
       comparable: false,

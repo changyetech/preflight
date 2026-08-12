@@ -14,7 +14,7 @@ const TIMEOUT_MS = 5000;
 /** 首次 + 最多重试 2 次（子计划 --web 第 1 步）。 */
 const ATTEMPTS = 3;
 
-type Ip4piResponse = {
+type IpApiResponse = {
   dns?: { geo?: unknown };
   edns?: { geo?: unknown };
 };
@@ -36,15 +36,21 @@ function randomLabel(): string {
   );
 }
 
-export async function probeDnsEgress(): Promise<DnsEgressProbe> {
+/** `signal` 由调用方在组件卸载时中止：不带它，卸载后最长 15s（3 次 × 5s）还在发请求。 */
+export async function probeDnsEgress(
+  signal?: AbortSignal,
+): Promise<DnsEgressProbe> {
   for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
+    if (signal?.aborted) break;
+
     try {
+      const timeout = AbortSignal.timeout(TIMEOUT_MS);
       const response = await fetch(ENDPOINT(randomLabel()), {
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       });
       if (!response.ok) continue;
 
-      const body = (await response.json()) as Ip4piResponse;
+      const body = (await response.json()) as IpApiResponse;
       // edns 段缺失即「响应中无 ECS 段」，是判定表里的一行正常输入，不是失败。
       return {
         ok: true,

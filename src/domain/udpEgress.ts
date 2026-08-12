@@ -68,10 +68,15 @@ export function judgeUdpEgress(
   // 第 2 行。反射地址是 IPv6 而出口是 IPv4（或反之）不得判命中——那正是 O3 在管的事，
   // 在这里再算一次等于同一个事实进了两次判级（契约 §2.6 协议族硬约束）。
   // 出口 IP 未知时无从筛选，N_fam = N_ok，输入因此落到第 3 行。
+  const exitFamily = exit === null ? null : familyOf(exit);
   const sameFamily =
     exit === null
       ? observed
-      : observed.filter((ip) => familyOf(ip) === familyOf(exit));
+      : // 出口 IP 认不出协议族时**一个都不留**：`familyOf` 两边同为 null 不是「同族」，
+        // 否则两个 STUN 报出同一个不可解析的串就会一路走到第 6 行判命中。
+        observed.filter(
+          (ip) => exitFamily !== null && familyOf(ip) === exitFamily,
+        );
   if (sameFamily.length < 2) {
     return done({ comparable: false, reason: "familyMismatch" });
   }
