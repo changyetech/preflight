@@ -67,7 +67,7 @@ export const ZH_HANS: Copy = {
     retry: "重试",
     copy: "复制",
     copied: "已复制",
-    installCommand: "pip install ai-ipcheck",
+    installCommand: "brew install <owner>/tap/ipcheck",
     meaningLabel: "这意味着什么",
   },
 

@@ -16,6 +16,14 @@ function renderLanding(lang: Lang): string {
   );
 }
 
+/** 安装命令里的 `<owner>` 占位符在 HTML 里是转义态，直接拿原串断言会假红。 */
+function esc(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 describe("落地内容三段", () => {
   it("中文版渲染出「为什么需要」「安装 CLI」「对照表」三段文案", () => {
     const html = renderLanding("zh-hans");
@@ -23,7 +31,7 @@ describe("落地内容三段", () => {
     expect(html).toContain(COPY_ZH_HANS.landing.why.title);
     expect(html).toContain(COPY_ZH_HANS.landing.install.title);
     expect(html).toContain(COPY_ZH_HANS.landing.compare.title);
-    expect(html).toContain(COPY_ZH_HANS.actions.installCommand);
+    expect(html).toContain(esc(COPY_ZH_HANS.actions.installCommand));
   });
 
   it("对照表渲染出全部 8 个检测项标题", () => {

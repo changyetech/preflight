@@ -75,7 +75,8 @@ export const EN = {
     retry: "Retry",
     copy: "Copy",
     copied: "Copied",
-    installCommand: "pip install ai-ipcheck",
+    /** 与 README「安装 CLI」的首选方式一致。`<owner>` 在第一个 `cli/v*` tag 前是占位。 */
+    installCommand: "brew install <owner>/tap/ipcheck",
     meaningLabel: "What this means",
   },
 

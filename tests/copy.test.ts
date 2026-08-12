@@ -57,8 +57,12 @@ describe.each(
     expect(copy.checks.O4.abuse.unknown).not.toBe(copy.checks.O4.abuse.clean);
   });
 
-  it("灰卡提示安装命令为 pip install ai-ipcheck（规格第 4 节）", () => {
-    expect(copy.actions.installCommand).toBe("pip install ai-ipcheck");
+  // 安装命令必须指向本仓库产出的 Rust CLI，不得回到已归档的 ai-ipcheck（README「安装 CLI」）。
+  it("灰卡提示的安装命令与 README 的首选方式一致", () => {
+    expect(copy.actions.installCommand).toBe(
+      "brew install <owner>/tap/ipcheck",
+    );
+    expect(copy.actions.installCommand).not.toContain("ai-ipcheck");
   });
 });
 
