@@ -1,0 +1,594 @@
+{
+  "version": 1,
+  "about": "docs/verdict.md 第 2-3 节的可执行形式。ipcheck Web（vitest）与 ipcheck CLI（cargo test）必须各写一个参数化测试消费本文件。改判级规则的顺序恒为：verdict.md -> 本文件 -> 两端实现。",
+  "conventions": {
+    "signals": "输入是原始观测值而非派生布尔量（如给 riskScore 数值而不是 riskScoreHigh），以便阈值本身也被测到。",
+    "unknown": "null 表示未知——该检测项未执行、进行中或已失败。未知一律不贡献信号（verdict.md 2.3）。",
+    "applies": "该用例适用的实现。仅列出该端可测的信号；某信号在该端结构性不可测时不出现在 signals 里。",
+    "expect": "stage 为 insufficient 时没有 level 字段——这与类型层面的设计一致，不是省略。",
+    "aiIpcheckDiverges": "标记该输入下 ipcheck CLI 与已归档的 ai-ipcheck 结论不同。平价比对（见实现计划 --output）遇到这些用例应按新契约判定，不得当作回归。",
+    "pairing": "riskScore 与 anonymous 必须成对：两者同为数值/布尔，或同为 null。只给其中一个是契约禁止的状态（verdict.md 2.3）。"
+  },
+  "notInThisFile": "Claude 端点命中中转黑名单（C5）不是信号（verdict.md 2.1 / ADR-0010），判级函数不接收它，因此无法在此表达。它对 ai-ipcheck 平价比对的影响记在实现计划的验收清单里：该场景下 ai-ipcheck 判高、ipcheck CLI 按其余信号定档。",
+  "cases": [
+    {
+      "id": "web-insufficient-nothing-produced",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": null,
+        "ipv6Leak": null,
+        "riskScore": null,
+        "anonymous": null,
+        "abuseListed": null
+      },
+      "expect": {
+        "stage": "insufficient"
+      },
+      "note": "首帧，或 O2/O3 全部失败。绝不能落到低风险——把没测成说成没问题是本项目最要防的误报。"
+    },
+    {
+      "id": "web-preliminary-low-clean",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": null,
+        "anonymous": null,
+        "abuseListed": null
+      },
+      "expect": {
+        "stage": "preliminary",
+        "level": "low"
+      },
+      "note": "正常首屏：O1-O3 成功、O4 未触发。"
+    },
+    {
+      "id": "web-preliminary-low-partial-o3-failed",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": null,
+        "riskScore": null,
+        "anonymous": null,
+        "abuseListed": null
+      },
+      "expect": {
+        "stage": "preliminary",
+        "level": "low"
+      },
+      "note": "只要有一个贡献信号产出结果就不再是 insufficient。区分「一个都没测成」与「测了一部分」。"
+    },
+    {
+      "id": "web-preliminary-medium-ipv6",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": true,
+        "riskScore": null,
+        "anonymous": null,
+        "abuseListed": null
+      },
+      "expect": {
+        "stage": "preliminary",
+        "level": "medium"
+      }
+    },
+    {
+      "id": "web-preliminary-medium-system-timezone",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": true,
+        "ipv6Leak": false,
+        "riskScore": null,
+        "anonymous": null,
+        "abuseListed": null
+      },
+      "expect": {
+        "stage": "preliminary",
+        "level": "medium"
+      }
+    },
+    {
+      "id": "web-preliminary-quota-exhausted",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": null,
+        "anonymous": null,
+        "abuseListed": null
+      },
+      "expect": {
+        "stage": "preliminary",
+        "level": "low"
+      },
+      "note": "O4 触发后配额耗尽：风险分仍未知，结论退回初步。配额耗尽计入覆盖度的「检测失败」，但不是错误。"
+    },
+    {
+      "id": "web-full-low",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "low"
+      }
+    },
+    {
+      "id": "web-full-low-anonymous-50",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 50,
+        "anonymous": true,
+        "abuseListed": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "low"
+      },
+      "note": "50 恰是 VPN 的基准分，差一分不到 51——「在用 VPN」本身不构成高风险，这条钉死匿名侧的下沿。"
+    },
+    {
+      "id": "web-full-high-anonymous-51",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 51,
+        "anonymous": true,
+        "abuseListed": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "high"
+      },
+      "note": "anonymous 为真时阈值降到 51。VPN 的基准分是 50——被判定为正在充当匿名地址、且有任何攻击历史，即为高风险。"
+    },
+    {
+      "id": "web-full-low-not-anonymous-75",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 75,
+        "anonymous": false,
+        "abuseListed": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "low"
+      },
+      "note": "anonymous 为假时阈值是 76，75 差一分不到——这条钉死非匿名侧的下沿。75 同时是 TOR/Scraper 的基准分：一个 IP 光是被判为那几类、却没有在充当匿名地址，还不足以判高。"
+    },
+    {
+      "id": "web-full-high-not-anonymous-76",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 76,
+        "anonymous": false,
+        "abuseListed": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "high"
+      },
+      "note": "76 是 proxycheck v3 官方对 anonymous:false 的 deny 边界，闭区间。"
+    },
+    {
+      "id": "web-full-medium-abuse-listed",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": true
+      },
+      "expect": {
+        "stage": "full",
+        "level": "medium"
+      }
+    },
+    {
+      "id": "web-full-low-abuse-unknown",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": null
+      },
+      "expect": {
+        "stage": "full",
+        "level": "low"
+      },
+      "note": "StopForumSpam 不可用时 abuseListed 为未知：未知不贡献信号，也不冒充无收录。O4 仍算已完成——SFS 只贡献中风险，它挂掉不应连累 proxycheck 的结果。"
+    },
+    {
+      "id": "web-full-high-outranks-medium",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": true,
+        "ipv6Leak": true,
+        "riskScore": 100,
+        "anonymous": false,
+        "abuseListed": true
+      },
+      "expect": {
+        "stage": "full",
+        "level": "high"
+      },
+      "note": "高档命中时中档信号不再影响档位。"
+    },
+    {
+      "id": "cli-insufficient-nothing-produced",
+      "applies": [
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchCliEnv": null,
+        "tzMismatchSystem": null,
+        "ipv6Leak": null,
+        "riskScore": null,
+        "anonymous": null,
+        "abuseListed": null,
+        "tunOff": null
+      },
+      "expect": {
+        "stage": "insufficient"
+      },
+      "note": "CLI 侧极罕见（C3/C4 是本地读取，几乎不会失败），但契约必须完整。"
+    },
+    {
+      "id": "cli-preliminary-low-clean",
+      "applies": [
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchCliEnv": false,
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": null,
+        "anonymous": null,
+        "abuseListed": null,
+        "tunOff": false
+      },
+      "expect": {
+        "stage": "preliminary",
+        "level": "low"
+      },
+      "note": "CLI 侧 preliminary 是异常态：O4 自动执行，只有 proxycheck 失败或配额耗尽才会落到这里。"
+    },
+    {
+      "id": "cli-preliminary-quota-exhausted",
+      "applies": [
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchCliEnv": false,
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": null,
+        "anonymous": null,
+        "abuseListed": null,
+        "tunOff": false
+      },
+      "expect": {
+        "stage": "preliminary",
+        "level": "low"
+      },
+      "note": "无 key 的 100 次/天按出口 IP 计、与同节点用户共享，因此这个状态在共享代理节点上并不罕见（ADR-0012）。"
+    },
+    {
+      "id": "cli-preliminary-medium-cli-timezone",
+      "applies": [
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchCliEnv": true,
+        "tzMismatchSystem": true,
+        "ipv6Leak": false,
+        "riskScore": null,
+        "anonymous": null,
+        "abuseListed": null,
+        "tunOff": false
+      },
+      "expect": {
+        "stage": "preliminary",
+        "level": "medium"
+      }
+    },
+    {
+      "id": "cli-preliminary-medium-tun-off",
+      "applies": [
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchCliEnv": false,
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": null,
+        "anonymous": null,
+        "abuseListed": null,
+        "tunOff": true
+      },
+      "expect": {
+        "stage": "preliminary",
+        "level": "medium"
+      }
+    },
+    {
+      "id": "cli-full-low",
+      "applies": [
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchCliEnv": false,
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": false,
+        "tunOff": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "low"
+      },
+      "note": "CLI 的常态：9 项全测且干净。"
+    },
+    {
+      "id": "cli-full-low-anonymous-50",
+      "applies": [
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchCliEnv": false,
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 50,
+        "anonymous": true,
+        "abuseListed": false,
+        "tunOff": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "low"
+      },
+      "note": "与 web 侧成对。"
+    },
+    {
+      "id": "cli-full-high-anonymous-51",
+      "applies": [
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchCliEnv": false,
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 51,
+        "anonymous": true,
+        "abuseListed": false,
+        "tunOff": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "high"
+      },
+      "note": "与 web 侧成对。"
+    },
+    {
+      "id": "cli-full-low-not-anonymous-75",
+      "applies": [
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchCliEnv": false,
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 75,
+        "anonymous": false,
+        "abuseListed": false,
+        "tunOff": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "low"
+      },
+      "note": "与 web 侧成对。"
+    },
+    {
+      "id": "cli-full-high-not-anonymous-76",
+      "applies": [
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchCliEnv": false,
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 76,
+        "anonymous": false,
+        "abuseListed": false,
+        "tunOff": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "high"
+      },
+      "note": "与 web 侧成对。"
+    },
+    {
+      "id": "cli-full-medium-ipv6-leak",
+      "applies": [
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchCliEnv": false,
+        "tzMismatchSystem": false,
+        "ipv6Leak": true,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": false,
+        "tunOff": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "medium"
+      },
+      "aiIpcheckDiverges": true,
+      "note": "ai-ipcheck 在此输入下判低（IPv6 泄露只进检测建议）。ipcheck CLI 判中——ADR-0006 升格后成为契约的一部分，对两端同时生效。这是相对 ai-ipcheck 的两处刻意行为变更之一，平价比对时不得当作回归。"
+    },
+    {
+      "id": "cli-full-medium-tun-off",
+      "applies": [
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchCliEnv": false,
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": false,
+        "tunOff": true
+      },
+      "expect": {
+        "stage": "full",
+        "level": "medium"
+      }
+    },
+    {
+      "id": "cli-full-medium-abuse-listed",
+      "applies": [
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchCliEnv": false,
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": true,
+        "tunOff": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "medium"
+      }
+    },
+    {
+      "id": "divergence-system-tz-only--web",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": true,
+        "ipv6Leak": false,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "medium"
+      },
+      "note": "与 divergence-system-tz-only--cli 成对：同一台机器、同一时刻，Web 判中而 CLI 判低。verdict.md 5.1 登记的能力边界差异，不是 bug。Web 读不到 $TZ，只能用系统时区作降级代理。"
+    },
+    {
+      "id": "divergence-system-tz-only--cli",
+      "applies": [
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchCliEnv": false,
+        "tzMismatchSystem": true,
+        "ipv6Leak": false,
+        "riskScore": 10,
+        "anonymous": false,
+        "abuseListed": false,
+        "tunOff": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "low"
+      },
+      "note": "用户把 $TZ 设成了与出口 IP 匹配的时区（正确），但系统时区没改。CLI 只认 $TZ，判低。这一条同时锁住「tzMismatchSystem 在 CLI 侧展示但不贡献综合结论」。"
+    },
+    {
+      "id": "web-full-low-old-threshold-70-no-longer-high",
+      "applies": [
+        "web"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 70,
+        "anonymous": false,
+        "abuseListed": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "low"
+      },
+      "note": "70 是二维判定之前的旧阈值。非匿名 IP 在 70 分现在判低（阈值 76）——这条专门锁住阈值确实改了，防止有人把旧常量改回来还全绿。分项颜色在 70 仍是红，那是另一把尺子（verdict.md 6）。"
+    },
+    {
+      "id": "cli-full-low-old-threshold-70-no-longer-high",
+      "applies": [
+        "cli"
+      ],
+      "signals": {
+        "tzMismatchSystem": false,
+        "ipv6Leak": false,
+        "riskScore": 70,
+        "anonymous": false,
+        "abuseListed": false,
+        "tzMismatchCliEnv": false,
+        "tunOff": false
+      },
+      "expect": {
+        "stage": "full",
+        "level": "low"
+      },
+      "note": "70 是二维判定之前的旧阈值。非匿名 IP 在 70 分现在判低（阈值 76）——这条专门锁住阈值确实改了，防止有人把旧常量改回来还全绿。分项颜色在 70 仍是红，那是另一把尺子（verdict.md 6）。"
+    }
+  ]
+}
