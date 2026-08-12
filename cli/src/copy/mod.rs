@@ -156,7 +156,7 @@ copy_leaf! {
 }
 
 copy_node! {
-    /// 9 个检测项。O1–O4 的标题必须与 ipcheck Web 逐字一致（契约 1.1）。
+    /// 8 个检测项。O1–O4 的标题必须与 ipcheck Web 逐字一致（契约 1.1）。
     ChecksText / ChecksTextPatch {
         o1: CheckText / CheckTextPatch,
         o2: CheckText / CheckTextPatch,
@@ -166,7 +166,6 @@ copy_node! {
         c2: CheckText / CheckTextPatch,
         c3: CheckText / CheckTextPatch,
         c4: CheckText / CheckTextPatch,
-        c5: CheckText / CheckTextPatch,
     }
 }
 
@@ -193,12 +192,6 @@ copy_leaf! {
         abuse_listed,
         abuse_clean,
         abuse_unknown,
-        endpoint_official,
-        endpoint_domestic,
-        endpoint_relay,
-        endpoint_not_installed,
-        blacklist_hit,
-        blacklist_clear,
     }
 }
 
@@ -216,12 +209,10 @@ copy_leaf! {
     NoteText / NoteTextPatch {
         /// 契约 5.4：归属来自 proxycheck，不是 Cloudflare，两端可能对不上。
         geo_source,
-        /// 契约 5.1：O2 对应桌面版，CC CLI 认 `$TZ`（那是 C4）。
+        /// 契约 5.1：O2 测的是系统时区，命令行进程认 `$TZ`（那是 C4）。
         o2_desktop_only,
         /// ADR-0012：无 key 配额按出口 IP 计，与同节点用户共享。
         quota_shared,
-        /// ADR-0010：黑名单命中只告警，不改变档位。
-        blacklist_not_in_verdict,
     }
 }
 

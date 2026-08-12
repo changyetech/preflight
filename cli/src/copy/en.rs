@@ -85,12 +85,8 @@ pub const EN: Text = Text {
             description: "Environment variables, system proxy and TUN/VPN. Only on/off is shown — never the addresses.",
         },
         c4: CheckText {
-            title: "Claude Code CLI timezone match",
-            description: "Compares $TZ with the timezone of your exit IP. This is the one Claude Code CLI actually reads.",
-        },
-        c5: CheckText {
-            title: "Claude endpoint",
-            description: "Whether ANTHROPIC_BASE_URL points at the official API, a domestic model provider, or a third-party relay.",
+            title: "$TZ timezone match",
+            description: "Compares $TZ with the timezone of your exit IP. This is the timezone command-line tools actually run in.",
         },
     },
 
@@ -114,12 +110,6 @@ pub const EN: Text = Text {
         abuse_listed: "abuse reports found",
         abuse_clean: "no abuse reports",
         abuse_unknown: "abuse reports unknown",
-        endpoint_official: "official API",
-        endpoint_domestic: "domestic model provider",
-        endpoint_relay: "third-party relay — data leak and account risk",
-        endpoint_not_installed: "Claude Code not installed",
-        blacklist_hit: "on the Anthropic 147-domain list",
-        blacklist_clear: "not on the Anthropic 147-domain list",
     },
 
     failures: FailureText {
@@ -130,8 +120,7 @@ pub const EN: Text = Text {
 
     notes: NoteText {
         geo_source: "Ownership data comes from proxycheck. The website uses Cloudflare's database, so the two can disagree.",
-        o2_desktop_only: "This one matches Claude Desktop. Claude Code CLI reads $TZ instead — that is C4 below.",
+        o2_desktop_only: "This one covers GUI apps, which follow the system timezone. Command-line tools read $TZ instead — that is C4 below.",
         quota_shared: "Without an API key proxycheck allows 100 queries per day, counted per exit IP — you share it with anyone else on the same proxy node. Run `ipcheck config set proxycheck-key` to raise it to 1,000.",
-        blacklist_not_in_verdict: "The list is a frozen snapshot that can no longer be refreshed, so it warns but does not change the verdict.",
     },
 };

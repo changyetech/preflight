@@ -11,7 +11,7 @@ use std::fmt::Write as _;
 use crate::copy::Text;
 use crate::domain::checks::{CheckId, Coverage, Failure, Outcome};
 use crate::domain::verdict::{self, Level, PreliminaryLevel, Verdict};
-use crate::probe::{ExitInfo, Report, Risk, TimezoneCheck, claude, dns, ipify, proxy};
+use crate::probe::{ExitInfo, Report, Risk, TimezoneCheck, dns, ipify, proxy};
 
 /// 分项的颜色语义。与综合结论无关（契约 6）。
 #[derive(Clone, Copy, PartialEq)]
@@ -235,7 +235,6 @@ fn cards(report: &Report, text: &Text) -> Vec<Card> {
         card_c2(&report.c2, text),
         card_c3(&report.c3, text),
         card_timezone(CheckId::C4, &report.c4, text, &text.checks.c4, false),
-        card_c5(&report.c5, text),
     ]
 }
 
@@ -533,54 +532,6 @@ fn card_c3(outcome: &Outcome<proxy::Status>, text: &Text) -> Card {
     }
 }
 
-fn card_c5(outcome: &Outcome<claude::Detection>, text: &Text) -> Card {
-    let meta = &text.checks.c5;
-    let Outcome::Done(detection) = outcome else {
-        return failed_card(
-            CheckId::C5,
-            meta.title,
-            meta.description,
-            outcome.failure().unwrap(),
-            text,
-        );
-    };
-
-    let mut notes = Vec::new();
-    let (tone, values) = match &detection.endpoint {
-        claude::Endpoint::NotInstalled => (
-            Tone::Dim,
-            vec![text.values.endpoint_not_installed.to_string()],
-        ),
-        claude::Endpoint::Official => (Tone::Ok, vec![text.values.endpoint_official.to_string()]),
-        claude::Endpoint::Domestic { host } => (
-            Tone::Ok,
-            vec![format!("{}  {host}", text.values.endpoint_domestic)],
-        ),
-        claude::Endpoint::Relay { host, blacklisted } => {
-            let mut lines = vec![format!("{}  {host}", text.values.endpoint_relay)];
-            lines.push(match blacklisted {
-                Some(entry) => format!("{} ({entry})", text.values.blacklist_hit),
-                None => text.values.blacklist_clear.to_string(),
-            });
-            if blacklisted.is_some() {
-                // ADR-0010：命中只告警，不改变档位——这句话必须在屏幕上，
-                // 否则用户会奇怪为什么红字告警了结论却没变高。
-                notes.push(text.notes.blacklist_not_in_verdict);
-            }
-            (Tone::Bad, lines)
-        }
-    };
-
-    Card {
-        id: CheckId::C5,
-        tone,
-        title: meta.title,
-        values,
-        notes,
-        description: meta.description,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -599,7 +550,6 @@ mod tests {
             c2: Outcome::Failed(Failure::Local),
             c3: Outcome::Failed(Failure::Local),
             c4: Outcome::Failed(Failure::Upstream),
-            c5: Outcome::Failed(Failure::Local),
         }
     }
 
@@ -623,7 +573,7 @@ mod tests {
     fn every_check_is_rendered_even_when_it_failed() {
         // 覆盖度里数着它们，屏幕上就必须有它们。
         let out = render(&blank(), false, false);
-        for id in ["O1", "O2", "O3", "O4", "C1", "C2", "C3", "C4", "C5"] {
+        for id in ["O1", "O2", "O3", "O4", "C1", "C2", "C3", "C4"] {
             assert!(out.contains(id), "缺少 {id}：{out}");
         }
     }
@@ -641,7 +591,7 @@ mod tests {
         let text = copy::text(Lang::En);
         let out = render(&blank(), false, false);
         assert!(out.contains(&format!("{} 0", text.coverage.done)));
-        assert!(out.contains(&format!("{} 9", text.coverage.failed)));
+        assert!(out.contains(&format!("{} 8", text.coverage.failed)));
     }
 
     #[test]
@@ -728,21 +678,5 @@ mod tests {
         let out = render(&report, false, false);
         assert!(!out.contains("127.0.0.1"), "{out}");
         assert!(!out.contains("7890"), "{out}");
-    }
-
-    #[test]
-    fn blacklist_hit_explains_why_the_verdict_did_not_change() {
-        let mut report = blank();
-        report.c5 = Outcome::Done(claude::Detection {
-            endpoint: claude::Endpoint::Relay {
-                host: "api.yunwu.ai".into(),
-                blacklisted: Some("yunwu.ai"),
-            },
-            source: Some("env"),
-        });
-        let text = copy::text(Lang::En);
-        let out = render(&report, false, false);
-        assert!(out.contains(text.values.blacklist_hit));
-        assert!(out.contains(text.notes.blacklist_not_in_verdict));
     }
 }

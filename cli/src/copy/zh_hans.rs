@@ -91,12 +91,8 @@ pub const ZH_HANS: TextPatch = TextPatch {
             description: Some("环境变量代理、系统代理与 TUN/VPN。只显示开关状态，不显示地址。"),
         },
         c4: CheckTextPatch {
-            title: Some("Claude Code CLI 时区一致性"),
-            description: Some("比对 $TZ 与出口 IP 所在时区。这一条才是 Claude Code CLI 真正认的。"),
-        },
-        c5: CheckTextPatch {
-            title: Some("Claude 端点"),
-            description: Some("ANTHROPIC_BASE_URL 指向的是官方 API、国产大模型，还是第三方中转。"),
+            title: Some("$TZ 时区一致性"),
+            description: Some("比对 $TZ 与出口 IP 所在时区。命令行工具实际跑在这个时区里。"),
         },
     },
 
@@ -120,12 +116,6 @@ pub const ZH_HANS: TextPatch = TextPatch {
         abuse_listed: Some("有滥用举报记录"),
         abuse_clean: Some("无滥用举报记录"),
         abuse_unknown: Some("滥用记录未知"),
-        endpoint_official: Some("官方直连"),
-        endpoint_domestic: Some("国产大模型"),
-        endpoint_relay: Some("第三方中转 —— 注意数据泄露与封号风险"),
-        endpoint_not_installed: Some("未安装 Claude Code"),
-        blacklist_hit: Some("命中 Anthropic 147 域名名单"),
-        blacklist_clear: Some("未命中 Anthropic 147 域名名单"),
     },
 
     failures: FailureTextPatch {
@@ -139,13 +129,10 @@ pub const ZH_HANS: TextPatch = TextPatch {
             "归属数据来自 proxycheck；网页版用的是 Cloudflare 的地理库，两者可能对不上。",
         ),
         o2_desktop_only: Some(
-            "本项对应 Claude 桌面版。Claude Code CLI 认的是 $TZ，那是下面的 C4。",
+            "本项对应图形界面应用（跟随系统时区）。命令行工具认的是 $TZ，那是下面的 C4。",
         ),
         quota_shared: Some(
             "无 key 时 proxycheck 每天 100 次，按出口 IP 计——与同一代理节点上的其他人共享。执行 `ipcheck config set proxycheck-key` 可提升到 1000 次。",
-        ),
-        blacklist_not_in_verdict: Some(
-            "该名单是无法再刷新的冻结快照，因此只告警、不改变综合结论。",
         ),
     },
 };

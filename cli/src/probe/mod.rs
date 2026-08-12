@@ -1,10 +1,9 @@
-//! 探测层：9 个检测项的采集与编排。
+//! 探测层：8 个检测项的采集与编排。
 //!
 //! **并发跑，一次性出结果**：单个探测失败不影响其余探测（契约 4 的覆盖度要求
 //! 每一项都有确定的终态）。不引 tokio——这是个跑几秒就退出的 CLI，
 //! 异步运行时带来的编译时间与二进制体积换不回任何东西。
 
-pub mod claude;
 pub mod dns;
 pub mod echo;
 pub mod http;
@@ -49,7 +48,6 @@ pub struct Report {
     pub c2: Outcome<Vec<dns::Server>>,
     pub c3: Outcome<proxy::Status>,
     pub c4: Outcome<TimezoneCheck>,
-    pub c5: Outcome<claude::Detection>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -70,7 +68,6 @@ impl Report {
             self.c2.is_done(),
             self.c3.is_done(),
             self.c4.is_done(),
-            self.c5.is_done(),
         ])
     }
 
@@ -98,7 +95,7 @@ impl Report {
     }
 }
 
-/// 跑完 9 项。
+/// 跑完 8 项。
 ///
 /// 编排上分两拨：先并发跑彼此独立的探测，再跑依赖出口 IP 的那些。
 /// O2/C4 依赖 proxycheck 给的出口时区，因此排在最后——这条依赖链正是
@@ -106,21 +103,19 @@ impl Report {
 pub fn run(timeout: Duration, proxycheck_key: Option<&str>) -> Report {
     let agent = http::agent(timeout);
 
-    // 第一拨：互不依赖，全部并发。本机探测（C2/C3/C5）也放进来——
+    // 第一拨：互不依赖，全部并发。本机探测（C2/C3）也放进来——
     // 它们要 fork 子进程，等待时间不该串在网络探测后面。
-    let (exposure, real_ip, dns_servers, proxy_status, claude_detection) = thread::scope(|scope| {
+    let (exposure, real_ip, dns_servers, proxy_status) = thread::scope(|scope| {
         let exposure = scope.spawn(|| ipify::probe(&agent));
         let real_ip = scope.spawn(|| echo::probe(&agent));
         let dns_servers = scope.spawn(dns::probe);
         let proxy_status = scope.spawn(proxy::probe);
-        let claude_detection = scope.spawn(claude::probe);
 
         (
             exposure.join().ok(),
             real_ip.join().ok().flatten(),
             dns_servers.join().ok(),
             proxy_status.join().ok(),
-            claude_detection.join().ok(),
         )
     });
 
@@ -147,11 +142,9 @@ pub fn run(timeout: Duration, proxycheck_key: Option<&str>) -> Report {
         real_ip,
         dns_servers,
         proxy_status,
-        claude_detection,
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn assemble(
     exposure: Option<ipify::Exposure>,
     exit_ip: Option<String>,
@@ -160,7 +153,6 @@ fn assemble(
     real_ip: Option<String>,
     dns_servers: Option<Vec<dns::Server>>,
     proxy_status: Option<proxy::Status>,
-    claude_detection: Option<claude::Detection>,
 ) -> Report {
     let geo = match &lookup {
         proxycheck::Outcome::Ok(l) => Some(l.geo.clone()),
@@ -208,10 +200,6 @@ fn assemble(
             None => Outcome::Failed(Failure::Local),
         },
         c4,
-        c5: match claude_detection {
-            Some(detection) => Outcome::Done(detection),
-            None => Outcome::Failed(Failure::Local),
-        },
     }
 }
 
@@ -241,7 +229,6 @@ mod tests {
             c2: Outcome::Failed(Failure::Local),
             c3: Outcome::Failed(Failure::Local),
             c4: Outcome::Failed(Failure::Upstream),
-            c5: Outcome::Failed(Failure::Local),
         }
     }
 
@@ -254,9 +241,9 @@ mod tests {
     }
 
     #[test]
-    fn coverage_always_sums_to_nine() {
+    fn coverage_always_sums_to_eight() {
         assert!(blank().coverage().is_complete());
-        assert_eq!(blank().coverage().failed, 9);
+        assert_eq!(blank().coverage().failed, 8);
     }
 
     #[test]

@@ -1,8 +1,8 @@
-//! O2 系统时区一致性 与 C4 CC CLI 时区一致性。
+//! O2 系统时区一致性 与 C4 `$TZ` 时区一致性。
 //!
 //! **两条是不同的信号，不是一条的两种说法**（契约 5.1）：
-//! - C4 比 `$TZ` 与出口 IP 时区 —— Claude Code CLI 真正认的那个，**进综合结论**
-//! - O2 比系统时区与出口 IP 时区 —— 对应 Claude 桌面版，**只展示不进结论**
+//! - C4 比 `$TZ` 与出口 IP 时区 —— 命令行进程真正跑在这个时区里，**进综合结论**
+//! - O2 比系统时区与出口 IP 时区 —— 对应图形界面应用，**只展示不进结论**
 //!
 //! 系统时区必须**绕开 `$TZ`** 读取，否则两条就成了同一条。
 
@@ -70,7 +70,7 @@ fn windows_system_timezone() -> Option<String> {
     (!id.is_empty()).then_some(id)
 }
 
-/// Claude Code CLI 实际会用的时区名：`$TZ` 优先，未设则继承系统时区。
+/// 命令行进程实际会用的时区名：`$TZ` 优先，未设则继承系统时区。
 pub fn cli_timezone() -> Option<String> {
     match std::env::var("TZ") {
         Ok(tz) if !tz.trim().is_empty() => Some(tz.trim().to_string()),

@@ -43,7 +43,7 @@ pub struct Signals {
     pub tz_mismatch_cli_env: Option<bool>,
     /// 系统时区 ≠ 出口 IP 时区（O2）。
     ///
-    /// **在 CLI 侧只展示、不贡献综合结论**（契约 5.1）：Claude Code CLI 认 `$TZ`，
+    /// **在 CLI 侧只展示、不贡献综合结论**（契约 5.1）：命令行进程认 `$TZ`，
     /// 设对了 `$TZ` 的用户不该因为系统时区没改而被报中风险——而设了 `$TZ` 的
     /// 恰恰是最懂行的那批。Web 侧读不到 `$TZ`，才拿这条当降级代理。
     pub tz_mismatch_system: Option<bool>,

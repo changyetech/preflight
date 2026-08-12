@@ -2,7 +2,8 @@
 
 use std::fmt;
 
-/// 9 个检测项。ID 是跨端稳定标识，**不得复用、不得改号**。
+/// 8 个检测项。ID 是跨端稳定标识，**不得复用、不得改号**——
+/// 这条对已删除的 ID 同样成立：`C5`（原厂商端点检测）是废弃编号，不得复用（ADR-0013）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CheckId {
     /// 出口 IP 与归属。
@@ -19,14 +20,12 @@ pub enum CheckId {
     C2,
     /// 代理检测（环境变量 / 系统代理 / TUN）。
     C3,
-    /// CC CLI 时区一致性（认 `$TZ`）。
+    /// `$TZ` 时区一致性（命令行进程认的那个）。
     C4,
-    /// Claude 端点检测。
-    C5,
 }
 
-/// 覆盖度的分母恒为 9。
-pub const TOTAL_CHECKS: usize = 9;
+/// 覆盖度的分母恒为 8。
+pub const TOTAL_CHECKS: usize = 8;
 
 pub const ALL_CHECKS: [CheckId; TOTAL_CHECKS] = [
     CheckId::O1,
@@ -37,7 +36,6 @@ pub const ALL_CHECKS: [CheckId; TOTAL_CHECKS] = [
     CheckId::C2,
     CheckId::C3,
     CheckId::C4,
-    CheckId::C5,
 ];
 
 impl CheckId {
@@ -51,7 +49,6 @@ impl CheckId {
             CheckId::C2 => "C2",
             CheckId::C3 => "C3",
             CheckId::C4 => "C4",
-            CheckId::C5 => "C5",
         }
     }
 }
@@ -105,7 +102,7 @@ impl<T> Outcome<T> {
     }
 }
 
-/// 覆盖度。CLI 侧的不变量是 `done + failed == 9`。
+/// 覆盖度。CLI 侧的不变量是 `done + failed == 8`。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Coverage {
     pub done: usize,
@@ -125,7 +122,7 @@ impl Coverage {
         coverage
     }
 
-    /// 不变量：两档之和恒为 9。呈现层在打印前断言它。
+    /// 不变量：两档之和恒为 8。呈现层在打印前断言它。
     pub const fn is_complete(&self) -> bool {
         self.done + self.failed == TOTAL_CHECKS
     }
@@ -136,7 +133,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn there_are_exactly_nine_checks_with_distinct_ids() {
+    fn there_are_exactly_eight_checks_with_distinct_ids() {
         assert_eq!(ALL_CHECKS.len(), TOTAL_CHECKS);
         let mut seen: Vec<&str> = ALL_CHECKS.iter().map(|id| id.as_str()).collect();
         seen.sort_unstable();
@@ -146,7 +143,7 @@ mod tests {
 
     #[test]
     fn coverage_invariant_holds_for_any_mix() {
-        // 全成功 / 全失败 / 混合，三档之和恒为 9。
+        // 全成功 / 全失败 / 混合，两档之和恒为 8。
         for failed_count in 0..=TOTAL_CHECKS {
             let outcomes = (0..TOTAL_CHECKS).map(|i| i >= failed_count);
             let coverage = Coverage::tally(outcomes);

@@ -11,7 +11,7 @@
 use serde_json::{Value, json};
 
 use crate::domain::checks::{ALL_CHECKS, CheckId, Failure, Outcome, TOTAL_CHECKS};
-use crate::probe::{Report, TimezoneCheck, claude, ipify, proxy};
+use crate::probe::{Report, TimezoneCheck, ipify, proxy};
 
 fn failure_name(failure: Failure) -> &'static str {
     match failure {
@@ -147,12 +147,6 @@ fn check_json(id: CheckId, report: &Report) -> Value {
             })
         }),
         CheckId::C4 => check(&report.c4, timezone),
-        CheckId::C5 => check(&report.c5, |detection| {
-            json!({
-                "endpoint": endpoint_json(&detection.endpoint),
-                "source": detection.source,
-            })
-        }),
     }
 }
 
@@ -162,20 +156,6 @@ fn state_name(state: &proxy::State) -> &'static str {
         proxy::State::Disabled => "off",
         // 「没检测」与「检测了、没开」必须分得开。
         proxy::State::Unsupported => "unsupported",
-    }
-}
-
-fn endpoint_json(endpoint: &claude::Endpoint) -> Value {
-    match endpoint {
-        claude::Endpoint::NotInstalled => json!({ "kind": "notInstalled" }),
-        claude::Endpoint::Official => json!({ "kind": "official" }),
-        claude::Endpoint::Domestic { host } => json!({ "kind": "domestic", "host": host }),
-        claude::Endpoint::Relay { host, blacklisted } => json!({
-            "kind": "relay",
-            "host": host,
-            // 命中只告警，不进综合结论（ADR-0010）——所以它在 checks 里而不在 signals 里。
-            "blacklisted": blacklisted,
-        }),
     }
 }
 
@@ -195,7 +175,6 @@ mod tests {
             c2: Outcome::Failed(Failure::Local),
             c3: Outcome::Failed(Failure::Local),
             c4: Outcome::Failed(Failure::Upstream),
-            c5: Outcome::Failed(Failure::Local),
         }
     }
 
