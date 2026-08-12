@@ -52,9 +52,41 @@ type Case = {
   applies: string[];
   signals: CaseSignals;
   expect: { stage: string; level?: string };
+  /** 指向一条**未命中**的基准用例，含义是「本条与它的结论必须完全相同」（见文件 conventions）。 */
+  pairsWith?: string;
 };
 
 const CASES = (casesFile as unknown as { cases: Case[] }).cases;
+
+const CASE_BY_ID = new Map(CASES.map((testCase) => [testCase.id, testCase]));
+
+const webCases = CASES.filter((testCase) => testCase.applies.includes("web"));
+
+/**
+ * 解析 `pairsWith` 指向的基准用例。
+ *
+ * **悬空引用必须响亮失败**：那是数据错误，静默跳过会让配对断言整条失效——
+ * 一条改错了 id 的用例从此再也证明不了任何事，而它看起来仍然是绿的。
+ */
+function baselineOf(testCase: Case, byId: Map<string, Case>): Case {
+  const baseline = testCase.pairsWith && byId.get(testCase.pairsWith);
+  if (!baseline) {
+    throw new Error(
+      `用例 ${testCase.id} 的 pairsWith 指向不存在的用例 ${testCase.pairsWith}`,
+    );
+  }
+  return baseline;
+}
+
+/** 两条用例的 signals 中取值不同的键。 */
+function differingSignals(a: CaseSignals, b: CaseSignals): string[] {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...keys].filter(
+    (key) =>
+      JSON.stringify(a[key as keyof CaseSignals]) !==
+      JSON.stringify(b[key as keyof CaseSignals]),
+  );
+}
 
 /**
  * 用例的扁平信号 → Web 实现的嵌套 `VerdictInput`。
@@ -198,8 +230,6 @@ describe("判级契约 · golden 向量", () => {
     }
   });
 
-  const webCases = CASES.filter((c) => c.applies.includes("web"));
-
   it("存在 Web 用例（筛选逻辑没坏）", () => {
     expect(webCases.length).toBeGreaterThan(0);
   });
@@ -211,6 +241,58 @@ describe("判级契约 · golden 向量", () => {
       expect(levelOf(verdict)).toBe(testCase.expect.level);
     });
   }
+});
+
+/**
+ * `pairsWith`：证明某个取值是**无从比对**而不是**未命中**。
+ *
+ * 单看一条用例分不出这两者——只有让它与一条已知未命中的用例算出**同一个结论**才说得清。
+ * 断言的是两条各自**算出来**的 verdict 相等，而不是各自等于某个硬编码值：后者会退化成
+ * 把同一个期望写两遍，那样一条写错 `expect` 的新用例照样能全绿。
+ *
+ * 这与 `tests/verdict.test.ts` 里那条判定层断言是两层保障：那边锁的是实现，
+ * 这边锁的是**向量本身**——将来有人加一条「无从比对」用例却把 `expect` 写错，只有这里抓得住。
+ */
+describe("判级契约 · pairsWith 配对（无从比对 ≠ 未命中）", () => {
+  const pairedWebCases = webCases.filter(
+    (testCase) => testCase.pairsWith !== undefined,
+  );
+
+  it("存在带 pairsWith 的 Web 用例（筛选逻辑没坏）", () => {
+    expect(pairedWebCases.length).toBeGreaterThan(0);
+  });
+
+  for (const testCase of pairedWebCases) {
+    it(`${testCase.id} 与基准 ${testCase.pairsWith} 结论相同`, () => {
+      const baseline = baselineOf(testCase, CASE_BY_ID);
+
+      // 基准必须同样适用于本端，否则拿它作对照不成立。
+      expect(baseline.applies, baseline.id).toContain("web");
+
+      // 除被比对的那一个字段外其余 signals 必须逐一相同，否则「结论相同」证明不了
+      // 是那个字段不贡献信号——可能是别处的差异把结论又拉了回来。
+      expect(
+        differingSignals(testCase.signals, baseline.signals),
+        `${testCase.id} 与 ${baseline.id} 只应差一个被比对的字段`,
+      ).toHaveLength(1);
+
+      expect(computeVerdict(toVerdictInput(testCase.signals))).toEqual(
+        computeVerdict(toVerdictInput(baseline.signals)),
+      );
+    });
+  }
+
+  it("pairsWith 指向不存在的用例时响亮失败，不静默跳过", () => {
+    const dangling: Case = {
+      id: "dangling",
+      applies: ["web"],
+      signals: {},
+      expect: { stage: "insufficient" },
+      pairsWith: "no-such-case",
+    };
+
+    expect(() => baselineOf(dangling, CASE_BY_ID)).toThrow(/no-such-case/);
+  });
 });
 
 /** 这一组只关心风险分那把尺子，四个中档信号一律未命中。 */
