@@ -11,14 +11,24 @@ import type { PanelState } from "./checks";
  * 「没有任何证据却报低风险」这个状态在类型层面构造不出来。
  *
  * `risk` 为 `null` 表示 O4 尚未产出可用结果（未触发 / 检测中 / 失败 / 配额耗尽），
- * 此时结论恒为「初步」。把 riskScore 与 abuseListed 捆在同一个可空对象里，
- * 是为了让「风险分未知但滥用收录已知」这种不存在的组合无法被构造出来。
+ * 此时结论恒为「初步」。把 riskScore、anonymous 与 abuseListed 捆在同一个可空对象里，
+ * 是为了让「风险分未知但滥用收录已知」「有分数却不知道匿名状态」这两种判不了的组合
+ * 无法被构造出来——后者尤其要紧：判「高」的阈值正是由 anonymous 决定的。
  *
  * 网络类型 Hosting、代理检出等只是分项提醒（规格 3.2），刻意不出现在这里。
  */
 export type VerdictInput = {
   signals: { timezoneMismatch: boolean; ipv6Leak: boolean } | null;
-  risk: { riskScore: number; abuseListed: boolean | null } | null;
+  risk: {
+    riskScore: number;
+    /**
+     * proxycheck 判定该 IP 当前正被用作匿名化地址。**不是「用户在用 VPN」**。
+     * 它与 `riskScore` 捆在同一个对象里，是因为判「高」的阈值由它决定——
+     * 「有分数但不知道匿名状态」这个判不了的组合，因此在类型层面就构造不出来。
+     */
+    anonymous: boolean;
+    abuseListed: boolean | null;
+  } | null;
 };
 
 /**
@@ -33,12 +43,22 @@ export type Verdict =
   | { stage: "full"; level: "low" | "medium" | "high" };
 
 /**
- * 综合结论判「高」的风险分阈值（规格 3.1）。
+ * 综合结论判「高」的阈值（判级契约 §3.1）——**二维**，由 `anonymous` 选择。
  *
- * 这里刻意不复用 `riskLevel`：那是**分项**分级（规格 3.2），语义上与综合结论是两件事，
- * 只是当前阈值恰好都是 70。分项颜色由卡片直接吃 `riskLevel`，综合结论看这个常量。
+ * 两个数直接取自 proxycheck v3 官方的 deny 边界（见 docs/proxycheck.md）。
+ * `anonymous` 不是「用户在用 VPN」，而是 proxycheck 判定「这个 IP 当前正被用作匿名化
+ * 地址」——实测普通商业 VPN 出口是 false，TOR 出口是 true。这一维把「你在用 VPN」
+ * 和「你的出口正被别人拿来匿名作恶」分开，前者是本产品用户的常态。
+ *
+ * 刻意不复用 `riskLevelOf`：那是**分项**分级（契约 §6），语义上是另一件事，
+ * 现在连数值都不同了。分项颜色由卡片直接吃 `riskLevel`，综合结论看这里。
  */
-const HIGH_RISK_SCORE = 70;
+const HIGH_RISK_SCORE_NOT_ANONYMOUS = 76;
+const HIGH_RISK_SCORE_ANONYMOUS = 51;
+
+function highRiskScore(anonymous: boolean): number {
+  return anonymous ? HIGH_RISK_SCORE_ANONYMOUS : HIGH_RISK_SCORE_NOT_ANONYMOUS;
+}
 
 export function computeVerdict(input: VerdictInput): Verdict {
   // 一个信号都没有就不给结论。规格 3.3 说的是「O1–O3 完成后」给出初步结论，
@@ -56,7 +76,7 @@ export function computeVerdict(input: VerdictInput): Verdict {
     return { stage: "preliminary", level: medium ? "medium" : "low" };
   }
 
-  if (input.risk.riskScore >= HIGH_RISK_SCORE) {
+  if (input.risk.riskScore >= highRiskScore(input.risk.anonymous)) {
     return { stage: "full", level: "high" };
   }
 
@@ -84,7 +104,11 @@ export function verdictInputFrom(panel: PanelState): VerdictInput {
           },
     risk:
       risk?.status === "ok"
-        ? { riskScore: risk.riskScore, abuseListed: risk.abuseListed }
+        ? {
+            riskScore: risk.riskScore,
+            anonymous: risk.anonymous,
+            abuseListed: risk.abuseListed,
+          }
         : null,
   };
 }

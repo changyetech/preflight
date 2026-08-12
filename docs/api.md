@@ -101,6 +101,7 @@ O4 IP 类型与风险。按需触发，串联 proxycheck v3 与 StopForumSpam �
     "scraper": false,
     "riskScore": 100,
     "riskLevel": "high",
+    "anonymous": true,
     "abuseListed": true
   }
 }
@@ -113,10 +114,13 @@ O4 IP 类型与风险。按需触发，串联 proxycheck v3 与 StopForumSpam �
 | `networkType` | `"Residential" \| "Business" \| "Wireless" \| "Hosting" \| null` | 取 proxycheck `network.type`；`null` = 未知 |
 | `proxy` / `vpn` / `tor` / `scraper` | `boolean` | 取 proxycheck `detections.*` |
 | `riskScore` | `number` | 0–100，取 proxycheck `detections.risk` |
-| `riskLevel` | `"low" \| "medium" \| "high"` | 由 `riskScore` 分级：`< 30` low，`< 70` medium，`>= 70` high（规格 3.2） |
+| `riskLevel` | `"low" \| "medium" \| "high"` | **分项**分级，由 `riskScore` 得出：`< 26` low，`< 76` medium，`>= 76` high（对齐 proxycheck v3 自己的分档）。**这不是综合结论**——后者的阈值是二维的，见 [docs/verdict.md](./verdict.md) §3.1 与 §6 |
+| `anonymous` | `boolean` | 取 proxycheck `detections.anonymous`：该 IP 当前是否正被用作匿名化地址。**不是「用户在用 VPN」**。综合结论判「高」的阈值由它选择（`false` ⇒ ≥ 76，`true` ⇒ ≥ 51），因此**前端必须拿到它**才能算结论 |
 | `abuseListed` | `boolean \| null` | StopForumSpam 是否有滥用收录；`null` = 该第三方不可用，前端应显示「未知」而非「无收录」 |
 
 `abuseListed` 为 `null` 时本接口仍返回 200：StopForumSpam 只贡献「中」风险信号，它挂掉不应连累 proxycheck 的结果。
+
+`riskScore` 与 `anonymous` **必定同时存在**：判级阈值由后者决定，只给其中一个是无法判定的状态。proxycheck 缺任一字段时本接口返回 5001（上游不可用），不会返回一个残缺的 `status: "ok"`。
 
 **响应中永不包含 proxycheck API key，也不包含 proxycheck 的原始响应体。**
 
@@ -140,7 +144,7 @@ O4 IP 类型与风险。按需触发，串联 proxycheck v3 与 StopForumSpam �
 | 403 | 2010 | 缺失 `turnstileToken`，或 Turnstile siteverify 判定 token 无效 |
 | 404 | 4001 | 路由未命中：`/api/` 下不存在的路径，或方法不匹配（如 `GET /api/risk`） |
 | 429 | 2020 | 触发 Rate Limiting 绑定的单 IP 限流 |
-| 500 | 5001 | proxycheck 不可用（网络失败、非 200、`status != "ok"`） |
+| 500 | 5001 | proxycheck 不可用（网络失败、非 200、`status != "ok"`、缺 `risk` 或 `anonymous`） |
 | 500 | 5002 | 无法确定来源 IP（`CF-Connecting-IP` 缺失） |
 
 `details` 只放对用户/前端有意义的短语，绝不回填第三方的原始错误文本或任何密钥。

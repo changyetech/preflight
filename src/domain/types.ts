@@ -42,7 +42,14 @@ export type RiskData =
       tor: boolean;
       scraper: boolean;
       riskScore: number;
+      /** **分项**分级，不是综合结论——后者的阈值是二维的（docs/verdict.md §3.1 / §6）。 */
       riskLevel: "low" | "medium" | "high";
+      /**
+       * proxycheck 判定该 IP 当前正被用作匿名化地址。**不是「用户在用 VPN」**。
+       * 综合结论判「高」的阈值由它选择（`false` ⇒ ≥ 76，`true` ⇒ ≥ 51）。
+       * 与 `riskScore` 必定同时存在（docs/api.md 3.1）。
+       */
+      anonymous: boolean;
       /** `null` = StopForumSpam 不可用，前端显示「未知」而非「无收录」（docs/api.md 3.1） */
       abuseListed: boolean | null;
     }

@@ -1,5 +1,8 @@
-// O2 系统时区一致性（规格 2.2）。
+// O2 系统时区一致性（判级契约 §2.4）。
 // 比对两个 IANA 时区名：浏览器（= 系统）时区 vs 出口 IP 时区。
+//
+// 比对算法**两端统一**：先比名，名不同再比当前 UTC 偏移。
+// CLI 侧的对应测试在 cli/src/probe/timezone.rs。
 
 import { describe, expect, it } from "vitest";
 
@@ -35,5 +38,34 @@ describe("compareTimezone", () => {
     expect(compareTimezone(" Asia/Shanghai ", "asia/shanghai").match).toBe(
       true,
     );
+  });
+
+  it("IANA 别名靠偏移判为一致，而不是靠名字", () => {
+    // `US/Pacific` 与 `America/Los_Angeles` 是同一个时区的两个 IANA 名。
+    // 只比名字会给设置完全正确的用户报一个中风险——这是一类真实误报。
+    expect(compareTimezone("US/Pacific", "America/Los_Angeles").match).toBe(
+      true,
+    );
+    expect(compareTimezone("Asia/Chongqing", "Asia/Shanghai").match).toBe(true);
+  });
+
+  it("同偏移的不同时区算一致", () => {
+    // 风控看到的是偏移。同为 UTC+8 不构成破绽。
+    expect(compareTimezone("Asia/Shanghai", "Asia/Hong_Kong").match).toBe(true);
+    expect(compareTimezone("Asia/Shanghai", "Asia/Singapore").match).toBe(true);
+  });
+
+  it("认不出的时区名判「无法比对」，不判不一致", () => {
+    // 猜不出来就别猜——出口侧给了个我们不认识的名字，不该记成用户的异常。
+    expect(compareTimezone("Asia/Shanghai", "Totally/Bogus").match).toBe(null);
+    expect(compareTimezone("Totally/Bogus", "Asia/Shanghai").match).toBe(null);
+    expect(compareTimezone("", "Asia/Shanghai").match).toBe(null);
+  });
+
+  it("真正跨时区仍判不一致", () => {
+    expect(compareTimezone("Asia/Shanghai", "America/Los_Angeles").match).toBe(
+      false,
+    );
+    expect(compareTimezone("Europe/London", "Europe/Paris").match).toBe(false);
   });
 });

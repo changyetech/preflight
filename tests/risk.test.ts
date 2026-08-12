@@ -14,6 +14,7 @@ const PROXYCHECK_OK = {
       vpn: true,
       tor: false,
       scraper: false,
+      anonymous: false,
       risk: 100,
     },
   },
@@ -149,6 +150,7 @@ describe("POST /api/risk 成功响应", () => {
       scraper: false,
       riskScore: 100,
       riskLevel: "high",
+      anonymous: false,
       abuseListed: true,
     });
   });

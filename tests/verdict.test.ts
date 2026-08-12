@@ -34,7 +34,7 @@ const CLEAN: VerdictInput = {
 /** 已含 O4 且 proxycheck 干净的基线输入。 */
 const WITH_RISK: VerdictInput = {
   ...CLEAN,
-  risk: { riskScore: 0, abuseListed: false },
+  risk: { riskScore: 0, anonymous: false, abuseListed: false },
 };
 
 describe("computeVerdict", () => {
@@ -42,22 +42,54 @@ describe("computeVerdict", () => {
     expect(computeVerdict(WITH_RISK)).toEqual({ stage: "full", level: "low" });
   });
 
-  it("风险分 ≥ 70 → 高", () => {
+  // 判「高」的阈值是**二维**的（契约 §3.1）：anonymous 为假 ⇒ 76，为真 ⇒ 51。
+  // 两个数取自 proxycheck v3 官方的 deny 边界。
+  it("非匿名：风险分 ≥ 76 → 高", () => {
     expect(
       computeVerdict({
         ...WITH_RISK,
-        risk: { riskScore: 70, abuseListed: false },
+        risk: { riskScore: 76, anonymous: false, abuseListed: false },
       }),
     ).toEqual({ stage: "full", level: "high" });
   });
 
-  it("风险分 69 未达阈值，不判高", () => {
+  it("非匿名：风险分 75 未达阈值，不判高", () => {
+    // 75 是 TOR/Scraper 的基准分。光是被判为那几类、却没在充当匿名地址，还不够。
     expect(
       computeVerdict({
         ...WITH_RISK,
-        risk: { riskScore: 69, abuseListed: false },
+        risk: { riskScore: 75, anonymous: false, abuseListed: false },
       }),
     ).toEqual({ stage: "full", level: "low" });
+  });
+
+  it("匿名：阈值降到 51，风险分 51 → 高", () => {
+    expect(
+      computeVerdict({
+        ...WITH_RISK,
+        risk: { riskScore: 51, anonymous: true, abuseListed: false },
+      }),
+    ).toEqual({ stage: "full", level: "high" });
+  });
+
+  it("匿名：风险分 50（VPN 基准分）仍判低", () => {
+    // 「在用 VPN」本身不构成高风险——那是本产品用户的常态。
+    expect(
+      computeVerdict({
+        ...WITH_RISK,
+        risk: { riskScore: 50, anonymous: true, abuseListed: false },
+      }),
+    ).toEqual({ stage: "full", level: "low" });
+  });
+
+  it("同一个分数，匿名与否结论不同", () => {
+    const at70 = (anonymous: boolean) =>
+      computeVerdict({
+        ...WITH_RISK,
+        risk: { riskScore: 70, anonymous, abuseListed: false },
+      });
+    expect(at70(false)).toEqual({ stage: "full", level: "low" });
+    expect(at70(true)).toEqual({ stage: "full", level: "high" });
   });
 
   it("时区不一致 → 中", () => {
@@ -88,7 +120,7 @@ describe("computeVerdict", () => {
     expect(
       computeVerdict({
         ...WITH_RISK,
-        risk: { riskScore: 0, abuseListed: true },
+        risk: { riskScore: 0, anonymous: false, abuseListed: true },
       }),
     ).toEqual({ stage: "full", level: "medium" });
   });
@@ -97,7 +129,7 @@ describe("computeVerdict", () => {
     expect(
       computeVerdict({
         ...WITH_RISK,
-        risk: { riskScore: 0, abuseListed: null },
+        risk: { riskScore: 0, anonymous: false, abuseListed: null },
       }),
     ).toEqual({ stage: "full", level: "low" });
   });
@@ -122,7 +154,7 @@ describe("computeVerdict", () => {
     expect(
       computeVerdict({
         signals: { timezoneMismatch: true, ipv6Leak: true },
-        risk: { riskScore: 100, abuseListed: true },
+        risk: { riskScore: 100, anonymous: false, abuseListed: true },
       }),
     ).toEqual({ stage: "full", level: "high" });
   });
@@ -156,7 +188,7 @@ describe("computeVerdict", () => {
     expect(
       computeVerdict({
         signals: null,
-        risk: { riskScore: 100, abuseListed: null },
+        risk: { riskScore: 100, anonymous: false, abuseListed: null },
       }),
     ).toEqual({ stage: "full", level: "high" });
   });
@@ -271,6 +303,7 @@ describe("verdictInputFrom", () => {
           scraper: false,
           riskScore: 100,
           riskLevel: "high",
+          anonymous: false,
           abuseListed: true,
         },
       },
@@ -278,7 +311,7 @@ describe("verdictInputFrom", () => {
 
     expect(input).toEqual({
       signals: { timezoneMismatch: true, ipv6Leak: true },
-      risk: { riskScore: 100, abuseListed: true },
+      risk: { riskScore: 100, anonymous: false, abuseListed: true },
     });
   });
 

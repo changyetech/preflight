@@ -14,6 +14,8 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
+    // 判级契约的 golden 向量 docs/verdict-cases.json 由测试直接 import。
+    "resolveJsonModule": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,

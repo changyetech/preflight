@@ -54,6 +54,7 @@ function fixtureWithRisk(ip: string, risk: number) {
         vpn: false,
         tor: false,
         scraper: false,
+        anonymous: false,
         risk,
       },
     },
@@ -65,13 +66,15 @@ afterEach(() => {
 });
 
 describe("riskLevelOf", () => {
-  // 分项分级沿用 CLI：< 30 绿 / < 70 黄 / >= 70 红（规格 3.2）。
+  // 分项分级（判级契约 §6）：< 26 绿 / < 76 黄 / >= 76 红。
+  // 三个分界对齐 proxycheck v3 自己的分档 0–25 / 26–50 / 51–75 / 76–100，
+  // 四档收成三色时中间两档并作黄（docs/proxycheck.md）。
   it.each([
     [0, "low"],
-    [29, "low"],
-    [30, "medium"],
-    [69, "medium"],
-    [70, "high"],
+    [25, "low"],
+    [26, "medium"],
+    [75, "medium"],
+    [76, "high"],
     [100, "high"],
   ])("风险分 %i 分级为 %s", (score, level) => {
     expect(riskLevelOf(score)).toBe(level);
@@ -90,6 +93,7 @@ describe("fetchProxycheck", () => {
       scraper: false,
       riskScore: 100,
       riskLevel: "high",
+      anonymous: true,
     });
   });
 
@@ -119,6 +123,19 @@ describe("fetchProxycheck", () => {
     expect(result?.riskLevel).toBe(level);
   });
 
+  it("缺 anonymous 时视为上游不可用", async () => {
+    // 判「高」的阈值由 anonymous 决定（契约 §3.1）。默认成 false 会把阈值静默抬到 76，
+    // 本该判高的 IP 悄悄变成低——静默降级比响亮失败难查得多。
+    stubFetch({
+      status: "ok",
+      "185.59.221.75": {
+        network: { type: "Hosting" },
+        detections: { proxy: false, vpn: false, tor: false, scraper: false, risk: 90 },
+      },
+    });
+    await expect(fetchProxycheck("185.59.221.75", "k")).resolves.toBeNull();
+  });
+
   it("网络类型未知时为 null", async () => {
     stubFetch({
       status: "ok",
@@ -129,6 +146,7 @@ describe("fetchProxycheck", () => {
           vpn: false,
           tor: false,
           scraper: false,
+          anonymous: false,
           risk: 100,
         },
       },

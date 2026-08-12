@@ -3,6 +3,8 @@
 // 归属数据继续走 request.cf（免费无限，见 docs/api.md 第 2 节）。
 //
 // PROXYCHECK_API_KEY 只存在于 Worker Secret，不进仓库、不进响应、不进日志（ADR-0008）。
+//
+// 第三方的行为细节（基准分表、配额、必带参数、已知坑）见 docs/proxycheck.md。
 
 export type NetworkType =
   "Residential" | "Business" | "Wireless" | "Hosting" | null;
@@ -17,12 +19,27 @@ export interface ProxycheckResult {
   scraper: boolean;
   riskScore: number;
   riskLevel: RiskLevel;
+  /**
+   * proxycheck 判定该 IP 当前正被用作匿名化地址。**不是「用户在用 VPN」**——
+   * 实测普通商业 VPN 出口是 false，TOR 出口是 true。
+   * 综合结论判「高」的阈值由它选择（判级契约 §3.1），所以必须透给前端。
+   */
+  anonymous: boolean;
 }
 
-/** 分项分级沿用 CLI：< 30 绿 / < 70 黄 / >= 70 红（规格 3.2）。 */
+/**
+ * 分项分级（判级契约 §6）：`< 26` 绿 / `< 76` 黄 / `>= 76` 红。
+ *
+ * 三个分界直接对齐 proxycheck v3 自己的分档（0–25 / 26–50 / 51–75 / 76–100）：
+ * 四档收成三色时中间两档并作黄——**绿 = 它建议放行的区间，红 = 它对任何 IP 都建议
+ * 拒绝的区间**。依据见 docs/proxycheck.md。
+ *
+ * **这与综合结论的阈值是两个常量**：结论是二维的（51 或 76），分项只看分数。
+ * `anonymous: true` 时两者不同界——结论 51 起判高，分项 76 才转红。
+ */
 export function riskLevelOf(score: number): RiskLevel {
-  if (score < 30) return "low";
-  if (score < 70) return "medium";
+  if (score < 26) return "low";
+  if (score < 76) return "medium";
   return "high";
 }
 
@@ -41,6 +58,7 @@ interface V3Response {
           tor?: boolean;
           scraper?: boolean;
           risk?: number;
+          anonymous?: boolean;
         };
       };
 }
@@ -86,6 +104,14 @@ export async function fetchProxycheck(
     return null;
   }
 
+  // anonymous 与 riskScore 必须成对：判「高」的阈值由前者决定（判级契约 §3.1）。
+  // 缺它时默认成 false 会把阈值静默抬到 76，本该判高的 IP 悄悄变成低——
+  // 静默降级比响亮失败难查得多，所以这里同样走 5001。
+  const { anonymous } = detections;
+  if (typeof anonymous !== "boolean") {
+    return null;
+  }
+
   return {
     networkType: entry.network?.type ?? null,
     proxy: detections.proxy === true,
@@ -94,5 +120,6 @@ export async function fetchProxycheck(
     scraper: detections.scraper === true,
     riskScore,
     riskLevel: riskLevelOf(riskScore),
+    anonymous,
   };
 }

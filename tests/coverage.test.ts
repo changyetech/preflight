@@ -100,6 +100,7 @@ describe("computeCoverage", () => {
           scraper: false,
           riskScore: 0,
           riskLevel: "low",
+          anonymous: false,
           abuseListed: false,
         },
       },
