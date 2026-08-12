@@ -130,7 +130,13 @@ describe("fetchProxycheck", () => {
       status: "ok",
       "185.59.221.75": {
         network: { type: "Hosting" },
-        detections: { proxy: false, vpn: false, tor: false, scraper: false, risk: 90 },
+        detections: {
+          proxy: false,
+          vpn: false,
+          tor: false,
+          scraper: false,
+          risk: 90,
+        },
       },
     });
     await expect(fetchProxycheck("185.59.221.75", "k")).resolves.toBeNull();

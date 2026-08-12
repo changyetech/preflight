@@ -93,7 +93,10 @@ describe("判级契约 · golden 向量", () => {
 
   it("每条用例都声明了有效且非空的适用侧", () => {
     for (const testCase of CASES) {
-      expect(testCase.applies.length, `用例 ${testCase.id} 没有适用侧`).toBeGreaterThan(0);
+      expect(
+        testCase.applies.length,
+        `用例 ${testCase.id} 没有适用侧`,
+      ).toBeGreaterThan(0);
       for (const side of testCase.applies) {
         expect(
           KNOWN_SIDES as readonly string[],
@@ -117,9 +120,10 @@ describe("判级契约 · golden 向量", () => {
     for (const testCase of CASES) {
       const hasScore = testCase.signals.riskScore != null;
       const hasAnonymous = testCase.signals.anonymous != null;
-      expect(hasAnonymous, `用例 ${testCase.id}：riskScore 与 anonymous 必须成对`).toBe(
-        hasScore,
-      );
+      expect(
+        hasAnonymous,
+        `用例 ${testCase.id}：riskScore 与 anonymous 必须成对`,
+      ).toBe(hasScore);
     }
   });
 
