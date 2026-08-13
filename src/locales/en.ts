@@ -326,10 +326,3 @@ type Widen<T> = T extends string
     : { [K in keyof T]: Widen<T[K]> };
 
 export type Copy = Widen<typeof EN>;
-
-type DeepPartial<T> = {
-  [K in keyof T]?: T[K] extends string ? string : DeepPartial<T[K]>;
-};
-
-/** 尚未译全的语种用它：只写已翻好的字段，其余逐字段回落英文（规格第 7 节）。 */
-export type PartialCopy = DeepPartial<Copy>;
