@@ -1,9 +1,9 @@
 // 右上角主题菜单：浅色/深色/跟随系统三态下拉（规格 §2 决策 1）。
 //
-// 与 LangSwitch 不同，这里没有用原生 <details>——三态需要「当前生效项打勾」这种
-// 比链接列表更强的语义，照原型走 button + role="menu" 的可达性模式（aria-haspopup/
-// aria-expanded/role=menuitem/aria-current），自己管开合状态、点外部与 Esc 关闭。
-// 状态推导（偏好 → 生效主题）是纯函数，放在 ../theme 里单独测试，这里只接 DOM。
+// 三态需要「当前生效项打勾」这种比链接列表更强的语义，照原型走 button + role="menu"
+// 的可达性模式（aria-haspopup/aria-expanded/role=menuitem/aria-current），自己管
+// 开合状态、点外部与 Esc 关闭。状态推导（偏好 → 生效主题）是纯函数，放在 ../theme
+// 里单独测试，这里只接 DOM。
 
 import { useEffect, useRef, useState } from "react";
 

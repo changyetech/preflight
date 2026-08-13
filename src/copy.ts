@@ -40,6 +40,16 @@ export function localeOf(lang: Lang): Locale {
 }
 
 /**
+ * 语言切换器单键直切（规格 §2 决策 8）：只有两个语种时，「另一个」就是切换目标，
+ * 从 LOCALES 派生而非硬编码路径。找不到同样只可能是表被改坏，属于开发期错误。
+ */
+export function otherLocale(lang: Lang): Locale {
+  const hit = LOCALES.find((locale) => locale.id !== lang);
+  if (!hit) throw new Error(`no other locale for: ${lang}`);
+  return hit;
+}
+
+/**
  * 语言取自路径首段：`/zh-hans`，其余（含 `/` 与已删除的 `/en`）为英文。
  * 不做 Accept-Language 自动跳转（规格第 7 节）。
  */

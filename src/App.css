@@ -193,58 +193,12 @@ article[id] {
 }
 
 /* ---------- 语言切换 ---------- */
-
-.lang-menu {
-  position: relative;
-  flex: none;
-}
-
-/* summary 默认带三角 marker，两种浏览器各去一次 */
-.lang-switch::-webkit-details-marker {
-  display: none;
-}
-
-.lang-menu-list {
-  position: absolute;
-  /* 逻辑属性：RTL（阿拉伯语）下菜单自动贴左，不必写方向分支 */
-  inset-inline-end: 0;
-  z-index: 20;
-  min-width: 9rem;
-  margin: 0.35rem 0 0;
-  padding: 0.25rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg);
-  box-shadow: var(--shadow);
-  list-style: none;
-}
-
-.lang-menu-list a {
-  display: block;
-  padding: 0.35rem 0.6rem;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  color: var(--text);
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.lang-menu-list a:hover {
-  background: var(--chip-bg);
-  color: var(--text-h);
-}
-
-/* 当前语言在菜单里要看得出来，光靠 aria-current 只有读屏用户能感知 */
-.lang-menu-list a[aria-current] {
-  background: var(--accent-bg);
-  color: var(--accent);
-}
+/* 单键直切（规格 §2 决策 8）：真 <a href>，样式量级照抄主题切换（同属顶栏工具组），
+   但不需要弹层——点击即整页导航到另一语种。 */
 
 .lang-switch {
   display: inline-flex;
   flex: none;
-  /* details 的 summary 默认是 list-item，去掉标记后才能当按钮排版 */
-  list-style: none;
   cursor: pointer;
   align-items: center;
   gap: 0.35rem;

@@ -12,7 +12,7 @@ export const ZH_HANS: Copy = {
   },
 
   nav: {
-    language: "语言",
+    switchLanguageTo: "切换语言到",
     skipToContent: "跳到主要内容",
     brand: "ipcheck",
     checks: "网页检测",

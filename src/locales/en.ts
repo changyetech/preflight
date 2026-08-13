@@ -10,8 +10,9 @@ export const EN = {
   },
 
   nav: {
-    /** 右上角语言菜单的标签（规格第 7 节）。各语言的自称写在 LOCALES 表里，不在文案里翻译。 */
-    language: "Language",
+    /** 语言切换器无障碍名称的前缀，后接目标语种自称（在 LOCALES 表里，不在文案里翻译），
+     *  拼成「Switch language to 简体中文」（规格 §2 决策 8：单键直切）。 */
+    switchLanguageTo: "Switch language to",
     /** 跳过导航链接（规格 §4 要点 6）：键盘用户可跳过顶栏 5 个锚点直达正文。 */
     skipToContent: "Skip to main content",
     /** 顶栏品牌名与锚点标签：短于 landing 各段标题，顶栏放不下长标题。 */
