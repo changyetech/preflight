@@ -232,7 +232,7 @@ fn udp_not_comparable_reason(result: &udp_egress::UdpEgress) -> Option<&'static 
 mod tests {
     use super::*;
     use crate::domain::checks::Failure;
-    use crate::probe::{ExitInfo, Risk, TimezoneCheck, proxycheck, stopforumspam};
+    use crate::probe::{ExitInfo, Risk, TimezoneCheck, dns, proxycheck, stopforumspam};
 
     fn blank() -> Report {
         Report {
@@ -439,5 +439,491 @@ mod tests {
         let rendered = report(&r).to_string().to_lowercase();
         assert!(!rendered.contains("key"), "{rendered}");
         assert!(!rendered.contains("secret"));
+    }
+
+    // O5／O6 三种「无从比对」成因里，上面只覆盖了各一种（noEcs / stunDisagree）。
+    // 补齐剩下的，免得某个成因的映射改错也没有测试能发现。
+
+    #[test]
+    fn dns_egress_not_comparable_unmapped_country_is_reported() {
+        let mut r = blank();
+        r.o5 = Outcome::Done(dns_egress::DnsEgress {
+            resolver_geo: None,
+            comparison: dns_egress::Comparison::NotComparable(
+                dns_egress::NotComparable::UnmappedCountry,
+            ),
+        });
+        let out = report(&r);
+        assert_eq!(
+            out["checks"]["O5"]["notComparableReason"],
+            "unmappedCountry"
+        );
+    }
+
+    #[test]
+    fn dns_egress_not_comparable_unknown_exit_country_is_reported() {
+        let mut r = blank();
+        r.o5 = Outcome::Done(dns_egress::DnsEgress {
+            resolver_geo: None,
+            comparison: dns_egress::Comparison::NotComparable(
+                dns_egress::NotComparable::UnknownExitCountry,
+            ),
+        });
+        let out = report(&r);
+        assert_eq!(
+            out["checks"]["O5"]["notComparableReason"],
+            "unknownExitCountry"
+        );
+    }
+
+    #[test]
+    fn udp_egress_not_comparable_family_mismatch_is_reported() {
+        let mut r = blank();
+        r.o6 = Outcome::Done(udp_egress::UdpEgress::NotComparable(
+            udp_egress::NotComparable::FamilyMismatch,
+        ));
+        let out = report(&r);
+        assert_eq!(out["checks"]["O6"]["notComparableReason"], "familyMismatch");
+    }
+
+    #[test]
+    fn udp_egress_not_comparable_unknown_exit_ip_is_reported() {
+        let mut r = blank();
+        r.o6 = Outcome::Done(udp_egress::UdpEgress::NotComparable(
+            udp_egress::NotComparable::UnknownExitIp,
+        ));
+        let out = report(&r);
+        assert_eq!(out["checks"]["O6"]["notComparableReason"], "unknownExitIp");
+    }
+
+    // ------------------------------------------------------------------
+    // 冻结基线：改版前 `--json` 输出的整份负载快照。
+    //
+    // 与上面的字段级测试不同，这里每条用例断言的是**整个 `report()` 返回值**，
+    // 逐字段、逐检测项。任何一次渲染层改动（render.rs / copy/）如果不小心
+    // 让某个字段漏进/漏出/改名/改类型，这里必须转红——这正是本组测试存在
+    // 的唯一理由（task-C1）。
+    //
+    // 场景选择参照 docs/verdict-cases.json 里 `applies` 含 "cli" 的用例（该文件
+    // 是判级契约 signals 层面的 golden 向量，没有携带 IP / geo / DNS 服务器等
+    // 呈现层字段，因此不能直接当 fixture 用；这里按其覆盖的信号组合重新构造
+    // 完整的 `Report`，覆盖度对照见 report.md）：
+    //   - insufficient（全部失败）
+    //   - preliminary·low（O4 配额耗尽，其余测完且干净）
+    //   - full·low（10 项全测、全干净）
+    //   - full·medium（IPv6 泄露）
+    //   - full·high，anonymous=true 且 riskScore=51（契约 3.1 的「结论高但原始
+    //     分数仍在 51–75」边界——JSON 里 riskScore 必须原样是 51，不能被判级
+    //     阈值污染）
+    //   - full·high，anonymous=false 且 riskScore=76（对照上一条的非匿名阈值）
+    //   - full·medium，abuseListed 与 tunOff 同时命中
+
+    fn clean_geo() -> proxycheck::Geo {
+        proxycheck::Geo {
+            country_name: Some("United States".into()),
+            country_code: Some("US".into()),
+            region_name: Some("California".into()),
+            city_name: Some("Los Angeles".into()),
+            timezone: Some("America/Los_Angeles".into()),
+            asn: Some("AS15169".into()),
+            organisation: Some("Example Org".into()),
+            provider: Some("Example Cloud".into()),
+        }
+    }
+
+    /// 10 项全测、全干净的基线报告：riskScore 10、anonymous false、无任何异常信号。
+    /// 各场景在此基础上只改动与该场景相关的字段。
+    fn full_clean() -> Report {
+        Report {
+            o1: Outcome::Done(ExitInfo {
+                ip: "203.0.113.10".into(),
+                geo: Some(clean_geo()),
+            }),
+            o2: Outcome::Done(TimezoneCheck {
+                local: Some("America/Los_Angeles".into()),
+                exit: Some("America/Los_Angeles".into()),
+                matches: Some(true),
+            }),
+            o3: Outcome::Done(ipify::Ipv6::Disabled),
+            o4: Outcome::Done(Risk {
+                risk: proxycheck::Risk {
+                    network_type: Some("Residential".into()),
+                    proxy: false,
+                    vpn: false,
+                    tor: false,
+                    scraper: false,
+                    risk_score: 10,
+                    anonymous: false,
+                },
+                abuse: Some(stopforumspam::Abuse {
+                    listed: false,
+                    frequency: 0,
+                    last_seen: None,
+                }),
+            }),
+            o5: Outcome::Done(dns_egress::DnsEgress {
+                resolver_geo: Some("United States - Google LLC".into()),
+                comparison: dns_egress::Comparison::Comparable {
+                    leak: false,
+                    ecs_country: "US".into(),
+                    exit_country: "US".into(),
+                },
+            }),
+            o6: Outcome::Done(udp_egress::UdpEgress::Comparable {
+                mismatch: false,
+                reflexive_ip: "203.0.113.10".parse().unwrap(),
+                exit_ip: "203.0.113.10".parse().unwrap(),
+            }),
+            c1: Outcome::Done("198.51.100.5".into()),
+            c2: Outcome::Done(vec![
+                dns::Server {
+                    address: "192.168.1.1".into(),
+                    label: Some("Router"),
+                    private: true,
+                    domestic: true,
+                },
+                dns::Server {
+                    address: "8.8.8.8".into(),
+                    label: Some("Google Public DNS"),
+                    private: false,
+                    domestic: false,
+                },
+            ]),
+            c3: Outcome::Done(proxy::Status {
+                env_vars: Vec::new(),
+                system: proxy::State::Disabled,
+                system_kinds: Vec::new(),
+                tun: proxy::State::Enabled,
+            }),
+            c4: Outcome::Done(TimezoneCheck {
+                local: Some("America/Los_Angeles".into()),
+                exit: Some("America/Los_Angeles".into()),
+                matches: Some(true),
+            }),
+        }
+    }
+
+    fn clean_geo_json() -> Value {
+        json!({
+            "countryName": "United States",
+            "countryCode": "US",
+            "regionName": "California",
+            "cityName": "Los Angeles",
+            "timezone": "America/Los_Angeles",
+            "asn": "AS15169",
+            "organisation": "Example Org",
+            "provider": "Example Cloud",
+        })
+    }
+
+    /// `full_clean()` 对应的整份期望负载，其余快照用例以此为基础按需覆写字段。
+    fn full_clean_json() -> Value {
+        json!({
+            "verdict": { "stage": "full", "level": "low" },
+            "coverage": { "done": 10, "failed": 0, "total": TOTAL_CHECKS },
+            "signals": {
+                "tzMismatchCliEnv": false,
+                "tzMismatchSystem": false,
+                "ipv6Leak": false,
+                "riskScore": 10,
+                "anonymous": false,
+                "abuseListed": false,
+                "dnsEgressLeak": false,
+                "udpEgressMismatch": false,
+                "tunOff": false,
+            },
+            "checks": {
+                "O1": {
+                    "status": "done",
+                    "ip": "203.0.113.10",
+                    "geoSource": "proxycheck",
+                    "geo": clean_geo_json(),
+                },
+                "O2": {
+                    "status": "done",
+                    "local": "America/Los_Angeles",
+                    "exit": "America/Los_Angeles",
+                    "match": true,
+                },
+                "O3": { "status": "done", "leak": false, "address": null },
+                "O4": {
+                    "status": "done",
+                    "networkType": "Residential",
+                    "proxy": false,
+                    "vpn": false,
+                    "tor": false,
+                    "scraper": false,
+                    "riskScore": 10,
+                    "anonymous": false,
+                    "abuseListed": false,
+                    "abuseFrequency": 0,
+                    "abuseLastSeen": null,
+                },
+                "O5": {
+                    "status": "done",
+                    "resolverGeo": "United States - Google LLC",
+                    "leak": false,
+                    "ecsCountry": "US",
+                    "exitCountry": "US",
+                    "notComparableReason": null,
+                },
+                "O6": {
+                    "status": "done",
+                    "mismatch": false,
+                    "reflexiveIp": "203.0.113.10",
+                    "exitIp": "203.0.113.10",
+                    "notComparableReason": null,
+                },
+                "C1": { "status": "done", "ip": "198.51.100.5" },
+                "C2": {
+                    "status": "done",
+                    "servers": [
+                        {
+                            "address": "192.168.1.1",
+                            "provider": "Router",
+                            "private": true,
+                            "domestic": true,
+                        },
+                        {
+                            "address": "8.8.8.8",
+                            "provider": "Google Public DNS",
+                            "private": false,
+                            "domestic": false,
+                        },
+                    ],
+                    "domestic": true,
+                },
+                "C3": {
+                    "status": "done",
+                    "envVars": [],
+                    "envProxy": "off",
+                    "systemProxy": "off",
+                    "systemProxyKinds": [],
+                    "tun": "on",
+                },
+                "C4": {
+                    "status": "done",
+                    "local": "America/Los_Angeles",
+                    "exit": "America/Los_Angeles",
+                    "match": true,
+                },
+            },
+        })
+    }
+
+    #[test]
+    fn snapshot_insufficient_when_every_check_fails() {
+        let out = report(&blank());
+        let expected = json!({
+            "verdict": { "stage": "insufficient", "level": null },
+            "coverage": { "done": 0, "failed": TOTAL_CHECKS, "total": TOTAL_CHECKS },
+            "signals": {
+                "tzMismatchCliEnv": null,
+                "tzMismatchSystem": null,
+                "ipv6Leak": null,
+                "riskScore": null,
+                "anonymous": null,
+                "abuseListed": null,
+                "dnsEgressLeak": null,
+                "udpEgressMismatch": null,
+                "tunOff": null,
+            },
+            "checks": {
+                "O1": { "status": "failed", "reason": "upstream" },
+                "O2": { "status": "failed", "reason": "upstream" },
+                "O3": { "status": "failed", "reason": "upstream" },
+                "O4": { "status": "failed", "reason": "quotaExhausted" },
+                "O5": { "status": "failed", "reason": "upstream" },
+                "O6": { "status": "failed", "reason": "upstream" },
+                "C1": { "status": "failed", "reason": "upstream" },
+                "C2": { "status": "failed", "reason": "local" },
+                "C3": { "status": "failed", "reason": "local" },
+                "C4": { "status": "failed", "reason": "upstream" },
+            },
+        });
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn snapshot_preliminary_low_when_o4_quota_exhausted_but_the_rest_is_clean() {
+        let mut r = full_clean();
+        r.o4 = Outcome::Failed(Failure::QuotaExhausted);
+        let out = report(&r);
+
+        let mut expected = full_clean_json();
+        expected["verdict"] = json!({ "stage": "preliminary", "level": "low" });
+        expected["coverage"] = json!({ "done": 9, "failed": 1, "total": TOTAL_CHECKS });
+        expected["signals"]["riskScore"] = Value::Null;
+        expected["signals"]["anonymous"] = Value::Null;
+        expected["signals"]["abuseListed"] = Value::Null;
+        expected["checks"]["O4"] = json!({ "status": "failed", "reason": "quotaExhausted" });
+
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn snapshot_full_low_when_everything_is_clean() {
+        let out = report(&full_clean());
+        assert_eq!(out, full_clean_json());
+    }
+
+    #[test]
+    fn snapshot_full_medium_when_ipv6_leaks() {
+        let mut r = full_clean();
+        r.o3 = Outcome::Done(ipify::Ipv6::Leaked("2001:db8::42".into()));
+        let out = report(&r);
+
+        let mut expected = full_clean_json();
+        expected["verdict"] = json!({ "stage": "full", "level": "medium" });
+        expected["signals"]["ipv6Leak"] = json!(true);
+        expected["checks"]["O3"] = json!({
+            "status": "done",
+            "leak": true,
+            "address": "2001:db8::42",
+        });
+
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn snapshot_full_high_anonymous_at_51_keeps_the_raw_score_visible() {
+        // 契约 3.1：anonymous=true 时综合结论从 51 起判高，但分项阈值仍是 76——
+        // JSON 里的 riskScore 必须原样是 51，不能被综合结论「高」污染成 76 或某个等级字面量。
+        let mut r = full_clean();
+        r.o4 = Outcome::Done(Risk {
+            risk: proxycheck::Risk {
+                network_type: Some("Residential".into()),
+                proxy: false,
+                vpn: false,
+                tor: true,
+                scraper: false,
+                risk_score: 51,
+                anonymous: true,
+            },
+            abuse: Some(stopforumspam::Abuse {
+                listed: false,
+                frequency: 0,
+                last_seen: None,
+            }),
+        });
+        let out = report(&r);
+
+        let mut expected = full_clean_json();
+        expected["verdict"] = json!({ "stage": "full", "level": "high" });
+        expected["signals"]["riskScore"] = json!(51);
+        expected["signals"]["anonymous"] = json!(true);
+        expected["checks"]["O4"] = json!({
+            "status": "done",
+            "networkType": "Residential",
+            "proxy": false,
+            "vpn": false,
+            "tor": true,
+            "scraper": false,
+            "riskScore": 51,
+            "anonymous": true,
+            "abuseListed": false,
+            "abuseFrequency": 0,
+            "abuseLastSeen": null,
+        });
+
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn snapshot_full_high_not_anonymous_at_76() {
+        let mut r = full_clean();
+        r.o4 = Outcome::Done(Risk {
+            risk: proxycheck::Risk {
+                network_type: Some("Residential".into()),
+                proxy: false,
+                vpn: false,
+                tor: false,
+                scraper: false,
+                risk_score: 76,
+                anonymous: false,
+            },
+            abuse: Some(stopforumspam::Abuse {
+                listed: false,
+                frequency: 0,
+                last_seen: None,
+            }),
+        });
+        let out = report(&r);
+
+        let mut expected = full_clean_json();
+        expected["verdict"] = json!({ "stage": "full", "level": "high" });
+        expected["signals"]["riskScore"] = json!(76);
+        expected["checks"]["O4"] = json!({
+            "status": "done",
+            "networkType": "Residential",
+            "proxy": false,
+            "vpn": false,
+            "tor": false,
+            "scraper": false,
+            "riskScore": 76,
+            "anonymous": false,
+            "abuseListed": false,
+            "abuseFrequency": 0,
+            "abuseLastSeen": null,
+        });
+
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn snapshot_full_medium_when_abuse_listed_and_tun_off_both_fire() {
+        let mut r = full_clean();
+        r.o4 = Outcome::Done(Risk {
+            risk: proxycheck::Risk {
+                network_type: Some("Residential".into()),
+                proxy: false,
+                vpn: false,
+                tor: false,
+                scraper: false,
+                risk_score: 10,
+                anonymous: false,
+            },
+            abuse: Some(stopforumspam::Abuse {
+                listed: true,
+                frequency: 5,
+                last_seen: Some("2026-01-01".into()),
+            }),
+        });
+        // 存在代理迹象（环境变量代理）且 TUN 明确未开启 ⇒ tunOff = Some(true)（契约 2.7）。
+        r.c3 = Outcome::Done(proxy::Status {
+            env_vars: vec!["HTTPS_PROXY".into()],
+            system: proxy::State::Disabled,
+            system_kinds: Vec::new(),
+            tun: proxy::State::Disabled,
+        });
+        let out = report(&r);
+
+        let mut expected = full_clean_json();
+        expected["verdict"] = json!({ "stage": "full", "level": "medium" });
+        expected["signals"]["abuseListed"] = json!(true);
+        expected["signals"]["tunOff"] = json!(true);
+        expected["checks"]["O4"] = json!({
+            "status": "done",
+            "networkType": "Residential",
+            "proxy": false,
+            "vpn": false,
+            "tor": false,
+            "scraper": false,
+            "riskScore": 10,
+            "anonymous": false,
+            "abuseListed": true,
+            "abuseFrequency": 5,
+            "abuseLastSeen": "2026-01-01",
+        });
+        expected["checks"]["C3"] = json!({
+            "status": "done",
+            "envVars": ["HTTPS_PROXY"],
+            "envProxy": "on",
+            "systemProxy": "off",
+            "systemProxyKinds": [],
+            "tun": "off",
+        });
+
+        assert_eq!(out, expected);
     }
 }
