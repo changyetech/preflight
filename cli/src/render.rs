@@ -157,7 +157,29 @@ pub fn report(report: &Report, text: &Text, style: &Style, verbose: bool) -> Str
     }
     let _ = writeln!(out);
 
+    render_footer(&mut out, text, style);
+
     out
+}
+
+/// 页脚提示行（design：`.footer-hint`）。命令字面量以 `main.rs` 的 `Cli`/
+/// `Command`/`ConfigAction`/`SettableKey` 定义为准：`--verbose`/`--json` 是
+/// 顶层 flag，`config set proxycheck-key` 是 `SettableKey` 目前唯一枚举的键。
+/// 只在 `render::report` 里调用——`--json` 走 `json::report`，完全不经过这里，
+/// 提示行天然不会混进机器可读输出。
+fn render_footer(out: &mut String, text: &Text, style: &Style) {
+    let f = &text.footer;
+    let _ = writeln!(
+        out,
+        "  ipcheck --verbose  {}  ·  ipcheck --json  {}",
+        style.tone(Tone::Dim, f.verbose_hint),
+        style.tone(Tone::Dim, f.json_hint)
+    );
+    let _ = writeln!(
+        out,
+        "  ipcheck config set proxycheck-key  {}",
+        style.tone(Tone::Dim, f.quota_hint)
+    );
 }
 
 fn render_verdict(

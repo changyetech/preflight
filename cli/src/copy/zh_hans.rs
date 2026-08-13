@@ -3,7 +3,7 @@
 
 use super::{
     C4FixText, CheckText, ChecksText, ConfigText, CoverageText, DnsEgressText, ErrorText,
-    FailureText, NoteText, O1FieldsText, Text, UdpEgressText, ValueText, VerdictText,
+    FailureText, FooterText, NoteText, O1FieldsText, Text, UdpEgressText, ValueText, VerdictText,
 };
 
 pub const ZH_HANS: Text = Text {
@@ -149,6 +149,12 @@ pub const ZH_HANS: Text = Text {
         geo_source: "归属数据来自 proxycheck；网页版用的是 Cloudflare 的地理库，两者可能对不上。",
         o2_desktop_only: "本项对应图形界面应用（跟随系统时区）。命令行工具认的是 $TZ，那是下面的 C4。",
         quota_shared: "无 key 时 proxycheck 每天 100 次，按出口 IP 计——与同一代理节点上的其他人共享。执行 `ipcheck config set proxycheck-key` 可提升到 1000 次。",
+    },
+
+    footer: FooterText {
+        verbose_hint: "逐项说明",
+        json_hint: "机器可读输出",
+        quota_hint: "proxycheck 日配额 100 → 1000",
     },
 
     dns_egress: DnsEgressText {

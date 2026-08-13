@@ -6,7 +6,7 @@
 
 use super::{
     C4FixText, CheckText, ChecksText, ConfigText, CoverageText, DnsEgressText, ErrorText,
-    FailureText, NoteText, O1FieldsText, Text, UdpEgressText, ValueText, VerdictText,
+    FailureText, FooterText, NoteText, O1FieldsText, Text, UdpEgressText, ValueText, VerdictText,
 };
 
 pub const EN: Text = Text {
@@ -153,6 +153,12 @@ pub const EN: Text = Text {
         geo_source: "Ownership data comes from proxycheck. The website uses Cloudflare's database, so the two can disagree.",
         o2_desktop_only: "This one covers GUI apps, which follow the system timezone. Command-line tools read $TZ instead — that is C4 below.",
         quota_shared: "Without an API key proxycheck allows 100 queries per day, counted per exit IP — you share it with anyone else on the same proxy node. Run `ipcheck config set proxycheck-key` to raise it to 1,000.",
+    },
+
+    footer: FooterText {
+        verbose_hint: "explain every check",
+        json_hint: "machine-readable output",
+        quota_hint: "proxycheck quota 100/day → 1,000/day",
     },
 
     dns_egress: DnsEgressText {

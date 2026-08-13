@@ -229,6 +229,20 @@ copy_leaf! {
 }
 
 copy_leaf! {
+    /// 页脚提示行（design：`.footer-hint`）。命令本身（`ipcheck --verbose` 等）
+    /// 是字面 CLI 语法，不随语种变化，写死在 `render.rs`；这里只放随语种变化的
+    /// 说明词。
+    FooterText {
+        /// `ipcheck --verbose` 之后的说明词。
+        verbose_hint,
+        /// `ipcheck --json` 之后的说明词。
+        json_hint,
+        /// `ipcheck config set proxycheck-key` 之后的配额提示。
+        quota_hint,
+    }
+}
+
+copy_leaf! {
     /// 契约要求必须出现在屏幕上的说明，删掉就是回退。
     NoteText {
         /// 契约 5.4：归属来自 proxycheck，不是 Cloudflare，两端可能对不上。
@@ -288,6 +302,7 @@ copy_node! {
         values: ValueText,
         failures: FailureText,
         notes: NoteText,
+        footer: FooterText,
         dns_egress: DnsEgressText,
         udp_egress: UdpEgressText,
     }
