@@ -36,6 +36,25 @@ main:focus {
   transform: translateY(0);
 }
 
+/* ---------- 可达性：统一焦点环兜底 + reduced-motion 全站核查 ---------- */
+/* 顶栏几个控件（skip/lang-switch/theme-switch/back-to-top）各自定制过焦点环；
+   其余交互元素（品牌链接、导航锚点、主题菜单项、卡片重试/复制/同意按钮、折叠说明）
+   还在吃浏览器默认焦点环，深色主题下对比度不够，统一兜底成同一条 accent 环（W6 走查）。 */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* skip 链接聚焦时靠 translateY 位移落下，是全站唯二的真实位移动画之一
+     （另一处是回顶按钮，已在下面单独覆盖）——W6 走查发现的缺口，此前未覆盖。 */
+  .skip {
+    transition: none;
+  }
+}
+
 /* ---------- 顶部 sticky 导航 ---------- */
 
 .nav {

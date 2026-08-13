@@ -51,15 +51,30 @@ function asnOf(geo: GeoData, unknown: string): string {
 }
 
 /**
- * 10 格覆盖度 meter（规格 §4 要点 5）。纯装饰：格子数组已经从 PanelState 派生
- * （见 src/coverageMeter.ts），色块信息与紧邻的 CoverageChips 完全重复——那里的每个数字
- * 都是可读文本节点，读屏设备已经拿得到同样的信息，meter 再重复播报一遍只会增加噪音，
- * 因此标 aria-hidden 而不是照抄原型的 role="img" + 手拼一句话（那句话得靠标点粘出来，
- * 与「文案不写死在 JSX 里」冲突，而 chips 已经如实覆盖了同一份信息）。
+ * 10 格覆盖度 meter（规格 §4 要点 5 / W6 可达性走查，原型 refs/ipcheck-web-redesign.html:837
+ * 的 `role="img" aria-label="覆盖度分布"`，动态描述取自同处 `meter.setAttribute("aria-label", ...)`）。
+ * 10 个色块对屏幕阅读器就是一张图，必须有随状态更新的文字描述，标 aria-hidden 会让这块信息
+ * 对读屏用户整段消失。文字描述不写死在 JSX 里，而是拼接 CoverageChips 已在用的同一批
+ * 两语种 Copy 片段（coverage.total/done/needCli/failed/pending）+ 数字，不新增文案键。
  */
-function CoverageMeter({ cells }: { cells: CoverageCell[] }) {
+function CoverageMeter({
+  copy,
+  coverage,
+  cells,
+}: {
+  copy: Copy;
+  coverage: Coverage;
+  cells: CoverageCell[];
+}) {
+  const label = [
+    `${copy.coverage.total}: ${copy.coverage.done} ${coverage.done}`,
+    `${copy.coverage.needCli} ${coverage.needCli}`,
+    `${copy.coverage.failed} ${coverage.failed}`,
+    `${copy.coverage.pending} ${coverage.pending}`,
+  ].join(", ");
+
   return (
-    <div className="cov-meter" aria-hidden="true">
+    <div className="cov-meter" role="img" aria-label={label}>
       {cells.map((cell, i) => (
         <span key={i} className={`cov-cell is-${cell}`} />
       ))}
@@ -113,7 +128,7 @@ function CoverageSection({
   return (
     <div className="cov">
       <p className="eyebrow">{copy.coverage.label}</p>
-      <CoverageMeter cells={cells} />
+      <CoverageMeter copy={copy} coverage={coverage} cells={cells} />
       <CoverageChips copy={copy} coverage={coverage} />
       <p className="cov-hint">{copy.coverage.hint}</p>
     </div>

@@ -97,6 +97,14 @@ export function ThemeSwitch() {
   const { pref, setPref } = useTheme();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  /** 关闭菜单并把焦点还给触发按钮——键盘用户按 Esc 或选中一项后，菜单项被 hidden 摘出
+   *  tab 序，焦点若不主动交还会直接丢给 body（可达性走查发现的缺口，W6）。 */
+  function closeAndRefocus() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
 
   // 点击菜单外部或按 Esc 关闭——菜单是低频弹层，不必用全局单例管理器（当前只有这一个）。
   useEffect(() => {
@@ -105,7 +113,7 @@ export function ThemeSwitch() {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") closeAndRefocus();
     };
     document.addEventListener("click", onDocClick);
     document.addEventListener("keydown", onKeyDown);
@@ -121,6 +129,7 @@ export function ThemeSwitch() {
   return (
     <div className="theme-menu" ref={rootRef}>
       <button
+        ref={triggerRef}
         type="button"
         className="theme-switch"
         aria-haspopup="true"
@@ -143,7 +152,7 @@ export function ThemeSwitch() {
               aria-current={opt === pref ? "true" : undefined}
               onClick={() => {
                 setPref(opt);
-                setOpen(false);
+                closeAndRefocus();
               }}
             >
               <span className="theme-menu-item-label">
