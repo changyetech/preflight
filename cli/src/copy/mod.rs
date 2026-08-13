@@ -215,7 +215,6 @@ copy_leaf! {
         risk_level_high,
         /// 「仅供参考」短标签（如 O5 resolver 归属旁的 pill），与整句
         /// `dns_egress.resolver_note` 并存，不是同一样东西的重复定义。
-        #[allow(dead_code)]
         reference_only,
     }
 }

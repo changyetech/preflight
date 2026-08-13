@@ -847,14 +847,17 @@ fn card_o5(outcome: &Outcome<dns_egress::DnsEgress>, text: &Text) -> Card {
     };
 
     // resolver 归属始终展示（与 §5.1 里 CLI 同时展示 $TZ 与系统时区同构），
-    // 但 notes 明确标出只有上面的 ECS 判定进综合结论。
+    // 挂一个「仅供参考」pill 在值旁边（原型 refs/cli-report-redesign.html:392-394
+    // 的位置关系）；notes 里的 resolver_note 整句保留不动——两者并存是原型的
+    // 设计，不是待消除的重复：pill 挂在值本身供扫读，note 是解释句供细读。
     values.push(format!(
-        "{}  {}",
+        "{}  {}  {}",
         dt.resolver_label,
         result
             .resolver_geo
             .as_deref()
             .unwrap_or(text.values.unknown),
+        text.values.reference_only,
     ));
 
     Card {
@@ -1247,6 +1250,36 @@ mod tests {
         assert!(out.contains("JP"), "{out}");
         assert!(out.contains("US"), "{out}");
         assert!(out.contains("Japan - Google LLC"), "{out}");
+        assert!(
+            dewrap(&out).contains(text.dns_egress.resolver_note),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn the_o5_card_shows_the_reference_only_pill_next_to_resolver_geo_and_keeps_the_note() {
+        // 设计权威 refs/cli-report-redesign.html:392-394：pill 与整句 note 并存，
+        // 不是同一件事的重复——pill 挂在值本身（扫读），note 是解释句（细读）。
+        let mut report = blank();
+        report.o5 = Outcome::Done(dns_egress::DnsEgress {
+            resolver_geo: Some("Japan - Google LLC".into()),
+            comparison: dns_egress::Comparison::Comparable {
+                leak: false,
+                ecs_country: "JP".into(),
+                exit_country: "JP".into(),
+            },
+        });
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+        // pill 绑定在 resolver 归属值这一行，具体文案字符串。
+        assert!(
+            out.contains(&format!(
+                "{}  Japan - Google LLC  {}",
+                text.dns_egress.resolver_label, text.values.reference_only
+            )),
+            "{out}"
+        );
+        // resolver_note 整句仍然在——两者并存，不是二选一。
         assert!(
             dewrap(&out).contains(text.dns_egress.resolver_note),
             "{out}"
