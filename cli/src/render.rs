@@ -10,9 +10,12 @@ use std::fmt::Write as _;
 
 use crate::copy::Text;
 use crate::domain::checks::{CheckId, Coverage, Failure, Outcome};
+use crate::domain::dns_servers::{Entry, Variant};
 use crate::domain::verdict::{self, Level, PreliminaryLevel, Verdict};
 use crate::domain::{dns_egress, udp_egress};
-use crate::probe::{ExitInfo, RealIp, Report, Risk, TimezoneCheck, dns, ipify, proxy, proxycheck};
+use crate::probe::{
+    ExitInfo, RealIp, Report, Risk, TimezoneCheck, dns, dns_check, ipify, proxy, proxycheck,
+};
 
 /// 分项的颜色语义。与综合结论无关（契约 6）。
 #[derive(Clone, Copy, PartialEq)]
@@ -216,6 +219,176 @@ struct CardFix {
     /// 修复行的标签（「建议」），与卡内标签列同样降 dim。
     label: &'static str,
     command: String,
+}
+
+/// `preflight dns` 的表格视图。
+pub fn dns_table(
+    entries: &[Entry],
+    results: Option<&[dns_check::CheckResult]>,
+    text: &Text,
+    style: &Style,
+) -> String {
+    let has_check = results.is_some();
+    let width = style.width();
+
+    // 窄屏判定：估算展开后的宽度，超了就把地区折进提供商列。
+    let longest_ip = entries
+        .iter()
+        .map(|e| display_width(&e.ip))
+        .max()
+        .unwrap_or(0);
+    let longest_name = entries
+        .iter()
+        .map(|e| display_width(&e.name))
+        .max()
+        .unwrap_or(0);
+    let unfolded_est = longest_ip
+        + 2
+        + longest_name
+        + 2
+        + 2
+        + 2
+        + display_width(text.dns_cmd.col_domestic)
+        + 2
+        + display_width(text.dns_cmd.variant_standard);
+    let fold_region = unfolded_est > width;
+
+    // 排序索引（--check 时按延迟升序，不通的排末尾）。
+    let indices: Vec<usize> = if let Some(results) = results {
+        let mut idx: Vec<usize> = (0..entries.len()).collect();
+        idx.sort_by_key(|&i| {
+            let r = &results[i];
+            match r.status {
+                dns_check::Status::Ok | dns_check::Status::Suspicious => {
+                    (0usize, r.latency.map(|d| d.as_millis()))
+                }
+                dns_check::Status::Unreachable => (1, Some(u128::MAX)),
+            }
+        });
+        idx
+    } else {
+        (0..entries.len()).collect()
+    };
+
+    // 构建 Matrix（header + data rows）。
+    let mut matrix: Vec<Vec<String>> = Vec::new();
+
+    // --- header ---
+    let mut hdr = Vec::new();
+    hdr.push(text.dns_cmd.col_ip.to_string());
+    hdr.push(text.dns_cmd.col_provider.to_string());
+    if !fold_region {
+        hdr.push(text.dns_cmd.col_region.to_string());
+    }
+    hdr.push(text.dns_cmd.col_domestic.to_string());
+    hdr.push(text.dns_cmd.col_variant.to_string());
+    if has_check {
+        hdr.push(text.dns_cmd.col_latency.to_string());
+        hdr.push(text.dns_cmd.col_status.to_string());
+    }
+    matrix.push(hdr);
+
+    // --- data ---
+    for &i in &indices {
+        let entry = &entries[i];
+        let mut row = Vec::new();
+
+        // IP
+        row.push(entry.ip.clone());
+
+        // Provider（折叠时把地区折进来）
+        row.push(if fold_region {
+            format!("{} ({})", entry.name, entry.region)
+        } else {
+            entry.name.clone()
+        });
+
+        // Region（折叠时省略）
+        if !fold_region {
+            row.push(entry.region.clone());
+        }
+
+        // Domestic
+        row.push(if entry.domestic {
+            text.dns_cmd.domestic_yes.to_string()
+        } else {
+            String::new()
+        });
+
+        // Variant
+        row.push(variant_label(entry.variant, text).to_string());
+
+        // Latency + Status（仅 --check）
+        if has_check {
+            let r = &results.unwrap()[i];
+            row.push(match r.latency {
+                Some(d) => format!("{} ms", d.as_millis()),
+                None => "-".to_string(),
+            });
+            row.push(match r.status {
+                dns_check::Status::Ok => style.tone(Tone::Ok, text.dns_cmd.check_ok),
+                dns_check::Status::Suspicious => {
+                    style.tone(Tone::Warn, text.dns_cmd.check_suspicious)
+                }
+                dns_check::Status::Unreachable => {
+                    style.tone(Tone::Bad, text.dns_cmd.check_unreachable)
+                }
+            });
+        }
+
+        matrix.push(row);
+    }
+
+    // 列宽：取每列 display_width 的最大值。
+    let num_cols = matrix[0].len();
+    let col_widths: Vec<usize> = (0..num_cols)
+        .map(|c| {
+            matrix
+                .iter()
+                .map(|r| display_width(&r[c]))
+                .max()
+                .unwrap_or(0)
+        })
+        .collect();
+
+    // 渲染。
+    let mut out = String::new();
+    let _ = writeln!(out);
+
+    // 发丝线分隔表头。
+    let sep = col_widths
+        .iter()
+        .map(|w| "─".repeat(*w))
+        .collect::<Vec<_>>()
+        .join("  ");
+    let _ = writeln!(out, "  {sep}");
+
+    for (row_idx, row) in matrix.iter().enumerate() {
+        let cells: Vec<String> = (0..num_cols)
+            .map(|c| pad_to(&row[c], col_widths[c]))
+            .collect();
+        let _ = writeln!(out, "  {}", cells.join("  "));
+
+        // 表头后补一根发丝线。
+        if row_idx == 0 {
+            let _ = writeln!(out, "  {sep}");
+        }
+    }
+
+    let _ = writeln!(out);
+    let _ = writeln!(out, "  {}", style.tone(Tone::Dim, text.dns_cmd.footer_hint));
+    let _ = writeln!(out);
+
+    out
+}
+
+fn variant_label(v: Variant, text: &Text) -> &'static str {
+    match v {
+        Variant::Standard => text.dns_cmd.variant_standard,
+        Variant::Security => text.dns_cmd.variant_security,
+        Variant::Family => text.dns_cmd.variant_family,
+        Variant::Adblock => text.dns_cmd.variant_adblock,
+    }
 }
 
 pub fn report(report: &Report, text: &Text, style: &Style, verbose: bool) -> String {

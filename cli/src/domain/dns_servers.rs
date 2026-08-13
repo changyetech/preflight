@@ -9,7 +9,7 @@
 use std::sync::OnceLock;
 
 /// DNS 服务商的过滤级别。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Variant {
     /// 普通解析，不做内容过滤。
@@ -23,7 +23,7 @@ pub enum Variant {
 }
 
 /// 注册表中的一条 DNS 服务商条目。
-#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct Entry {
     pub ip: String,
     /// 品牌名 / 专名，两语种共用不翻译。

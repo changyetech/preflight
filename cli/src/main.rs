@@ -62,6 +62,12 @@ enum Command {
         #[command(subcommand)]
         action: ConfigAction,
     },
+    /// List public DNS servers (optionally test reachability with --check)
+    Dns {
+        /// Test each server with a real DNS query
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -129,6 +135,7 @@ fn run() -> Result<i32> {
             run_config(action, &text, config_path.as_deref(), file, &settings)?;
             Ok(0)
         }
+        Some(Command::Dns { check }) => run_dns(&cli, &text, &settings, check),
         None => run_checkup(&cli, &text, &settings),
     }
 }
@@ -172,6 +179,47 @@ fn run_checkup(cli: &Cli, text: &Text, settings: &Settings) -> Result<i32> {
         domain::verdict::Verdict::Insufficient => EXIT_NO_VERDICT,
         _ => 0,
     })
+}
+
+fn run_dns(cli: &Cli, text: &Text, settings: &Settings, check: bool) -> Result<i32> {
+    let entries = domain::dns_servers::all();
+
+    let results = if check {
+        let interactive = std::io::stderr().is_terminal();
+        if interactive && !cli.json {
+            eprint!("{}\r", text.values.checking);
+            let _ = std::io::stderr().flush();
+        }
+        let r = probe::dns_check::check_all(entries, settings.timeout);
+        if interactive && !cli.json {
+            eprint!("\x1b[2K\r");
+            let _ = std::io::stderr().flush();
+        }
+        Some(r)
+    } else {
+        None
+    };
+
+    if cli.json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json::dns_servers(entries, results.as_deref()))?
+        );
+    } else {
+        let color = !settings.no_color && std::io::stdout().is_terminal();
+        let style = match terminal_size::terminal_size_of(std::io::stdout()) {
+            Some((terminal_size::Width(columns), _)) => {
+                render::Style::sized(color, columns as usize)
+            }
+            None => render::Style::new(color),
+        };
+        print!(
+            "{}",
+            render::dns_table(entries, results.as_deref(), text, &style)
+        );
+    }
+
+    Ok(0)
 }
 
 fn run_config(
@@ -318,6 +366,25 @@ mod tests {
     #[test]
     fn config_list_is_a_valid_subcommand() {
         assert!(Cli::try_parse_from(["preflight", "config", "list"]).is_ok());
+    }
+
+    #[test]
+    fn dns_subcommand_is_accepted() {
+        assert!(Cli::try_parse_from(["preflight", "dns"]).is_ok());
+        let cli = Cli::try_parse_from(["preflight", "dns"]).unwrap();
+        match cli.command {
+            Some(Command::Dns { check }) => assert!(!check),
+            _ => panic!("expected Dns command"),
+        }
+    }
+
+    #[test]
+    fn dns_check_flag_is_accepted() {
+        let cli = Cli::try_parse_from(["preflight", "dns", "--check"]).unwrap();
+        match cli.command {
+            Some(Command::Dns { check }) => assert!(check),
+            _ => panic!("expected Dns command"),
+        }
     }
 
     #[test]

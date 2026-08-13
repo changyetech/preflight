@@ -11,8 +11,47 @@
 use serde_json::{Value, json};
 
 use crate::domain::checks::{ALL_CHECKS, CheckId, Failure, Outcome, TOTAL_CHECKS};
+use crate::domain::dns_servers;
 use crate::domain::{dns_egress, udp_egress};
-use crate::probe::{Report, TimezoneCheck, ipify, proxy, proxycheck};
+use crate::probe::{Report, TimezoneCheck, dns_check, ipify, proxy, proxycheck};
+
+/// `preflight dns --json` 的独立 schema（spec §4.6）。不并入体检报告信封。
+pub fn dns_servers(
+    entries: &[dns_servers::Entry],
+    results: Option<&[dns_check::CheckResult]>,
+) -> Value {
+    let servers: Vec<Value> = entries
+        .iter()
+        .enumerate()
+        .map(|(i, entry)| {
+            let mut server = json!({
+                "ip": entry.ip,
+                "name": entry.name,
+                "region": entry.region,
+                "domestic": entry.domestic,
+                "variant": entry.variant,
+            });
+            if let Some(results) = results {
+                let r = &results[i];
+                server["check"] = json!({
+                    "reachable": r.status == dns_check::Status::Ok || r.status == dns_check::Status::Suspicious,
+                    "latency_ms": r.latency.map(|d| d.as_millis() as u64),
+                    "status": status_name(r.status),
+                });
+            }
+            server
+        })
+        .collect();
+    json!({ "servers": servers })
+}
+
+fn status_name(status: dns_check::Status) -> &'static str {
+    match status {
+        dns_check::Status::Ok => "ok",
+        dns_check::Status::Suspicious => "suspicious",
+        dns_check::Status::Unreachable => "unreachable",
+    }
+}
 
 fn failure_name(failure: Failure) -> &'static str {
     match failure {
@@ -945,5 +984,55 @@ mod tests {
         });
 
         assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn dns_json_without_check_has_no_check_key() {
+        let out = dns_servers(crate::domain::dns_servers::all(), None);
+        let servers = out["servers"].as_array().unwrap();
+        assert!(servers.len() == 27);
+        // 不带 --check 时，每个条目都没有 "check" 键。
+        for s in servers {
+            assert!(s.get("check").is_none(), "不应有 check 键");
+            assert!(s.get("ip").is_some());
+            assert!(s.get("variant").is_some());
+        }
+    }
+
+    #[test]
+    fn dns_json_with_check_has_status_and_latency() {
+        let entries = crate::domain::dns_servers::all();
+        let results: Vec<dns_check::CheckResult> = entries
+            .iter()
+            .enumerate()
+            .map(|(i, _)| dns_check::CheckResult {
+                status: if i % 3 == 0 {
+                    dns_check::Status::Ok
+                } else if i % 3 == 1 {
+                    dns_check::Status::Suspicious
+                } else {
+                    dns_check::Status::Unreachable
+                },
+                latency: if i % 3 == 0 {
+                    Some(std::time::Duration::from_millis(12 * (i as u64 + 1)))
+                } else {
+                    None
+                },
+            })
+            .collect();
+        let out = dns_servers(entries, Some(&results));
+        let servers = out["servers"].as_array().unwrap();
+        let first = &servers[0];
+        assert_eq!(first["check"]["status"], "ok");
+        assert!(first["check"]["latency_ms"].as_u64().is_some());
+        assert_eq!(first["check"]["reachable"], true);
+
+        let second = &servers[1];
+        assert_eq!(second["check"]["status"], "suspicious");
+        assert_eq!(second["check"]["reachable"], true);
+
+        let third = &servers[2];
+        assert_eq!(third["check"]["status"], "unreachable");
+        assert_eq!(third["check"]["reachable"], false);
     }
 }

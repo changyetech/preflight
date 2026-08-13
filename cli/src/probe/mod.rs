@@ -5,6 +5,7 @@
 //! 异步运行时带来的编译时间与二进制体积换不回任何东西。
 
 pub mod dns;
+pub mod dns_check;
 pub mod dns_egress;
 pub mod echo;
 pub mod http;

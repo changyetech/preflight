@@ -326,6 +326,44 @@ copy_leaf! {
     }
 }
 
+copy_leaf! {
+    /// `preflight dns` 命令的文案。列名、variant 取值、--check 状态词与引导句。
+    DnsCommandText {
+        /// 列名：IP 地址。
+        col_ip,
+        /// 列名：提供商（品牌名）。
+        col_provider,
+        /// 列名：地区。
+        col_region,
+        /// 列名：是否国内。
+        col_domestic,
+        /// 列名：用途（过滤级别）。
+        col_variant,
+        /// 列名：延迟（仅 --check）。
+        col_latency,
+        /// 列名：状态（仅 --check）。
+        col_status,
+        /// variant = standard：普通解析。
+        variant_standard,
+        /// variant = security：拦恶意/钓鱼。
+        variant_security,
+        /// variant = family：在 security 基础上再拦成人内容。
+        variant_family,
+        /// variant = adblock：拦广告/追踪。
+        variant_adblock,
+        /// 国内标记词。
+        domestic_yes,
+        /// --check 状态：通。
+        check_ok,
+        /// --check 状态：应答可疑。
+        check_suspicious,
+        /// --check 状态：不通。
+        check_unreachable,
+        /// 页脚引导句：用 `preflight dns --check` 实测。
+        footer_hint,
+    }
+}
+
 copy_node! {
     /// 全部文案。
     Text {
@@ -341,6 +379,7 @@ copy_node! {
         footer: FooterText,
         dns_egress: DnsEgressText,
         udp_egress: UdpEgressText,
+        dns_cmd: DnsCommandText,
     }
 }
 

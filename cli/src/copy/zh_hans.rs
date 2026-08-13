@@ -2,9 +2,9 @@
 //! 结构体强制译全，不存在字段级回落）。
 
 use super::{
-    C4FixText, CheckText, ChecksText, ConfigText, CoverageText, DnsEgressText, ErrorText,
-    FailureText, FooterText, GroupText, NoteText, O1FieldsText, Text, UdpEgressText, ValueText,
-    VerdictText,
+    C4FixText, CheckText, ChecksText, ConfigText, CoverageText, DnsCommandText, DnsEgressText,
+    ErrorText, FailureText, FooterText, GroupText, NoteText, O1FieldsText, Text, UdpEgressText,
+    ValueText, VerdictText,
 };
 
 pub const ZH_HANS: Text = Text {
@@ -199,5 +199,24 @@ pub const ZH_HANS: Text = Text {
         stun_disagree: "两个 STUN 服务器给出的地址不一致，没有一个可信的单一值可比——常见于多出口集群或对称 NAT。",
         state_match: "一致",
         state_mismatch: "不一致",
+    },
+
+    dns_cmd: DnsCommandText {
+        col_ip: "IP",
+        col_provider: "提供商",
+        col_region: "地区",
+        col_domestic: "国内",
+        col_variant: "用途",
+        col_latency: "延迟",
+        col_status: "状态",
+        variant_standard: "普通解析",
+        variant_security: "拦截恶意",
+        variant_family: "家庭保护",
+        variant_adblock: "拦截广告",
+        domestic_yes: "国内",
+        check_ok: "通",
+        check_suspicious: "应答可疑",
+        check_unreachable: "不通",
+        footer_hint: "用 `preflight dns --check` 实测哪些服务器在你这台机器上真正可用。",
     },
 };

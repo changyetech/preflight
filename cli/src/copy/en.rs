@@ -5,9 +5,9 @@
 //! O1–O6 的标题必须与 Preflight Web 的 `src/locales/en.ts` **逐字一致**（契约 1.1）。
 
 use super::{
-    C4FixText, CheckText, ChecksText, ConfigText, CoverageText, DnsEgressText, ErrorText,
-    FailureText, FooterText, GroupText, NoteText, O1FieldsText, Text, UdpEgressText, ValueText,
-    VerdictText,
+    C4FixText, CheckText, ChecksText, ConfigText, CoverageText, DnsCommandText, DnsEgressText,
+    ErrorText, FailureText, FooterText, GroupText, NoteText, O1FieldsText, Text, UdpEgressText,
+    ValueText, VerdictText,
 };
 
 pub const EN: Text = Text {
@@ -206,5 +206,24 @@ pub const EN: Text = Text {
         stun_disagree: "The two STUN servers reported different addresses, so there's no single reliable value to compare — this can happen with multi-exit clusters or symmetric NAT.",
         state_match: "match",
         state_mismatch: "mismatch",
+    },
+
+    dns_cmd: DnsCommandText {
+        col_ip: "IP",
+        col_provider: "Provider",
+        col_region: "Region",
+        col_domestic: "CN",
+        col_variant: "Filter",
+        col_latency: "Latency",
+        col_status: "Status",
+        variant_standard: "Standard",
+        variant_security: "Security",
+        variant_family: "Family",
+        variant_adblock: "Ad-block",
+        domestic_yes: "CN",
+        check_ok: "OK",
+        check_suspicious: "Suspicious",
+        check_unreachable: "Unreachable",
+        footer_hint: "Run `preflight dns --check` to test which servers actually work from here.",
     },
 };
