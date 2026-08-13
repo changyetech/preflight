@@ -2,18 +2,19 @@
 //
 // 分两组：
 // - 与语言无关的硬性内容（第三方域名、命令、$TZ 这类标识符）对**每个语种**断言——
-//   多语化之后，「某个语种漏译时把 proxycheck.io 的披露弄丢了」是新的失效方式，
-//   逐语种跑一遍才锁得住（未译语种走英文回落，同样必须带上这些披露）。
+//   语种终态只有 en + zh-hans 两份完整文案（规格 §2 决策 9：删除字段级回落，
+//   两语种都强制译全），逐语种跑一遍才锁得住。
 // - 措辞层面的要求（初步结论怎么标、失败不许说成安全、禁用词）按语言分别断言。
 
 import { describe, expect, it } from "vitest";
 
-import { COPY, COPY_ZH_HANS, LOCALES, getCopy } from "../src/copy";
+import { COPY, COPY_ZH_HANS } from "../src/copy";
 import { TOTAL_CHECKS } from "../src/domain/checks";
 
-describe.each(
-  LOCALES.map((locale) => [locale.id, getCopy(locale.id)] as const),
-)("受 ADR 约束的文案 · %s", (_id, copy) => {
+describe.each([
+  ["en", COPY] as const,
+  ["zh-hans", COPY_ZH_HANS] as const,
+])("受 ADR 约束的文案 · %s", (_id, copy) => {
   it("O4 触发按钮必须写明第三方调用对象（ADR-0008 / 规格 2.4）", () => {
     expect(copy.checks.O4.consentButton).toContain("proxycheck.io");
   });

@@ -1,5 +1,8 @@
 // 落地内容渲染断言（--content 计划步骤 1-3 / 5）：
 // 三段内容与对照表要真的渲染出来，且切到简体中文时用的是中文文案而不是默认的英文源。
+//
+// 语种终态只有 en + zh-hans 两份完整文案，字段级回落机制随收缩一起删除
+// （规格 §2 决策 9），因此不再断言「未译语种回落英文源」。
 
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -81,11 +84,6 @@ describe("落地内容三段", () => {
 
     expect(html).toContain(COPY.landing.why.title);
     expect(html).toContain(COPY.landing.compare.title);
-  });
-
-  // 未译语种走字段级回落：ru 目前一条未译，因此整页应与英文源逐字相同（规格第 7 节）。
-  it("未译语种回落英文源，而不是渲染出空文案", () => {
-    expect(renderLanding("ru")).toBe(renderLanding("en"));
   });
 
   // C1 修复的渲染层回归：CLI README.md 功能表里 O1-O6 与 C1-C4 全部 10 项 CLI 都测得到，
