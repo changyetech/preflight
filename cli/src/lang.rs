@@ -9,14 +9,12 @@
 
 use std::fmt;
 
-/// CLI 支持的语种。**不含 `ar`**——终端下 RTL 与 LTR 内容混排的 BiDi 处理各终端不一致。
-/// 网页版支持 5 种，CLI 是它的真子集。
+/// CLI 支持的语种。终态收缩为 en / zh-hans（ADR-0016）——
+/// 繁体中文、俄语、阿拉伯语均不再支持；阿拉伯语额外受终端 BiDi 渲染不一致所限。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Lang {
     En,
     ZhHans,
-    ZhHant,
-    Ru,
 }
 
 impl Lang {
@@ -24,15 +22,7 @@ impl Lang {
         match self {
             Lang::En => "en",
             Lang::ZhHans => "zh-hans",
-            Lang::ZhHant => "zh-hant",
-            Lang::Ru => "ru",
         }
-    }
-
-    /// 是否已译全。未译全的语种要打一行提示——网页悄悄回落英文没关系，
-    /// CLI 里用户配了却看到英文会像是坏了。
-    pub const fn is_fully_translated(self) -> bool {
-        matches!(self, Lang::En | Lang::ZhHans)
     }
 }
 
@@ -44,24 +34,18 @@ impl fmt::Display for Lang {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum LangError {
-    /// 显式请求了一个不认识的语种。
+    /// 显式请求了一个不支持的语种（包括已删除的 zh-hant / ru / ar）。
     Unknown(String),
-    /// 显式请求了阿拉伯语。单独成一档是因为它需要一个解释，而不是一句「未知语言」。
-    ArabicUnsupported,
 }
 
 /// 解析**显式请求**的语种（`--lang` 或配置文件）。认不出就报错——用户明确要了什么，
 /// 我们给别的东西是不行的。
 pub fn parse_explicit(value: &str) -> Result<Lang, LangError> {
-    match normalize(value) {
-        Some(lang) => Ok(lang),
-        None if is_arabic(value) => Err(LangError::ArabicUnsupported),
-        None => Err(LangError::Unknown(value.to_string())),
-    }
+    normalize(value).ok_or_else(|| LangError::Unknown(value.to_string()))
 }
 
 /// 从**系统 locale** 推断语种。系统 locale 是提示而非请求，认不出一律回落英文——
-/// 包括 `ar`：用户没有要求过阿拉伯语，不该因为系统是阿拉伯语就报错退出。
+/// 包括已删除的语种：用户没有要求过它们，不该因为系统 locale 落在那上面就报错退出。
 pub fn from_system_tag(tag: &str) -> Lang {
     normalize(tag).unwrap_or(Lang::En)
 }
@@ -99,9 +83,10 @@ pub fn system_tag() -> Option<String> {
     sys_locale::get_locale()
 }
 
-/// 把各种写法的语言标记归一到我们支持的四种。
+/// 把各种写法的语言标记归一到我们支持的两种。
 ///
-/// 认得 `zh-hans` / `zh_CN.UTF-8` / `zh-Hant-TW` / `ru_RU` / `en_US` 这类形态。
+/// 认得 `zh-hans` / `zh_CN.UTF-8` / `en_US` 这类形态。`zh-hant` / `zh-tw` / `zh-hk` / `zh-mo`
+/// 这些繁体标记**故意**归到「认不出」——繁体中文已随语种收缩删除，不再悄悄降级成简体。
 fn normalize(raw: &str) -> Option<Lang> {
     let tag = raw.trim().to_ascii_lowercase();
     // 砍掉 `.UTF-8` 之类的编码后缀与 `@modifier`。
@@ -117,13 +102,15 @@ fn normalize(raw: &str) -> Option<Lang> {
 
     match primary {
         // 繁体的判据是文字系统或地区，不是「不是简体就是繁体」——
-        // `zh` 单独出现（无地区）按简体处理，这是中文用户的多数情形。
-        "zh" => Some(if is_traditional(rest) {
-            Lang::ZhHant
-        } else {
-            Lang::ZhHans
-        }),
-        "ru" => Some(Lang::Ru),
+        // `zh` 单独出现（无地区）按简体处理，这是中文用户的多数情形；
+        // 带繁体标记的一律认不出，回落到 en（系统 locale）或报错（显式请求）。
+        "zh" => {
+            if is_traditional(rest) {
+                None
+            } else {
+                Some(Lang::ZhHans)
+            }
+        }
         "en" => Some(Lang::En),
         // `C` / `POSIX` 是"无 locale"，按英文处理。
         "c" | "posix" => Some(Lang::En),
@@ -136,32 +123,26 @@ fn is_traditional(rest: &str) -> bool {
         .any(|part| matches!(part, "hant" | "tw" | "hk" | "mo"))
 }
 
-fn is_arabic(raw: &str) -> bool {
-    let tag = raw.trim().to_ascii_lowercase();
-    let tag = tag.split(['.', '@']).next().unwrap_or("");
-    tag == "ar" || tag.starts_with("ar-") || tag.starts_with("ar_")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn flag_wins_over_config_and_system() {
-        let got = resolve(Some("ru"), Some("zh-hans"), Some("en_US.UTF-8"));
-        assert_eq!(got, Ok(Lang::Ru));
+        let got = resolve(Some("zh-hans"), Some("en"), Some("en_US.UTF-8"));
+        assert_eq!(got, Ok(Lang::ZhHans));
     }
 
     #[test]
     fn config_wins_over_system() {
-        let got = resolve(None, Some("zh-hant"), Some("en_US.UTF-8"));
-        assert_eq!(got, Ok(Lang::ZhHant));
+        let got = resolve(None, Some("zh-hans"), Some("en_US.UTF-8"));
+        assert_eq!(got, Ok(Lang::ZhHans));
     }
 
     #[test]
     fn system_locale_is_used_when_nothing_explicit() {
         assert_eq!(resolve(None, None, Some("zh_CN.UTF-8")), Ok(Lang::ZhHans));
-        assert_eq!(resolve(None, None, Some("ru_RU.UTF-8")), Ok(Lang::Ru));
+        assert_eq!(resolve(None, None, Some("en_US.UTF-8")), Ok(Lang::En));
     }
 
     #[test]
@@ -173,43 +154,39 @@ mod tests {
     }
 
     #[test]
-    fn traditional_chinese_is_detected_by_script_or_region() {
-        assert_eq!(from_system_tag("zh-Hant-TW"), Lang::ZhHant);
-        assert_eq!(from_system_tag("zh_TW.UTF-8"), Lang::ZhHant);
-        assert_eq!(from_system_tag("zh_HK"), Lang::ZhHant);
+    fn unrecognized_zh_variant_is_detected_by_script_or_region() {
         // 无地区的 `zh` 按简体处理。
         assert_eq!(from_system_tag("zh"), Lang::ZhHans);
     }
 
     #[test]
-    fn explicit_arabic_is_refused_with_its_own_error() {
-        // 不静默回落：用户配了 ar 却看到英文，会以为工具坏了。
-        assert_eq!(parse_explicit("ar"), Err(LangError::ArabicUnsupported));
-        assert_eq!(
-            parse_explicit("ar_SA.UTF-8"),
-            Err(LangError::ArabicUnsupported)
-        );
-    }
-
-    #[test]
-    fn arabic_system_locale_falls_back_instead_of_failing() {
-        // 用户没**要求**阿拉伯语，不该因为系统是阿拉伯语就退出。
+    fn deleted_locales_fall_back_instead_of_failing_as_system_locale() {
+        // 用户没**要求**这些已删除的语种，系统 locale 落在它们上面时不该报错退出。
+        assert_eq!(resolve(None, None, Some("zh-Hant-TW")), Ok(Lang::En));
+        assert_eq!(resolve(None, None, Some("zh_TW.UTF-8")), Ok(Lang::En));
+        assert_eq!(resolve(None, None, Some("zh_HK")), Ok(Lang::En));
+        assert_eq!(resolve(None, None, Some("ru_RU.UTF-8")), Ok(Lang::En));
         assert_eq!(resolve(None, None, Some("ar_SA.UTF-8")), Ok(Lang::En));
     }
 
     #[test]
-    fn explicit_unknown_language_is_refused() {
+    fn explicit_unsupported_language_is_refused() {
         assert_eq!(
             parse_explicit("ja"),
             Err(LangError::Unknown("ja".to_string()))
         );
-    }
-
-    #[test]
-    fn only_en_and_zh_hans_are_fully_translated_in_v1() {
-        assert!(Lang::En.is_fully_translated());
-        assert!(Lang::ZhHans.is_fully_translated());
-        assert!(!Lang::ZhHant.is_fully_translated());
-        assert!(!Lang::Ru.is_fully_translated());
+        // 已删除的语种：显式请求时报错，而不是像系统 locale 那样静默回落。
+        assert_eq!(
+            parse_explicit("zh-hant"),
+            Err(LangError::Unknown("zh-hant".to_string()))
+        );
+        assert_eq!(
+            parse_explicit("ru"),
+            Err(LangError::Unknown("ru".to_string()))
+        );
+        assert_eq!(
+            parse_explicit("ar"),
+            Err(LangError::Unknown("ar".to_string()))
+        );
     }
 }

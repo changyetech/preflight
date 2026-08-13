@@ -6,14 +6,10 @@
 
 use super::{
     CheckText, ChecksText, ConfigText, CoverageText, DnsEgressText, ErrorText, FailureText,
-    LangText, NoteText, Text, UdpEgressText, ValueText, VerdictText,
+    NoteText, Text, UdpEgressText, ValueText, VerdictText,
 };
 
 pub const EN: Text = Text {
-    lang: LangText {
-        partial_notice: "This language is only partially translated; untranslated items are shown in English.",
-    },
-
     config: ConfigText {
         path_label: "Config file",
         key_state_set: "proxycheck key: set",
@@ -28,9 +24,7 @@ pub const EN: Text = Text {
         config_read: "Cannot read the config file",
         config_parse: "The config file is invalid",
         config_write: "Cannot write the config file",
-        lang_unknown: "Unknown language",
-        // ar 是显式拒绝而不是静默回落：配了却看到英文，会让人以为工具坏了。
-        lang_arabic_unsupported: "Arabic is not supported in the terminal: mixing right-to-left text with left-to-right values (IP addresses, IANA timezone names, ASN numbers) renders inconsistently across terminal emulators. The website does support Arabic.",
+        lang_unknown: "Unsupported language",
         checkup_not_implemented: "The checkup could not run.",
     },
 

@@ -309,12 +309,12 @@ mod tests {
         let settings = Settings::resolve(
             &file,
             Sources {
-                flag_lang: Some("ru"),
+                flag_lang: Some("en"),
                 ..sources()
             },
         )
         .unwrap();
-        assert_eq!(settings.lang, Lang::Ru);
+        assert_eq!(settings.lang, Lang::En);
     }
 
     #[test]
