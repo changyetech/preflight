@@ -163,7 +163,7 @@ CLI 零配置可用。以下都是可选项。
 
 | 键 | 说明 |
 |---|---|
-| `language` | `en` / `zh-hans` / `zh-hant` / `ru`（**不支持 `ar`**，会报错并说明原因） |
+| `language` | `en` / `zh-hans`（其余值报错并说明支持的语种） |
 | `proxycheck_key` | 把配额从 100 次/天 提到 1,000 |
 | `timeout` | 网络探测超时（秒），默认 10 |
 | `no_color` | 关闭彩色输出 |
