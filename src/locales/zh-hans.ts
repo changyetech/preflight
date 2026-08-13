@@ -297,6 +297,7 @@ export const ZH_HANS: Copy = {
     onDemandLabel: "需手动触发",
     onDemandBody:
       "IP 风险检测需你手动触发，届时会先加载 Cloudflare Turnstile 人机验证，随后出口 IP 会被发送至 proxycheck.io 与 StopForumSpam。",
+    dnsLink: "公共 DNS 清单",
   },
 
   errors: {
@@ -308,5 +309,29 @@ export const ZH_HANS: Copy = {
     upstream: "数据源不可用，本项未能完成检测。",
     clientIp: "未能确定你的出口 IP。",
     unknown: "检测失败，请稍后重试。",
+  },
+
+  dns: {
+    title: "公共 DNS 服务器 · Preflight",
+    description:
+      "策展的公共 DNS 解析器清单——Cloudflare、Google、Quad9、AliDNS 等，标注地区、过滤级别，以及是否由中国大陆运营。",
+    heading: "公共 DNS 服务器",
+    tableHeaders: {
+      ip: "IP",
+      provider: "提供商",
+      region: "地区",
+      domestic: "国内",
+      filter: "用途",
+    },
+    variants: {
+      standard: "普通解析",
+      security: "拦截恶意",
+      family: "家庭保护",
+      adblock: "拦截广告",
+    },
+    domesticYes: "国内",
+    cliHint:
+      "想测你这台机器上实际可用的？在 CLI 里执行 preflight dns --check。",
+    backHome: "返回 Preflight",
   },
 };

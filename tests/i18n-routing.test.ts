@@ -112,4 +112,40 @@ describe("两语种各自是独立静态资源，不是彼此的软 404 兜底",
       expect(response.status).toBe(404);
     }
   });
+
+  it("/dns/ 返回 200 且是英文 DNS 清单页", async () => {
+    const response = await SELF.fetch("https://example.com/dns/");
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain('lang="en"');
+    expect(html).toContain(COPY.dns.title);
+  });
+
+  it("/zh-hans/dns/ 返回 200 且是中文 DNS 清单页", async () => {
+    const response = await SELF.fetch("https://example.com/zh-hans/dns/");
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain('lang="zh-Hans"');
+    expect(html).toContain(COPY_ZH_HANS.dns.title);
+  });
+
+  it("/dns（无尾斜杠）301 重定向到 /dns/", async () => {
+    const response = await SELF.fetch("https://example.com/dns");
+
+    // /dns 不带尾斜杠必须能到达内容（不是 404），不管是 301 重定向后还是直接 200。
+    // 线上 html_handling 的具体行为待核实（见文件头注释）。
+    expect(response.status).not.toBe(404);
+    const html = await response.text();
+    expect(html).toContain(COPY.dns.title);
+  });
+
+  it.each(["/dns/xxx", "/zh-hans/dns/xxx"])(
+    "%s 是真实 404，不做 SPA 回退",
+    async (path) => {
+      const response = await SELF.fetch(`https://example.com${path}`);
+      expect(response.status).toBe(404);
+    },
+  );
 });

@@ -22,6 +22,7 @@ import { Landing } from "./components/Landing";
 import { ThemeSwitch } from "./components/ThemeSwitch";
 import { VerdictPanel } from "./components/Verdict";
 import { CopyProvider, useCopy } from "./i18n";
+import { DnsPage } from "./components/DnsPage";
 import { usePanel } from "./usePanel";
 
 function AppShell({ lang }: { lang: Lang }) {
@@ -132,10 +133,11 @@ function AppShell({ lang }: { lang: Lang }) {
 
 function App() {
   const lang = langFromPathname(window.location.pathname);
+  const isDnsPage = window.location.pathname.includes("/dns");
 
   return (
     <CopyProvider lang={lang}>
-      <AppShell lang={lang} />
+      {isDnsPage ? <DnsPage lang={lang} /> : <AppShell lang={lang} />}
     </CopyProvider>
   );
 }

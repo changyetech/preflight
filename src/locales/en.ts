@@ -349,6 +349,7 @@ export const EN = {
     onDemandLabel: "Triggered manually",
     onDemandBody:
       "The IP risk check requires you to trigger it manually, at which point Cloudflare Turnstile loads for bot verification first, then your exit IP is sent to proxycheck.io and StopForumSpam.",
+    dnsLink: "Public DNS list",
   },
 
   errors: {
@@ -363,6 +364,30 @@ export const EN = {
     upstream: "The data source is unavailable — this item couldn't be checked.",
     clientIp: "Couldn't determine your exit IP.",
     unknown: "Check failed — please retry shortly.",
+  },
+
+  dns: {
+    title: "Public DNS Servers · Preflight",
+    description:
+      "A curated list of public DNS resolvers — Cloudflare, Google, Quad9, AliDNS and more — with their region, filtering level, and whether they are operated from mainland China.",
+    heading: "Public DNS Servers",
+    tableHeaders: {
+      ip: "IP",
+      provider: "Provider",
+      region: "Region",
+      domestic: "CN",
+      filter: "Filter",
+    },
+    variants: {
+      standard: "Standard",
+      security: "Security",
+      family: "Family",
+      adblock: "Ad-block",
+    },
+    domesticYes: "CN",
+    cliHint:
+      "Want to test which servers actually work from your machine? Run preflight dns --check in the CLI.",
+    backHome: "Back to Preflight",
   },
 } as const;
 

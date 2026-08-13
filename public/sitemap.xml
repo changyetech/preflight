@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://preflight.omnikit.run/</loc>
+  </url>
+  <url>
+    <loc>https://preflight.omnikit.run/zh-hans</loc>
+  </url>
+  <url>
+    <loc>https://preflight.omnikit.run/dns/</loc>
+  </url>
+  <url>
+    <loc>https://preflight.omnikit.run/zh-hans/dns/</loc>
+  </url>
+</urlset>

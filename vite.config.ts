@@ -22,6 +22,8 @@ export default defineConfig({
           input: {
             main: resolve(import.meta.dirname, "index.html"),
             zhHans: resolve(import.meta.dirname, "zh-hans/index.html"),
+            dns: resolve(import.meta.dirname, "dns/index.html"),
+            zhHansDns: resolve(import.meta.dirname, "zh-hans/dns/index.html"),
           },
         },
       },

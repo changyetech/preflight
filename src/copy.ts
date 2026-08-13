@@ -13,7 +13,7 @@ export type Lang = "en" | "zh-hans";
 
 export type Locale = {
   id: Lang;
-  /** URL 前缀。英文是根路径（规格第 7 节：默认英语）。 */
+  /** URL 前缀。英文为空串（根路径），中文为 `/zh-hans`（规格第 7 节：默认英语）。 */
   path: string;
   /** `<html lang>` 的值，用 BCP 47 规范大小写，与 URL 里的小写前缀不同。 */
   htmlLang: string;
@@ -23,7 +23,7 @@ export type Locale = {
 
 /** 菜单顺序即此处顺序：英文（默认）在前。 */
 export const LOCALES: readonly Locale[] = [
-  { id: "en", path: "/", htmlLang: "en", label: "English" },
+  { id: "en", path: "", htmlLang: "en", label: "English" },
   {
     id: "zh-hans",
     path: "/zh-hans",
@@ -31,6 +31,20 @@ export const LOCALES: readonly Locale[] = [
     label: "简体中文",
   },
 ];
+
+/**
+ * 由语种前缀 + 页面 slug 拼 URL（spec §5.3）。
+ * 首页 slug 是 `"/"`，DNS 页 slug 是 `"/dns/"`。
+ * `localeOf("en").path` 是空串 → `pageUrl("en", "/")` = `"/"`。
+ */
+export function pageUrl(lang: Lang, slug: string): string {
+  const prefix = localeOf(lang).path;
+  // 首页 slug 是 "/"：英文前缀为空 → 返回 "/"；中文前缀是 "/zh-hans" → 返回 "/zh-hans"（不带尾斜杠）。
+  if (slug === "/") {
+    return prefix || "/";
+  }
+  return prefix + slug;
+}
 
 export function localeOf(lang: Lang): Locale {
   // LOCALES 覆盖 Lang 的全部取值，找不到只可能是表被改坏了，属于开发期错误。

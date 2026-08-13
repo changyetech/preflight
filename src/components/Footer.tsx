@@ -24,7 +24,12 @@ export function Footer() {
         </div>
       </div>
       {/* 版权行不进 locales：符号、年份、产品名均无语种差异；年份取运行时当前年。 */}
-      <p className="footer-copyright">© {new Date().getFullYear()} Preflight</p>
+      <p className="footer-copyright">
+        © {new Date().getFullYear()} Preflight
+        <a href="/dns/" className="footer-dns-link">
+          {COPY.footer.dnsLink}
+        </a>
+      </p>
     </footer>
   );
 }
