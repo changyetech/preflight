@@ -80,8 +80,15 @@ copy_leaf! {
         full_badge,
         summary_insufficient,
         summary_preliminary_low,
+        /// 低档、但「需关注」清单里存在仅提醒项时的摘要。低档的默认摘要说「未发现异常」，
+        /// 与同屏的仅提醒清单（O2 系统时区、C2 国内 DNS 这类契约 §2.1 明列不进综合结论
+        /// 的项）自相矛盾——两句话的透镜不同：摘要看的是「有没有贡献信号」，清单看的是
+        /// 「有没有值得看一眼的项」。矛盾出在文案，不在判级逻辑，因此这里给它自己的键。
+        summary_preliminary_low_reminders,
         summary_preliminary_medium,
         summary_full_low,
+        /// 同 `summary_preliminary_low_reminders`，用于完整形态的低档。
+        summary_full_low_reminders,
         summary_full_medium,
         summary_full_high,
         exit_ip_label,
@@ -99,7 +106,8 @@ copy_leaf! {
         /// 「需关注」清单里非最后一项之间的分隔符——中英文习惯不同，不能由渲染层写死
         /// （中文顿号 vs 英文逗号）。
         attention_list_separator,
-        /// 「需关注」清单里最后一项前的连接词（中文"与"、英文" and "）。
+        /// 「需关注」清单里最后一项前的连接词（中文" 与 "、英文" and "）。
+        /// 与 `C4FixText` 的 `explain_connector` 同一约定：**空格由取值自带，渲染层裸拼接**。
         attention_list_connector,
         /// `attention_scope` 句的起始固定短语（中文"其中只有 "、英文"Only "），
         /// 只在有贡献项时使用。
