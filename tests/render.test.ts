@@ -662,6 +662,46 @@ describe("O5／O2 的降级代理说明必须在位（契约 §5.1／§5.5 呈�
   );
 });
 
+describe("O2「无从比对」不得渲染绿色（review 修复：Result 把结论包进实心底色框后放大了这个信号）", () => {
+  it("match === null 时结论不带 t-ok，落到中性 result", () => {
+    const html = renderToStaticMarkup(
+      createElement(O2Card, {
+        state: {
+          status: "done",
+          data: {
+            browserTimezone: "Asia/Shanghai",
+            exitTimezone: null,
+            match: null,
+          },
+        },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain(esc(COPY.checks.O2.unknown));
+    expect(html).not.toContain('class="result t-ok"');
+    expect(html).toContain('class="result"');
+  });
+
+  it("match === true 时才带 t-ok", () => {
+    const html = renderToStaticMarkup(
+      createElement(O2Card, {
+        state: {
+          status: "done",
+          data: {
+            browserTimezone: "Asia/Shanghai",
+            exitTimezone: "Asia/Shanghai",
+            match: true,
+          },
+        },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain('class="result t-ok"');
+  });
+});
+
 describe("检测项数量恒为 O1–O6 六项 + C1–C4 四项（防止重排时漏掉或多出一项）", () => {
   it("domain 层的 ID 表恒为 6 项在线 + 4 项仅 CLI", () => {
     expect(ONLINE_CHECK_IDS).toHaveLength(6);

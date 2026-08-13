@@ -92,8 +92,11 @@ export function O2Card({
   const COPY = useCopy();
   const copy = COPY.checks.O2;
   const data = state.status === "done" ? state.data : null;
+  // match === null 是「无从比对」（边缘未给出出口 IP 时区），既非一致也非不一致——
+  // 中性色，不得落到绿色（review 修复：Result 把这句话包进实心 t-ok 底色框后，
+  // 原先 `data ? "ok" : "neutral"` 的写法会让「无从比对」被渲染成显著的绿色结论）。
   const tone: CardTone =
-    data?.match === false ? "warn" : data ? "ok" : "neutral";
+    data?.match === false ? "warn" : data?.match === true ? "ok" : "neutral";
 
   return (
     <CheckCard
