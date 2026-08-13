@@ -16,8 +16,19 @@ describe("路径决定语言", () => {
     },
   );
 
-  it.each(["/fr", "/zh", "/", "/en", "/zh-hant", "/ru", "/ar"])(
-    "%s 落回默认语言英文，不猜测、不跳转（含已删除的 /en、/zh-hant、/ru、/ar）",
+  // 注意：不含 "/en"——"en" 本身就是一个 locale 的 id（`langFromPathname` 按
+  // segment 与 id 匹配，不是按 path），"/en" 无论收缩前后都会命中该 id，
+  // 恒返回 "en"，测不出「未注册路径回落」这件事（review Important 项）。
+  // "/en" 的真 404 由 i18n-routing.test.ts 的路由层断言覆盖。
+  it.each(["/fr", "/zh", "/"])(
+    "%s 是从未注册过的路径，落回默认语言英文，不猜测、不跳转",
+    (path) => {
+      expect(langFromPathname(path)).toBe("en");
+    },
+  );
+
+  it.each(["/zh-hant", "/ru", "/ar"])(
+    "%s 已从语种终态删除，落回默认语言英文（收缩后才成立，规格 §3）",
     (path) => {
       expect(langFromPathname(path)).toBe("en");
     },
