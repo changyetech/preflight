@@ -172,12 +172,12 @@ fn check_json(id: CheckId, report: &Report) -> Value {
         }),
         CheckId::C2 => check(&report.c2, |servers| {
             json!({
-                "servers": servers.iter().map(|server| json!({
-                    "address": server.address,
-                    "provider": server.label,
-                    "private": server.private,
-                    "domestic": server.domestic,
-                })).collect::<Vec<_>>(),
+               "servers": servers.iter().map(|server| json!({
+                   "address": server.address,
+                    "provider": server.entry.map(|e| format!("{} ({})", e.name, e.region)),
+                   "private": server.private,
+                   "domestic": server.domestic,
+               })).collect::<Vec<_>>(),
                 "domestic": servers.iter().any(|s| s.domestic),
             })
         }),
@@ -593,13 +593,13 @@ mod tests {
             c2: Outcome::Done(vec![
                 dns::Server {
                     address: "192.168.1.1".into(),
-                    label: Some("Router"),
+                    entry: None,
                     private: true,
                     domestic: true,
                 },
                 dns::Server {
                     address: "8.8.8.8".into(),
-                    label: Some("Google Public DNS"),
+                    entry: crate::domain::dns_servers::lookup("8.8.8.8"),
                     private: false,
                     domestic: false,
                 },
@@ -699,17 +699,17 @@ mod tests {
                     "status": "done",
                     "servers": [
                         {
-                            "address": "192.168.1.1",
-                            "provider": "Router",
-                            "private": true,
-                            "domestic": true,
-                        },
-                        {
-                            "address": "8.8.8.8",
-                            "provider": "Google Public DNS",
-                            "private": false,
-                            "domestic": false,
-                        },
+                           "address": "192.168.1.1",
+                            "provider": null,
+                           "private": true,
+                           "domestic": true,
+                       },
+                       {
+                           "address": "8.8.8.8",
+                            "provider": "Google Public DNS (US)",
+                           "private": false,
+                           "domestic": false,
+                       },
                     ],
                     "domestic": true,
                 },

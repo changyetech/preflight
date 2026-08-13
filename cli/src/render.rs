@@ -1632,14 +1632,14 @@ fn card_c2(outcome: &Outcome<Vec<dns::Server>>, text: &Text) -> Card {
     let values = servers
         .iter()
         .map(|server| {
-            let note = if let Some(label) = server.label {
-                Some(label)
+            let note = if let Some(entry) = server.entry {
+                Some(format!("{} ({})", entry.name, entry.region))
             } else if server.private {
-                Some(text.values.dns_router)
+                Some(text.values.dns_router.to_string())
             } else {
                 None
             };
-            Row::KvOwned(server.address.clone(), note.unwrap_or("").to_string())
+            Row::KvOwned(server.address.clone(), note.unwrap_or_default())
         })
         .collect();
 
@@ -1820,7 +1820,7 @@ mod tests {
             }),
             c2: Outcome::Done(vec![dns::Server {
                 address: "114.114.114.114".into(),
-                label: None,
+                entry: None,
                 private: false,
                 domestic: true,
             }]),
@@ -2646,7 +2646,7 @@ mod tests {
         });
         report.c2 = Outcome::Done(vec![dns::Server {
             address: "114.114.114.114".into(),
-            label: None,
+            entry: None,
             private: false,
             domestic: true,
         }]);

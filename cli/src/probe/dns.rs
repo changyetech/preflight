@@ -9,42 +9,11 @@
 use std::net::IpAddr;
 use std::process::Command;
 
-/// 已知公共 DNS 服务商。带地区标记，`CN` 用来判「可能暴露真实位置」。
-const KNOWN_DNS: [(&str, &str, bool); 27] = [
-    ("1.1.1.1", "Cloudflare (US)", false),
-    ("1.0.0.1", "Cloudflare (US)", false),
-    ("1.1.1.2", "Cloudflare for Families (US)", false),
-    ("1.0.0.2", "Cloudflare for Families (US)", false),
-    ("1.1.1.3", "Cloudflare for Families (US)", false),
-    ("1.0.0.3", "Cloudflare for Families (US)", false),
-    ("8.8.8.8", "Google Public DNS (US)", false),
-    ("8.8.4.4", "Google Public DNS (US)", false),
-    ("9.9.9.9", "Quad9 (US)", false),
-    ("149.112.112.112", "Quad9 (US)", false),
-    ("208.67.222.222", "OpenDNS/Cisco (US)", false),
-    ("208.67.220.220", "OpenDNS/Cisco (US)", false),
-    ("223.5.5.5", "AliDNS 阿里 (CN)", true),
-    ("223.6.6.6", "AliDNS 阿里 (CN)", true),
-    ("119.29.29.29", "DNSPod 腾讯 (CN)", true),
-    ("182.254.116.116", "DNSPod 腾讯 (CN)", true),
-    ("114.114.114.114", "114DNS (CN)", true),
-    ("114.114.115.115", "114DNS (CN)", true),
-    ("180.76.76.76", "BaiduDNS 百度 (CN)", true),
-    ("1.2.4.8", "CNNIC (CN)", true),
-    ("210.2.4.8", "CNNIC (CN)", true),
-    ("94.140.14.14", "AdGuard (CY)", false),
-    ("94.140.15.15", "AdGuard (CY)", false),
-    ("185.228.168.9", "CleanBrowsing (US)", false),
-    ("185.228.169.9", "CleanBrowsing (US)", false),
-    ("76.76.2.0", "Alternate DNS (US)", false),
-    ("76.76.10.0", "Alternate DNS (US)", false),
-];
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Server {
     pub address: String,
-    /// 已知服务商名，`None` 表示不认识。
-    pub label: Option<&'static str>,
+    /// 注册表条目；`None` 表示不是已知服务商。
+    pub entry: Option<&'static crate::domain::dns_servers::Entry>,
     /// 是否是私网地址（局域网路由器）。
     pub private: bool,
     pub domestic: bool,
@@ -59,7 +28,7 @@ fn parse_addr(value: &str) -> Option<IpAddr> {
 }
 
 pub fn describe(address: &str) -> Server {
-    let known = KNOWN_DNS.iter().find(|(ip, _, _)| *ip == address);
+    let known = crate::domain::dns_servers::lookup(address);
     let private = parse_addr(address)
         .map(|ip| match ip {
             IpAddr::V4(v4) => v4.is_private() || v4.is_loopback() || v4.is_link_local(),
@@ -72,9 +41,9 @@ pub fn describe(address: &str) -> Server {
 
     Server {
         address: address.to_string(),
-        label: known.map(|(_, name, _)| *name),
+        entry: known,
         private,
-        domestic: known.is_some_and(|(_, _, cn)| *cn),
+        domestic: known.is_some_and(|e| e.domestic),
     }
 }
 
@@ -231,7 +200,9 @@ mod tests {
 
     #[test]
     fn labels_known_providers_and_flags_domestic_ones() {
-        assert_eq!(describe("1.1.1.1").label, Some("Cloudflare (US)"));
+        let entry = describe("1.1.1.1").entry.expect("1.1.1.1 应识别");
+        assert_eq!(entry.name, "Cloudflare");
+        assert_eq!(entry.region, "US");
         assert!(!describe("1.1.1.1").domestic);
         assert!(describe("223.5.5.5").domestic);
         assert!(describe("114.114.114.114").domestic);
@@ -247,7 +218,7 @@ mod tests {
     #[test]
     fn unknown_public_dns_is_neither_labelled_nor_domestic() {
         let server = describe("203.0.113.53");
-        assert_eq!(server.label, None);
+        assert_eq!(server.entry, None);
         assert!(!server.domestic);
         assert!(!server.private);
     }

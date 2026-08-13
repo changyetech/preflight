@@ -5,5 +5,6 @@
 
 pub mod checks;
 pub mod dns_egress;
+pub mod dns_servers;
 pub mod udp_egress;
 pub mod verdict;
