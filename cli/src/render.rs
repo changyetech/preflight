@@ -248,12 +248,24 @@ fn render_attention(
     text: &Text,
     style: &Style,
 ) {
+    // 判据是「信号是否实际被 compute() 消费并命中」，不是卡片 tone——一张
+    // Warn/Bad 卡可能来自契约 2.1 明列的纯提醒信号。不在这里重算 51/76 阈值：
+    // O4 是否贡献综合结论，直接读 compute() 的结果（只有 O4 的风险分能把结论
+    // 判到 Full(High)，这是判级契约 3.2 的不变量，不是这里现算的）。
+    let contributing = contributing_ids(&report.signals(), verdict);
+
+    // 候选集合不能只看 tone：O4 卡片的 tone 只读 risk_score（契约 6），完全不读
+    // abuse_listed；但 abuse_listed 是独立于分数的贡献信号（滥用收录来自
+    // StopForumSpam，风险分来自 proxycheck，两个第三方彼此解耦）。分数低、
+    // tone=Ok 时 O4 卡片可能仍然贡献了综合结论——这种情形必须进候选集合，
+    // 否则会把「真的贡献了」的项完全隐去，比误判成「参与」更糟。
     let mut items: Vec<&Card> = all_cards
         .iter()
-        .filter(|c| c.tone == Tone::Warn || c.tone == Tone::Bad)
+        .filter(|c| c.tone == Tone::Warn || c.tone == Tone::Bad || contributing.contains(&c.id))
         .collect();
-    // bad 先于 warn，同级按 ALL_CHECKS（O1→C4）固定顺序——`cards()` 本就按此顺序
-    // 构建，`sort_by_key` 是稳定排序，同级元素的相对顺序保持不变。
+    // bad 先于 warn（含 tone=Ok 但贡献的项，按非 bad 处理），同级按 ALL_CHECKS
+    // （O1→C4）固定顺序——`cards()` 本就按此顺序构建，`sort_by_key` 是稳定排序，
+    // 同级元素的相对顺序保持不变。
     items.sort_by_key(|c| if c.tone == Tone::Bad { 0 } else { 1 });
 
     if items.is_empty() {
@@ -271,11 +283,6 @@ fn render_attention(
         );
     }
 
-    // 判据是「信号是否实际被 compute() 消费并命中」，不是卡片 tone——一张
-    // Warn/Bad 卡可能来自契约 2.1 明列的纯提醒信号。不在这里重算 51/76 阈值：
-    // O4 是否贡献综合结论，直接读 compute() 的结果（只有 O4 的风险分能把结论
-    // 判到 Full(High)，这是判级契约 3.2 的不变量，不是这里现算的）。
-    let contributing = contributing_ids(&report.signals(), verdict);
     let contributing_ids: Vec<CheckId> = items
         .iter()
         .map(|c| c.id)
@@ -1098,6 +1105,45 @@ mod tests {
         let text = copy::text(Lang::En);
         let out = render(&report, false, false);
         assert_eq!(report.verdict(), Verdict::Full(Level::High));
+        assert!(
+            out.contains(&format!("O4 {}", text.verdict.attention_contributing)),
+            "{out}"
+        );
+        assert!(
+            !out.contains(&format!("O4 {}", text.verdict.attention_reminder_only)),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn low_score_but_abuse_listed_still_puts_o4_in_the_attention_list_as_contributing() {
+        // O4 卡片的 tone 只读 risk_score（契约 6），完全不读 abuse_listed；
+        // 但 abuse_listed 是独立于分数的贡献信号（StopForumSpam vs proxycheck，
+        // 两个解耦的第三方）。risk_score 10 → risk_level(10) = Low → tone = Ok，
+        // 卡片是绿色的，但 abuse_listed: true 仍然把综合结论拉到 Full(Medium)。
+        // 候选集合如果只看 tone，这张真的贡献了综合结论的卡会被完全漏掉。
+        let mut report = blank();
+        report.o4 = Outcome::Done(Risk {
+            risk: crate::probe::proxycheck::Risk {
+                network_type: None,
+                proxy: false,
+                vpn: false,
+                tor: false,
+                scraper: false,
+                risk_score: 10,
+                anonymous: false,
+            },
+            abuse: Some(crate::probe::stopforumspam::Abuse {
+                listed: true,
+                frequency: 3,
+                last_seen: None,
+            }),
+        });
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+
+        assert_eq!(report.verdict(), Verdict::Full(Level::Medium));
+        assert!(out.contains(text.verdict.attention_label), "{out}");
         assert!(
             out.contains(&format!("O4 {}", text.verdict.attention_contributing)),
             "{out}"
