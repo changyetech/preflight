@@ -274,10 +274,24 @@ fn render_attention(
 
     let _ = writeln!(out, "    {}", style.bold(text.verdict.attention_label));
     for card in &items {
+        // 清单的 marker 取「清单自身的语义」，不取卡片 tone：卡片 tone 只读分项
+        // 分级（契约 6，只看分数），清单要说的是「这项影响了结论/值得看一眼」。
+        // 一张卡片能进这份清单，只有两种原因——tone 本身是 Warn/Bad，或者
+        // tone=Ok 但因为其他信号（如 abuse_listed）贡献了综合结论；后一种
+        // 情形如果继续显示卡片自己的绿色 marker，会在标题为「需关注」的清单里
+        // 出现一行「没问题」，逻辑自相矛盾。两种情形在清单里统一按 warn 处理
+        // （bad 除外，bad 仍是 bad）——不引入第三种视觉状态。
+        // 卡片自身的渲染（`render_card`）不受影响，仍然按契约 6 显示真实 tone：
+        // 「这项分数不高」和「这项影响了结论」是两句都对的话，各自在各自的位置上。
+        let list_tone = if card.tone == Tone::Bad {
+            Tone::Bad
+        } else {
+            Tone::Warn
+        };
         let _ = writeln!(
             out,
             "      {} {}  {}",
-            style.tone(card.tone, marker(card.tone)),
+            style.tone(list_tone, marker(list_tone)),
             style.tone(Tone::Dim, card.id.as_str()),
             card.title,
         );
@@ -1151,6 +1165,28 @@ mod tests {
         assert!(
             !out.contains(&format!("O4 {}", text.verdict.attention_reminder_only)),
             "{out}"
+        );
+        // 清单里 O4 这一行不能显示卡片自己的绿色 ✔——一个标题写着「需关注」的
+        // 清单里出现「这项没问题」的符号是逻辑矛盾。清单 marker 取「需要关注」
+        // 的语义（bad 除外，这里没有 bad 项，统一按 warn 处理），不取卡片 tone。
+        // 卡片自身的渲染（下面的检测卡列表）不受影响，仍按契约 6 显示真实 tone
+        // （分数 10 分，risk_level 判 Low，绿色 ✔）——用 O1 卡片行的位置把两段
+        // 切开，分别断言，而不是对整份输出做一次性 contains（O4 的「✔ ...」
+        // 子串本就会因为卡片本身而存在，一次性断言会把两件事混在一起）。
+        let cards_start = out.find("· O1").expect("O1 卡片必须存在");
+        let attention_block = &out[..cards_start];
+        let cards_block = &out[cards_start..];
+        assert!(
+            attention_block.contains("! O4  IP Type & Risk"),
+            "list line should use the warn marker: {attention_block}"
+        );
+        assert!(
+            !attention_block.contains("✔ O4  IP Type & Risk"),
+            "list line must not reuse the card's own ok marker: {attention_block}"
+        );
+        assert!(
+            cards_block.contains("✔ O4  IP Type & Risk"),
+            "the card itself must still show its real (green) tone: {cards_block}"
         );
     }
 
