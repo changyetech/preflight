@@ -2,7 +2,7 @@
 
 - 状态：**契约（normative）**——代码与本文不一致时，以本文为准（见 CLAUDE.md「Authoritative Source」）
 - 适用范围：**两个实现**——ipcheck Web（TypeScript，`src/domain/`）与 ipcheck CLI（Rust，`cli/`）
-- 相关：[ADR-0010](./adr/0010-verdict-contract-normative-cli-full-implementation.md)（本文的权威性来源）、[ADR-0011](./adr/0011-capability-boundary-divergence.md)（两端差异如何表达）、[ADR-0012](./adr/0012-cli-direct-third-party-not-worker-api.md)（CLI 不走本站 API）、[ADR-0013](./adr/0013-drop-vendor-endpoint-check.md)（移除厂商端点检测）、[ADR-0014](./adr/0014-split-tunnel-leak-checks.md)（新增分流泄露两项）
+- 相关：[ADR-0010](./adr/0010-verdict-contract-normative-cli-full-implementation.md)（本文的权威性来源）、[ADR-0011](./adr/0011-capability-boundary-divergence.md)（两端差异如何表达）、[ADR-0012](./adr/0012-cli-direct-third-party-not-worker-api.md)（CLI 不走本站 API）、[ADR-0013](./adr/0013-drop-vendor-endpoint-check.md)（移除厂商端点检测）、[ADR-0014](./adr/0014-split-tunnel-leak-checks.md)（新增分流泄露两项）、[ADR-0015](./adr/0015-tun-off-requires-proxy-evidence.md)（`tunOff` 以代理迹象为前提）
 
 本文定义「一次网络环境体检得出什么结论」。它是**两个实现共同的判据**：CLI 是全集实现（10 项全测），Web 是它在浏览器 + 边缘能力边界内的**投影**（C1–C4 恒为「需 CLI」）。
 
@@ -60,7 +60,7 @@
 | `abuseListed` | O4 | StopForumSpam 有滥用收录 | **中** | ✅ | ✅ |
 | `dnsEgressLeak` | O5 | ECS 客户端子网归属国 ≠ 出口 IP 归属国（详见 §2.5） | **中** | ✅ | ✅ |
 | `udpEgressMismatch` | O6 | ≥2 个 STUN 报出**同一** srflx IP 且该 IP ≠ 出口 IP（详见 §2.6） | **中** | ✅ | ✅ |
-| `tunOff` | C3 | TUN／VPN 未开启 | **中** | — | ✅ |
+| `tunOff` | C3 | 存在代理迹象且 TUN／VPN 未开启（详见 §2.7） | **中** | — | ✅ |
 
 **✅** = 该端可测且贡献综合结论；**仅提醒** = 该端可测、必须展示，但**不贡献**综合结论；**—** = 该端结构性不可测。
 
@@ -174,6 +174,29 @@ IPv6 泄露贡献「中」而非「高」：它暴露的是地理位置，不像
 **浏览器禁用 WebRTC ⇒ 检测失败（第 1 行，`N_ok = 0`），不是绿色的「未泄露」。** 在「UDP 走没走代理」这个语义下，禁用 WebRTC 只是把测量仪器关掉了，不是测出了没问题。这与部分参考站的做法是**刻意的分歧**（[ADR-0014](./adr/0014-split-tunnel-leak-checks.md)）。
 
 **协议族硬约束**：**反射地址是 IPv6 而出口 IP 是 IPv4（或反之）不得判命中。** 那正是 O3（IPv6 泄露）在管的事，在这里再算一次等于同一个事实进了两次判级。只比同协议族——这就是 `N_fam` 的全部作用，落进第 2 行时结论是「无从比对」而非任何一侧。
+
+### 2.7 `tunOff` 的判定
+
+`tunOff` 的语义**不是**「TUN 没开」，而是「**在用代理，但不是 TUN 模式**」——此时 DNS、UDP、不认代理的进程都在代理之外。没有代理的用户不存在「TUN 该开没开」这个问题：对他们无条件产出中风险，是把目标画像（用户本来就该开着代理）写进判级的系统性误报（[ADR-0015](./adr/0015-tun-off-requires-proxy-evidence.md)）。
+
+因此命中需要**两个前提同时成立**：存在**代理迹象**，且 TUN 明确未开启。
+
+**代理迹象**由 C3 自己的两个观测按三态取或（任一「开启」⇒ 存在；无「开启」且任一「未知」⇒ 未知；全部「关闭」⇒ 不存在）：
+
+- 环境变量代理已设（恒可判定）
+- 系统代理开启（三态：开启／关闭／**本平台未实现**——未实现是未知，不是关闭）
+
+**判定表**：
+
+| TUN 状态 | 代理迹象 | `tunOff` |
+|---|---|---|
+| 开启 | 任意 | 未命中 |
+| 本平台未实现 | 任意 | **未知**，不贡献信号 |
+| 未开启 | 存在 | **命中** |
+| 未开启 | 未知 | **未知**，不贡献信号（§2.3：未知不冒充任何一侧） |
+| 未开启 | 不存在 | 未命中 |
+
+**迹象来源刻意不含「C1 真实 IP ≠ O1 出口 IP」**：CGNAT 按目的地分池会让两个探测拿到不同公网 IP、凭空造出迹象；且网关级代理（软路由）用户的防护在网关，本机 TUN 状态对他们不构成判据。理由全文见 ADR-0015。
 
 ---
 

@@ -44,7 +44,10 @@ impl Status {
         }
     }
 
-    /// `tunOff` 信号：TUN 明确未开启才是 `Some(true)`。
+    /// `tunOff` 信号：存在代理迹象且 TUN 明确未开启才是 `Some(true)`（契约 2.7）。
+    ///
+    /// 无代理的直连用户不存在「TUN 该开没开」这个问题——无条件判命中是把
+    /// 「用户本来就该开着代理」这个画像写进判级的系统性误报（ADR-0015）。
     ///
     /// **平台不支持时是未知（`None`），不贡献综合结论**（契约 2.3）。这是相对
     /// `ai-ipcheck` 的一处刻意变更：那边 `tun_active is not True` 把"检测不到"
@@ -52,8 +55,20 @@ impl Status {
     pub fn tun_off(&self) -> Option<bool> {
         match self.tun {
             State::Enabled => Some(false),
-            State::Disabled => Some(true),
+            State::Disabled => self.proxy_evidence(),
             State::Unsupported => None,
+        }
+    }
+
+    /// 代理迹象：环境变量代理与系统代理按三态取或。任一开启 ⇒ `Some(true)`；
+    /// 无开启且系统代理未实现 ⇒ `None`——「没检测」不是「没开」，未知不冒充无迹象。
+    fn proxy_evidence(&self) -> Option<bool> {
+        if self.env_state() == State::Enabled || self.system == State::Enabled {
+            return Some(true);
+        }
+        match self.system {
+            State::Unsupported => None,
+            _ => Some(false),
         }
     }
 }
@@ -288,16 +303,43 @@ mod tests {
         };
         assert_eq!(status.tun_off(), None);
 
-        let off = Status {
-            tun: State::Disabled,
-            ..status.clone()
-        };
-        assert_eq!(off.tun_off(), Some(true));
-
         let on = Status {
             tun: State::Enabled,
             ..status
         };
         assert_eq!(on.tun_off(), Some(false));
+    }
+
+    #[test]
+    fn tun_off_requires_proxy_evidence() {
+        // 契约 2.7：命中 = 存在代理迹象 且 TUN 明确未开启。
+        // 无代理的直连用户不存在「TUN 该开没开」这个问题（ADR-0015）。
+        let direct = Status {
+            env_vars: Vec::new(),
+            system: State::Disabled,
+            system_kinds: Vec::new(),
+            tun: State::Disabled,
+        };
+        assert_eq!(direct.tun_off(), Some(false));
+
+        let env_proxy = Status {
+            env_vars: vec!["HTTPS_PROXY".into()],
+            ..direct.clone()
+        };
+        assert_eq!(env_proxy.tun_off(), Some(true));
+
+        let system_proxy = Status {
+            system: State::Enabled,
+            system_kinds: vec!["HTTP".into()],
+            ..direct.clone()
+        };
+        assert_eq!(system_proxy.tun_off(), Some(true));
+
+        // 系统代理未实现且无环境变量代理 ⇒ 迹象未知，未知不冒充任何一侧（契约 2.3）。
+        let evidence_unknown = Status {
+            system: State::Unsupported,
+            ..direct
+        };
+        assert_eq!(evidence_unknown.tun_off(), None);
     }
 }
