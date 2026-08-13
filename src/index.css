@@ -17,9 +17,6 @@
   --hairline: oklch(93.5% 0.006 240);
 
   --accent: oklch(50% 0.145 250);
-  --accent-hov: oklch(42% 0.145 250);
-  --accent-ring: oklch(52% 0.13 250);
-  --on-accent: oklch(100% 0 0);
 
   --ok: oklch(43% 0.11 155);
   --ok-bg: oklch(95.5% 0.035 155);
@@ -48,15 +45,9 @@
   --text: var(--muted);
   --text-h: var(--fg);
   --chip-bg: var(--sunken);
-  --code-bg: var(--sunken);
   --muted-bg: var(--sunken);
   --accent-bg: oklch(50% 0.145 250 / 0.1);
   --accent-border: oklch(50% 0.145 250 / 0.5);
-  --tone-ok: var(--ok);
-  --tone-ok-bg: var(--ok-bg);
-  --tone-warn: var(--warn);
-  --tone-warn-bg: var(--warn-bg);
-  --tone-danger: var(--danger);
   --sans: var(--font-ui);
   --mono: var(--font-mono);
   --shadow:
@@ -83,9 +74,6 @@
   --hairline: oklch(27% 0.014 245);
 
   --accent: oklch(72% 0.13 248);
-  --accent-hov: oklch(80% 0.12 248);
-  --accent-ring: oklch(72% 0.13 248);
-  --on-accent: oklch(17% 0.012 250);
 
   --ok: oklch(80% 0.14 155);
   --ok-bg: oklch(30% 0.055 155);
