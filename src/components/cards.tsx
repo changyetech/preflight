@@ -226,6 +226,9 @@ function RiskDetail({ data }: { data: Extract<RiskData, { status: "ok" }> }) {
           }
         />
       </Kv>
+      {/* 契约 §6：51–75 分且 anonymous 时结论判高而本项仍是黄，缺了这句解释，
+          用户看到高风险却找不到哪一项显红。判据本身不在这里算，只是把它说出来。 */}
+      {data.anonymous ? <Note>{copy.anonymousNote}</Note> : null}
       {data.networkType === "Hosting" || detections.length > 0 ? (
         <Note>{copy.hostingNote}</Note>
       ) : null}
@@ -251,11 +254,17 @@ export function O4Card({
   const ok = data?.status === "ok" ? data : null;
   // 分项颜色直接吃契约给的 riskLevel（docs/api.md 3.1 已按规格 3.2 的阈值分好级），
   // 不在前端拿 riskScore 再算一遍——同一套阈值放两处迟早会分叉。
-  // 唯一的本地叠加：Hosting 与代理检出把绿拉成黄（规格 3.2 的分项提醒），但不拉高综合结论。
+  // 本地叠加的都是**布尔信号**，不是阈值，与上面那句不冲突：
+  // - Hosting 与代理检出把绿拉成黄（契约 §2.1 明列的分项提醒，不进综合结论）；
+  // - abuseListed 同样把绿拉成黄，但它是**真的贡献综合结论**的信号
+  //   （domain/verdict.ts：`medium || abuseListed === true`）。分数低时 riskLevel
+  //   仍是 low，卡片会绿着，而结论区已经是黄的「中风险」——正是契约 §6 点名的
+  //   失败模式：结论变色了却没有任何一项告诉用户为什么。
   const tone: CardTone = ok
     ? ok.riskLevel === "high"
       ? "danger"
       : ok.riskLevel === "medium" ||
+          ok.abuseListed === true ||
           ok.networkType === "Hosting" ||
           ok.proxy ||
           ok.vpn ||

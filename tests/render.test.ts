@@ -31,7 +31,7 @@ import {
 } from "../src/domain/udpEgress";
 import { DNS_EGRESS_PROBE_FAILED } from "../src/domain/dnsEgress";
 import type { Coverage } from "../src/domain/coverage";
-import type { GeoData } from "../src/domain/types";
+import type { GeoData, RiskData } from "../src/domain/types";
 import type { Verdict } from "../src/domain/verdict";
 
 const GEO: GeoData = {
@@ -349,6 +349,78 @@ describe("O4 第三方披露（ADR-0008）", () => {
     expect(html).toContain(esc(COPY.cardStatus.failed));
     expect(html).toContain(esc(COPY.checks.O4.quotaExhausted));
     expect(html).not.toContain('class="retry"');
+  });
+});
+
+describe("O4 分项配色与契约 §6 的解释义务（终审修复波）", () => {
+  /** 只改要点的 O4 「ok」数据；默认是一份干干净净、riskLevel low 的住宅 IP。 */
+  function riskData(
+    over: Partial<Extract<RiskData, { status: "ok" }>> = {},
+  ): Extract<RiskData, { status: "ok" }> {
+    return {
+      status: "ok",
+      ip: "1.2.3.4",
+      networkType: "Residential",
+      proxy: false,
+      vpn: false,
+      tor: false,
+      scraper: false,
+      riskScore: 10,
+      riskLevel: "low",
+      anonymous: false,
+      abuseListed: false,
+      ...over,
+    };
+  }
+
+  function renderO4(data: Extract<RiskData, { status: "ok" }>): string {
+    return renderToStaticMarkup(
+      createElement(O4Card, {
+        state: { status: "done", data },
+        onRun: () => {},
+        onFail: () => {},
+      }),
+    );
+  }
+
+  it("abuseListed 把卡片从绿拉成黄——它是真的贡献综合结论的信号", () => {
+    // riskScore 10 ⇒ riskLevel low ⇒ 卡片本来是绿的，而 computeVerdict 因为
+    // abuseListed 已经把综合结论判到「中风险」。卡片继续显绿，用户就找不到
+    // 结论为什么是黄的（契约 §6 点名的失败模式）。
+    const html = renderO4(riskData({ abuseListed: true }));
+
+    expect(html).toContain('class="card tone-warn"');
+    expect(html).not.toContain('class="card tone-ok"');
+  });
+
+  it("判别力对照：同一份数据、abuseListed 为 false 时仍是绿卡", () => {
+    const html = renderO4(riskData({ abuseListed: false }));
+
+    expect(html).toContain('class="card tone-ok"');
+    expect(html).not.toContain('class="card tone-warn"');
+  });
+
+  it("abuseListed 未知（第三方不可用）不当作有收录，卡片仍是绿的", () => {
+    const html = renderO4(riskData({ abuseListed: null }));
+
+    expect(html).toContain('class="card tone-ok"');
+  });
+
+  it("anonymous 时卡内出现降阈值的解释（契约 §6：结论高 · 分项黄）", () => {
+    // 60 分 + anonymous ⇒ 综合结论判高（阈值降到 51），而分项分级只看分数，
+    // riskLevel 仍是 medium（黄）。这一档缺了文字就说不通。
+    const html = renderO4(
+      riskData({ riskScore: 60, riskLevel: "medium", anonymous: true }),
+    );
+
+    expect(html).toContain(esc(COPY.checks.O4.anonymousNote));
+    expect(html).toContain('class="card tone-warn"');
+  });
+
+  it("判别力对照：anonymous 为 false 时不出这句解释", () => {
+    const html = renderO4(riskData({ riskScore: 60, riskLevel: "medium" }));
+
+    expect(html).not.toContain(esc(COPY.checks.O4.anonymousNote));
   });
 });
 
