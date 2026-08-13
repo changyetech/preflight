@@ -57,19 +57,19 @@ pub const EN: Text = Text {
 
     checks: ChecksText {
         o1: CheckText {
-            title: "Exit IP and ownership",
+            title: "Exit IP and Ownership",
             description: "The public address your traffic leaves the proxy with, plus where the IP is registered. This is not the address behind the proxy.",
         },
         o2: CheckText {
-            title: "System timezone match",
+            title: "System Timezone Consistency",
             description: "Compares your system timezone with the timezone of your exit IP. A mismatch is a visible inconsistency to anti-abuse systems.",
         },
         o3: CheckText {
-            title: "IPv6 leak",
+            title: "IPv6 Leak",
             description: "Most proxies only handle IPv4. If IPv6 is reachable, it can expose a second address from a different location.",
         },
         o4: CheckText {
-            title: "IP type and risk",
+            title: "IP Type & Risk",
             description: "Whether the exit IP is residential or a datacenter, whether it is flagged as a proxy, its risk score, and any abuse reports.",
         },
         o5: CheckText {

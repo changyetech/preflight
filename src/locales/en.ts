@@ -82,7 +82,7 @@ export const EN = {
 
   checks: {
     O1: {
-      title: "Exit IP Info",
+      title: "Exit IP and Ownership",
       meaning:
         "This is what every service you connect to sees as you. The further this location is from where you actually are, the more likely your traffic gets flagged as anomalous.",
       fields: {
