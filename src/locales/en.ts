@@ -332,10 +332,15 @@ export const EN = {
     },
   },
 
+  /** 页脚双栏披露（原型 .footer-cols）：按「自动发起／需手动触发」拆开，原文一字未改，只是分段。 */
   footer: {
     privacy: "This site stores none of your check results.",
-    thirdParty:
-      "Three checks run automatically as soon as the page loads, directly from your browser: the IPv6 check queries ipify, the DNS egress check queries ip-api.com, and the UDP egress check queries stun.cloudflare.com and stun.l.google.com. The IP risk check requires you to trigger it manually, at which point Cloudflare Turnstile loads for bot verification first, then your exit IP is sent to proxycheck.io and StopForumSpam.",
+    autoLabel: "Runs automatically",
+    autoBody:
+      "Three checks run automatically as soon as the page loads, directly from your browser: the IPv6 check queries ipify, the DNS egress check queries ip-api.com, and the UDP egress check queries stun.cloudflare.com and stun.l.google.com.",
+    onDemandLabel: "Triggered manually",
+    onDemandBody:
+      "The IP risk check requires you to trigger it manually, at which point Cloudflare Turnstile loads for bot verification first, then your exit IP is sent to proxycheck.io and StopForumSpam.",
   },
 
   errors: {

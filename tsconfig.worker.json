@@ -32,6 +32,7 @@
   "exclude": [
     "tests/render.test.ts",
     "tests/landing.test.ts",
+    "tests/footer.test.ts",
     "tests/theme.test.ts"
   ]
 }

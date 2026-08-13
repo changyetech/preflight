@@ -16,6 +16,7 @@ import { coverageCells } from "./coverageMeter";
 import { CLI_CHECK_IDS } from "./domain/checks";
 import { langFromPathname, localeOf, type Lang } from "./copy";
 import { BackToTop } from "./components/BackToTop";
+import { Footer } from "./components/Footer";
 import { LangSwitch } from "./components/LangSwitch";
 import { Landing } from "./components/Landing";
 import { ThemeSwitch } from "./components/ThemeSwitch";
@@ -121,10 +122,7 @@ function AppShell({ lang }: { lang: Lang }) {
 
         <Landing />
 
-        <footer className="site-footer">
-          <p>{COPY.footer.privacy}</p>
-          <p>{COPY.footer.thirdParty}</p>
-        </footer>
+        <Footer />
       </main>
 
       <BackToTop />

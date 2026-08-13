@@ -289,8 +289,12 @@ export const ZH_HANS: Copy = {
 
   footer: {
     privacy: "本站不存储任何检测结果。",
-    thirdParty:
-      "页面加载后会自动发起三项检测，均由浏览器直接发出：IPv6 检测访问 ipify，DNS 出口检测访问 ip-api.com，UDP 出口检测访问 stun.cloudflare.com 与 stun.l.google.com。IP 风险检测需你手动触发，届时会先加载 Cloudflare Turnstile 人机验证，随后出口 IP 会被发送至 proxycheck.io 与 StopForumSpam。",
+    autoLabel: "自动发起",
+    autoBody:
+      "页面加载后会自动发起三项检测，均由浏览器直接发出：IPv6 检测访问 ipify，DNS 出口检测访问 ip-api.com，UDP 出口检测访问 stun.cloudflare.com 与 stun.l.google.com。",
+    onDemandLabel: "需手动触发",
+    onDemandBody:
+      "IP 风险检测需你手动触发，届时会先加载 Cloudflare Turnstile 人机验证，随后出口 IP 会被发送至 proxycheck.io 与 StopForumSpam。",
   },
 
   errors: {

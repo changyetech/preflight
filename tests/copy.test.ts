@@ -38,7 +38,7 @@ describe.each([["en", COPY] as const, ["zh-hans", COPY_ZH_HANS] as const])(
     });
 
     it("页脚第三方披露也要提到 Turnstile", () => {
-      expect(copy.footer.thirdParty).toContain("Turnstile");
+      expect(copy.footer.onDemandBody).toContain("Turnstile");
     });
 
     // 契约 §5.1 呈现约束：缺了这句，CLI 用户会误以为自己的 $TZ 已被检查。
@@ -112,9 +112,9 @@ describe.each([["en", COPY] as const, ["zh-hans", COPY_ZH_HANS] as const])(
 
     // ADR-0008：O5／O6 自动执行、没有触发控件，前置披露必须列出全部新增第三方域名。
     it("首屏前置告知列出 O5／O6 的第三方域名（ADR-0008）", () => {
-      expect(copy.footer.thirdParty).toContain("ip-api.com");
-      expect(copy.footer.thirdParty).toContain("stun.cloudflare.com");
-      expect(copy.footer.thirdParty).toContain("stun.l.google.com");
+      expect(copy.footer.autoBody).toContain("ip-api.com");
+      expect(copy.footer.autoBody).toContain("stun.cloudflare.com");
+      expect(copy.footer.autoBody).toContain("stun.l.google.com");
     });
 
     // O5／O6 自动执行、无控件可挂披露，只能就地放在卡片说明位（与 O3 同一套处理）。
