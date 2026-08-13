@@ -15,7 +15,8 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.104"
-clap = { version = "4.6.6", features = ["derive"] }
+# `string` 特性：`long_version` 需接受运行时构造的 String（版权行年份取当前年）。
+clap = { version = "4.6.6", features = ["derive", "string"] }
 jiff = "0.2.35"
 rpassword = "7.5.4"
 serde = { version = "1.0.229", features = ["derive"] }

@@ -54,6 +54,10 @@ copy_leaf! {
         key_prompt,
         key_saved,
         key_empty,
+        /// `config list` 里 secret 值的状态词（如「已设置」）。键名是字面 TOML 键，
+        /// 不随语种变化，写死在 main.rs；这里只放状态词。
+        list_value_set,
+        list_value_unset,
     }
 }
 

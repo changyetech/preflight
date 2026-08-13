@@ -1354,6 +1354,13 @@ button {
   }
 }
 
+.footer-copyright {
+  margin: 1.5rem 0 0;
+  font-size: 0.78125rem;
+  line-height: 1.85;
+  color: var(--muted);
+}
+
 /* ---------- 宽视口 ---------- */
 
 @media (min-width: 48rem) {

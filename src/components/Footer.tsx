@@ -23,6 +23,8 @@ export function Footer() {
           <p>{footer.onDemandBody}</p>
         </div>
       </div>
+      {/* 版权行不进 locales：符号、年份、产品名均无语种差异；年份取运行时当前年。 */}
+      <p className="footer-copyright">© {new Date().getFullYear()} ipcheck</p>
     </footer>
   );
 }

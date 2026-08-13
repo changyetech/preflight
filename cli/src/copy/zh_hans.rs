@@ -14,6 +14,8 @@ pub const ZH_HANS: Text = Text {
         key_prompt: "proxycheck API key（输入不回显）：",
         key_saved: "已保存。proxycheck 日配额从 100 次提升到 1000 次。",
         key_empty: "未输入内容，key 未改动。",
+        list_value_set: "已设置",
+        list_value_unset: "未设置",
     },
 
     errors: ErrorText {

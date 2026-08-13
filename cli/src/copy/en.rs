@@ -18,6 +18,8 @@ pub const EN: Text = Text {
         key_prompt: "proxycheck API key (input hidden):",
         key_saved: "Saved. Your daily proxycheck quota is now 1,000 instead of 100.",
         key_empty: "Nothing entered — the key was not changed.",
+        list_value_set: "set",
+        list_value_unset: "not set",
     },
 
     errors: ErrorText {

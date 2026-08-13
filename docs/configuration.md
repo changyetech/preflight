@@ -157,7 +157,7 @@ git tag cli/v0.2.0 && git push --tags
 
 CLI 零配置可用。以下都是可选项。
 
-**配置文件**：`~/.config/ipcheck/config.toml`（Unix）／`%APPDATA%\ipcheck\config.toml`（Windows）。`IPCHECK_CONFIG` 可覆盖路径，`ipcheck config path` 打印实际读的是哪个。
+**配置文件**：`~/.config/ipcheck/config.toml`（Unix）／`%APPDATA%\ipcheck\config.toml`（Windows）。`IPCHECK_CONFIG` 可覆盖路径，`ipcheck config path` 打印实际读的是哪个。`ipcheck config list` 打印全部键**合并后的生效值**（flag > 环境变量 > 配置文件 > 默认；secret 只报是否已设置，绝不回显）。
 
 **允许的键是白名单**（[verdict.md §8](./verdict.md)），**未知键报错退出**——静默忽略会让拼错的键表现成「配了但没生效」，那是最难查的一类问题：
 

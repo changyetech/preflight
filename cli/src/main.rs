@@ -24,6 +24,8 @@ use lang::{Lang, LangError};
 #[command(
     name = "ipcheck",
     version,
+    // GNU 惯例：版权信息进 `--version`（`-V` 仍是短版本号），日常报告输出保持干净。
+    long_version = long_version(),
     about = "Check your network environment before launching AI tools"
 )]
 struct Cli {
@@ -44,6 +46,15 @@ struct Cli {
     command: Option<Command>,
 }
 
+/// `--version` 的完整输出：版本号 + 版权行。年份取运行时当前年，不写死。
+fn long_version() -> String {
+    format!(
+        "{}\n© {} ipcheck",
+        env!("CARGO_PKG_VERSION"),
+        jiff::Zoned::now().year()
+    )
+}
+
 #[derive(Subcommand)]
 enum Command {
     /// View and change configuration
@@ -57,6 +68,8 @@ enum Command {
 enum ConfigAction {
     /// Print the config file path actually in use
     Path,
+    /// List the effective value of every key (secrets are never echoed)
+    List,
     /// Set a value interactively (input is not echoed)
     Set { key: SettableKey },
     /// Show whether a value is set (secrets are never echoed)
@@ -162,6 +175,24 @@ fn run_config(
     mut file: ConfigFile,
     settings: &Settings,
 ) -> Result<()> {
+    // `list` 打的是**合并后的生效值**（flag > 环境变量 > 配置文件 > 默认），
+    // 不是配置文件原文——用户想问的是「现在到底用的什么」。不依赖配置文件路径，
+    // 放在路径守卫之前。
+    if let ConfigAction::List = action {
+        println!("language = {}", settings.lang);
+        println!(
+            "proxycheck_key = {}",
+            if settings.proxycheck_key.is_some() {
+                text.config.list_value_set
+            } else {
+                text.config.list_value_unset
+            }
+        );
+        println!("timeout = {}", settings.timeout.as_secs());
+        println!("no_color = {}", settings.no_color);
+        return Ok(());
+    }
+
     let Some(path) = config_path else {
         bail!(
             "{}: HOME / XDG_CONFIG_HOME / APPDATA",
@@ -170,6 +201,9 @@ fn run_config(
     };
 
     match action {
+        // 已在上方的路径守卫之前处理并返回。
+        ConfigAction::List => unreachable!(),
+
         ConfigAction::Path => {
             println!("{}: {}", text.config.path_label, path.display());
         }
@@ -272,6 +306,25 @@ mod tests {
     fn config_set_only_accepts_whitelisted_keys() {
         assert!(Cli::try_parse_from(["ipcheck", "config", "set", "proxycheck-key"]).is_ok());
         assert!(Cli::try_parse_from(["ipcheck", "config", "set", "risk-threshold"]).is_err());
+    }
+
+    #[test]
+    fn config_list_is_a_valid_subcommand() {
+        assert!(Cli::try_parse_from(["ipcheck", "config", "list"]).is_ok());
+    }
+
+    #[test]
+    fn long_version_carries_the_copyright_line() {
+        // `--version` 走 long_version，除版本号外还要带版权行（`-V` 仍是短版本号）。
+        // 不用 unwrap_err：那需要 `Cli: Debug`，为一条测试给整个 CLI 派生 Debug 不值。
+        let Err(err) = Cli::try_parse_from(["ipcheck", "--version"]) else {
+            panic!("--version 应走 DisplayVersion 的错误路径");
+        };
+        let copyright = format!("© {} ipcheck", jiff::Zoned::now().year());
+        assert!(
+            err.to_string().contains(&copyright),
+            "--version 输出应包含版权行「{copyright}」：{err}"
+        );
     }
 
     #[test]
