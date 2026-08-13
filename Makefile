@@ -86,6 +86,10 @@ check: fmt lint build test ## Run all quality checks, web only (fmt + lint + bui
 cli-build: ## Build the Rust CLI
 	cargo build
 
+.PHONY: cli-release
+cli-release: ## Build the Rust CLI (release, target/release/)
+	cargo build --release
+
 .PHONY: cli-test
 cli-test: ## Run Rust tests
 	cargo test

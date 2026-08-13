@@ -38,6 +38,7 @@ Web application
 | `make lint` / `make fmt` | oxlint / Prettier |
 | `make check` | fmt + lint + build + test（**只管 Web**——改一行 CSS 不该等 Rust 编译） |
 | `make cli-build` / `cli-test` / `cli-lint` / `cli-fmt` | CLI 的 cargo 对应命令 |
+| `make cli-release` | CLI release 构建（产物在 `target/release/ipcheck`） |
 | `make check-cli` | CLI 的 fmt + clippy + build + test |
 | `make check-all` | Web 与 CLI 都跑 |
 | `make clean` | 删除 `dist`、`.wrangler` 等产物 |
