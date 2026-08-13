@@ -90,20 +90,15 @@ copy_leaf! {
         summary_full_high,
         exit_ip_label,
         /// 结论区「需关注」清单的标签（spec §5.1）。
-        #[allow(dead_code)]
         attention_label,
         /// 「需关注」清单里，贡献综合结论的项的标注词（vs 仅提醒项）。
-        #[allow(dead_code)]
         attention_contributing,
         /// 「需关注」清单里，仅提醒、不进综合结论的项的标注词。
-        #[allow(dead_code)]
         attention_reminder_only,
         /// 「需关注」清单里非最后一项之间的分隔符——中英文习惯不同，不能由渲染层写死
         /// （中文顿号 vs 英文逗号）。
-        #[allow(dead_code)]
         attention_list_separator,
         /// 「需关注」清单里最后一项前的连接词（中文"与"、英文" and "）。
-        #[allow(dead_code)]
         attention_list_connector,
     }
 }
@@ -213,7 +208,6 @@ copy_leaf! {
         #[allow(dead_code)]
         obtained,
         /// 风险分刻度说明，对应契约 §6 分项分级（`<26` 绿 / `<76` 黄 / `≥76` 红）。
-        #[allow(dead_code)]
         risk_scale_note,
         /// O4 标题行右端的风险分级短词（不带「风险」后缀，区别于 `verdict.low/medium/high`）。
         #[allow(dead_code)]

@@ -128,13 +128,17 @@ pub fn report(report: &Report, text: &Text, style: &Style, verbose: bool) -> Str
     let coverage = report.coverage();
     debug_assert!(coverage.is_complete(), "覆盖度不变量被破坏：{coverage:?}");
 
+    let all_cards = cards(report, text);
+
     let mut out = String::new();
     let _ = writeln!(out);
-    render_verdict(&mut out, &verdict, &coverage, report, text, style);
+    render_verdict(
+        &mut out, &verdict, &coverage, report, &all_cards, text, style,
+    );
     let _ = writeln!(out);
 
-    for card in cards(report, text) {
-        render_card(&mut out, &card, style, verbose);
+    for card in &all_cards {
+        render_card(&mut out, card, style, verbose);
     }
     let _ = writeln!(out);
 
@@ -146,6 +150,7 @@ fn render_verdict(
     verdict: &Verdict,
     coverage: &Coverage,
     report: &Report,
+    all_cards: &[Card],
     text: &Text,
     style: &Style,
 ) {
@@ -160,7 +165,44 @@ fn render_verdict(
     let _ = writeln!(out, "    {summary}");
 
     if let Outcome::Done(info) = &report.o1 {
-        let _ = writeln!(out, "    {}  {}", text.verdict.exit_ip_label, info.ip);
+        let mut parts = vec![info.ip.clone()];
+        if let Some(geo) = &info.geo {
+            let place: Vec<&str> = [&geo.city_name, &geo.region_name, &geo.country_name]
+                .into_iter()
+                .filter_map(|f| f.as_deref())
+                .collect();
+            if !place.is_empty() {
+                parts.push(place.join(", "));
+            }
+            let network: Vec<&str> = [&geo.asn, &geo.organisation]
+                .into_iter()
+                .filter_map(|f| f.as_deref())
+                .collect();
+            if !network.is_empty() {
+                parts.push(network.join("  "));
+            }
+        }
+        let _ = writeln!(
+            out,
+            "    {}  {}",
+            text.verdict.exit_ip_label,
+            parts.join("  ·  ")
+        );
+    }
+
+    if let Outcome::Done(risk) = &report.o4 {
+        let score = risk.risk.risk_score;
+        let bar_tone = match verdict::risk_level(score) {
+            Level::Low => Tone::Ok,
+            Level::Medium => Tone::Warn,
+            Level::High => Tone::Bad,
+        };
+        let _ = writeln!(
+            out,
+            "    {score}/100  {}  {}",
+            risk_bar(score, bar_tone, style),
+            style.tone(Tone::Dim, text.values.risk_scale_note)
+        );
     }
 
     // 综合结论永远不得脱离覆盖度单独呈现（ADR-0004）。
@@ -175,6 +217,153 @@ fn render_verdict(
             )
         )
     );
+
+    render_attention(out, all_cards, report, verdict, text, style);
+}
+
+/// 风险分刻度条：20 格块字符，填充比例 = `score / 100`。
+///
+/// `--no-color` 下也能读懂——填充长度本身传递信息，不依赖颜色（点 8）。
+fn risk_bar(score: u32, tone: Tone, style: &Style) -> String {
+    const WIDTH: usize = 20;
+    let filled = ((score as usize) * WIDTH + 50) / 100;
+    let filled = filled.min(WIDTH);
+    let empty = WIDTH - filled;
+    format!(
+        "{}{}",
+        style.tone(tone, &"█".repeat(filled)),
+        style.tone(Tone::Dim, &"░".repeat(empty))
+    )
+}
+
+/// 「需关注」清单从卡片 tone 派生（spec 5.2），不写死检测项列表。
+/// 无 warn/bad 项时整块（含 attention_scope 句）不出。
+fn render_attention(
+    out: &mut String,
+    all_cards: &[Card],
+    report: &Report,
+    verdict: &Verdict,
+    text: &Text,
+    style: &Style,
+) {
+    let mut items: Vec<&Card> = all_cards
+        .iter()
+        .filter(|c| c.tone == Tone::Warn || c.tone == Tone::Bad)
+        .collect();
+    // bad 先于 warn，同级按 ALL_CHECKS（O1→C4）固定顺序——`cards()` 本就按此顺序
+    // 构建，`sort_by_key` 是稳定排序，同级元素的相对顺序保持不变。
+    items.sort_by_key(|c| if c.tone == Tone::Bad { 0 } else { 1 });
+
+    if items.is_empty() {
+        return;
+    }
+
+    let _ = writeln!(out, "    {}", style.bold(text.verdict.attention_label));
+    for card in &items {
+        let _ = writeln!(
+            out,
+            "      {} {}  {}",
+            style.tone(card.tone, marker(card.tone)),
+            style.tone(Tone::Dim, card.id.as_str()),
+            card.title,
+        );
+    }
+
+    // 判据是「信号是否实际被 compute() 消费并命中」，不是卡片 tone——一张
+    // Warn/Bad 卡可能来自契约 2.1 明列的纯提醒信号。不在这里重算 51/76 阈值：
+    // O4 是否贡献综合结论，直接读 compute() 的结果（只有 O4 的风险分能把结论
+    // 判到 Full(High)，这是判级契约 3.2 的不变量，不是这里现算的）。
+    let contributing = contributing_ids(&report.signals(), verdict);
+    let contributing_ids: Vec<CheckId> = items
+        .iter()
+        .map(|c| c.id)
+        .filter(|id| contributing.contains(id))
+        .collect();
+    let reminder_ids: Vec<CheckId> = items
+        .iter()
+        .map(|c| c.id)
+        .filter(|id| !contributing.contains(id))
+        .collect();
+
+    let v = &text.verdict;
+    if !contributing_ids.is_empty() {
+        let _ = writeln!(
+            out,
+            "    {}",
+            style.tone(
+                Tone::Dim,
+                &format!(
+                    "{} {}",
+                    join_ids(
+                        &contributing_ids,
+                        v.attention_list_separator,
+                        v.attention_list_connector
+                    ),
+                    v.attention_contributing
+                )
+            )
+        );
+    }
+    if !reminder_ids.is_empty() {
+        let _ = writeln!(
+            out,
+            "    {}",
+            style.tone(
+                Tone::Dim,
+                &format!(
+                    "{} {}",
+                    join_ids(
+                        &reminder_ids,
+                        v.attention_list_separator,
+                        v.attention_list_connector
+                    ),
+                    v.attention_reminder_only
+                )
+            )
+        );
+    }
+}
+
+/// 哪些检测项的信号实际被 `verdict::compute()` 消费并命中（贡献综合结论）。
+///
+/// 只读 `Signals` 与 `Verdict` 已经算好的结果，不重算阈值：
+/// - 除 O4 外的贡献信号都是「命中即贡献」的布尔量，直接对照 `Signals` 字段。
+/// - O4（风险分）能否把结论抬到 `Full(High)`，取决于 `anonymous` 选择的
+///   51/76 阈值——但契约 3.2 保证了"高档信号只能来自 O4"，所以只需要看
+///   `verdict` 是否已经是 `Full(High)`，不必在这里重新比较分数与阈值。
+///   O4 也可能通过 `abuse_listed` 贡献到「中」，与分数无关。
+fn contributing_ids(signals: &verdict::Signals, verdict: &Verdict) -> Vec<CheckId> {
+    let mut ids = Vec::new();
+    if signals.tz_mismatch_cli_env == Some(true) {
+        ids.push(CheckId::C4);
+    }
+    if signals.ipv6_leak == Some(true) {
+        ids.push(CheckId::O3);
+    }
+    if signals.dns_egress_leak == Some(true) {
+        ids.push(CheckId::O5);
+    }
+    if signals.udp_egress_mismatch == Some(true) {
+        ids.push(CheckId::O6);
+    }
+    if signals.tun_off == Some(true) {
+        ids.push(CheckId::C3);
+    }
+    if signals.abuse_listed == Some(true) || matches!(verdict, Verdict::Full(Level::High)) {
+        ids.push(CheckId::O4);
+    }
+    ids
+}
+
+/// 用分隔符/连接词把编号列表拼成一句（如「O2 与 O4」「O2、O4 与 O6」）。
+/// 中英文标点不同，两个词都来自 Copy（spec 5.2 的裁定），不写死在这里。
+fn join_ids(ids: &[CheckId], separator: &str, connector: &str) -> String {
+    let strs: Vec<&str> = ids.iter().map(|id| id.as_str()).collect();
+    match strs.split_last() {
+        None => String::new(),
+        Some((last, [])) => (*last).to_string(),
+        Some((last, rest)) => format!("{}{connector}{last}", rest.join(separator)),
+    }
 }
 
 fn render_card(out: &mut String, card: &Card, style: &Style, verbose: bool) {
@@ -844,6 +1033,115 @@ mod tests {
         let out = render(&miss, false, false);
         assert!(out.contains(text.udp_egress.no_mismatch), "{out}");
         assert!(!out.contains(text.udp_egress.stun_disagree), "{out}");
+    }
+
+    fn risk_report(score: u32, anonymous: bool) -> Report {
+        let mut report = blank();
+        report.o4 = Outcome::Done(Risk {
+            risk: crate::probe::proxycheck::Risk {
+                network_type: None,
+                proxy: false,
+                vpn: false,
+                tor: false,
+                scraper: false,
+                risk_score: score,
+                anonymous,
+            },
+            abuse: None,
+        });
+        report
+    }
+
+    // ---- 判别力测试（brief 验证项 5，成对，缺一不可）----
+    // 同一分数（60，O4 分项黄），只翻转 anonymous，综合结论方向相反：
+    // - anonymous: false → 综合结论判高的阈值是 76，60 没过线，O4 仅作提醒。
+    // - anonymous: true  → 综合结论判高的阈值降到 51，60 过线，O4 参与判定。
+    // 判据必须来自 verdict::compute() 的结果，不能是卡片 tone（两次卡片 tone 都是黄）。
+
+    #[test]
+    fn not_anonymous_score_60_does_not_count_o4_toward_the_verdict() {
+        let report = risk_report(60, false);
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+        assert_eq!(report.verdict(), Verdict::Full(Level::Low));
+        assert!(
+            out.contains(&format!("O4 {}", text.verdict.attention_reminder_only)),
+            "{out}"
+        );
+        assert!(
+            !out.contains(&format!("O4 {}", text.verdict.attention_contributing)),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn anonymous_score_60_does_count_o4_toward_the_verdict() {
+        let report = risk_report(60, true);
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+        assert_eq!(report.verdict(), Verdict::Full(Level::High));
+        assert!(
+            out.contains(&format!("O4 {}", text.verdict.attention_contributing)),
+            "{out}"
+        );
+        assert!(
+            !out.contains(&format!("O4 {}", text.verdict.attention_reminder_only)),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn attention_block_is_absent_when_no_card_is_warn_or_bad() {
+        // blank() 全部检测失败——失败卡是 Dim，不是 Warn/Bad。
+        let text = copy::text(Lang::En);
+        let out = render(&blank(), false, false);
+        assert!(!out.contains(text.verdict.attention_label), "{out}");
+    }
+
+    #[test]
+    fn attention_scope_splits_contributing_from_reminder_only_items() {
+        // 混合场景：C4（tzMismatchCliEnv 命中，贡献）+ O2（系统时区不一致，契约 2.1
+        // 明列的纯提醒信号）+ O4（分项黄但分数没过线，仅提醒）。
+        let mut report = blank();
+        report.c4 = Outcome::Done(TimezoneCheck {
+            local: Some("Asia/Shanghai".into()),
+            exit: Some("America/New_York".into()),
+            matches: Some(false),
+        });
+        report.o2 = Outcome::Done(TimezoneCheck {
+            local: Some("Asia/Shanghai".into()),
+            exit: Some("America/New_York".into()),
+            matches: Some(false),
+        });
+        report.o4 = Outcome::Done(Risk {
+            risk: crate::probe::proxycheck::Risk {
+                network_type: None,
+                proxy: false,
+                vpn: false,
+                tor: false,
+                scraper: false,
+                risk_score: 40,
+                anonymous: false,
+            },
+            abuse: None,
+        });
+
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+
+        // 需关注清单三项都在，且都在结论区（O1 卡片之后才是下面的卡片流）。
+        assert!(out.contains(text.verdict.attention_label), "{out}");
+        assert!(
+            out.contains(&format!("C4 {}", text.verdict.attention_contributing)),
+            "{out}"
+        );
+        assert!(
+            out.contains(&format!(
+                "O2{}O4 {}",
+                text.verdict.attention_list_connector, text.verdict.attention_reminder_only
+            )),
+            "{out}"
+        );
     }
 
     #[test]
