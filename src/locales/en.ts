@@ -21,6 +21,13 @@ export const EN = {
     compare: "Comparison",
     /** 回顶按钮只有图标，标签给读屏用。 */
     backToTop: "Back to top",
+    /** 主题切换器：三态下拉（浅色/深色/跟随系统），规格 §2 决策 1。 */
+    theme: {
+      label: "Theme",
+      light: "Light",
+      dark: "Dark",
+      system: "Follow system",
+    },
   },
 
   verdict: {

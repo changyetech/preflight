@@ -231,6 +231,102 @@
   opacity: 1;
 }
 
+/* ---------- 主题切换 ---------- */
+/* 三态下拉，样式量级照抄语言切换（同属顶栏工具组），但主题需要「当前生效项打勾」，
+   语义比链接列表重，所以用 button + role="menu" 而非 <details>（组件内自管开合）。 */
+
+.theme-menu {
+  position: relative;
+  flex: none;
+}
+
+.theme-switch {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--muted-bg);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.theme-switch:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.theme-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.theme-menu-list {
+  position: absolute;
+  /* 逻辑属性：RTL 下菜单自动贴左，与语言菜单保持一致 */
+  inset-inline-end: 0;
+  z-index: 20;
+  min-width: 10rem;
+  margin: 0.35rem 0 0;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+}
+
+.theme-menu-list button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0.6rem;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+
+.theme-menu-list button:hover {
+  background: var(--chip-bg);
+  color: var(--text-h);
+}
+
+.theme-menu-list button[aria-current="true"] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.theme-menu-item-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* 打勾标记用 visibility 占位而非 display：三行的右缘要对齐，选中项切换时不能让菜单宽度跳动 */
+.theme-menu-chk {
+  visibility: hidden;
+  flex: none;
+}
+
+.theme-menu-list button[aria-current="true"] .theme-menu-chk {
+  visibility: visible;
+}
+
 /* ---------- 首屏结论区 ---------- */
 
 .verdict {
