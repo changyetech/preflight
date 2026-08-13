@@ -3,7 +3,7 @@
 
 import "./App.css";
 
-import { CliCard } from "./components/Card";
+import { CliListItem } from "./components/Card";
 import {
   O1Card,
   O2Card,
@@ -105,16 +105,18 @@ function AppShell({ lang }: { lang: Lang }) {
             <h2>{COPY.sections.cli.title}</h2>
             <p>{COPY.sections.cli.body}</p>
           </header>
-          <div className="cards">
+          {/* C1–C4 是终态名册，卡片壳（状态药丸、正文容器）是错的容器，改为发丝线列表
+              （规格 §4 要点 6，删的只是卡片形态，四项内容不变）。 */}
+          <ul className="cli-list">
             {CLI_CHECK_IDS.map((id) => (
-              <CliCard
+              <CliListItem
                 key={id}
                 id={id}
                 title={COPY.checks[id].title}
                 meaning={COPY.checks[id].meaning}
               />
             ))}
-          </div>
+          </ul>
         </section>
 
         <Landing />

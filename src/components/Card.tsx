@@ -1,12 +1,13 @@
-// 卡片壳与灰卡（规格 4.1 五态 / 4.2 每卡带「这意味着什么」）。
+// 卡片壳（规格 4.1 五态 / 4.2 每卡带「这意味着什么」）与 kv/result/note 三个共享呈现原语——
+// 原型（refs/ipcheck-web-redesign.html）把每张卡的正文统一收成这三类结构：
+// 字段列表（.kv）、着色结论（.result）、不参与判定的补充说明（.note）。
 
 import { useState, type ReactNode } from "react";
 
 import type { Copy } from "../copy";
-import { CLI_CHECK } from "../domain/checks";
 import { useCopy } from "../i18n";
 
-export type CardTone = "neutral" | "ok" | "warn" | "danger" | "muted";
+export type CardTone = "neutral" | "ok" | "warn" | "danger";
 
 type CardStatus = keyof Copy["cardStatus"];
 
@@ -30,6 +31,50 @@ export function CopyButton({ text }: { text: string }) {
   );
 }
 
+/** 一组 key/value 字段（原型 .kv：dl/dt/dd），取代逐条独立 <p> 的旧 Field。 */
+export function Kv({ children }: { children: ReactNode }) {
+  return <dl className="kv">{children}</dl>;
+}
+
+export function KvRow({
+  label,
+  value,
+  emphasis = false,
+}: {
+  label: string;
+  value: string;
+  /** 该行是否是这张卡最主要的值（原型 kv() 第三个可选参数 "em"），比如出口 IP 的归属地。 */
+  emphasis?: boolean;
+}) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd className={emphasis ? "em" : undefined}>{value}</dd>
+    </div>
+  );
+}
+
+/** 卡片的核心结论/失败原因（原型 .result，t-ok/t-warn/t-danger 三档着色）。
+ *  "neutral" 用于「无从比对」这类既非成功也非失败的中性结论，不带颜色后缀。 */
+export function Result({
+  tone = "neutral",
+  children,
+}: {
+  tone?: CardTone;
+  children: ReactNode;
+}) {
+  return (
+    <p className={tone === "neutral" ? "result" : `result t-${tone}`}>
+      {children}
+    </p>
+  );
+}
+
+/** 不参与判定的补充说明（原型 .note）：第三方披露、范围限定、resolver 归属之类。 */
+export function Note({ children }: { children: ReactNode }) {
+  return <p className="note">{children}</p>;
+}
+
 export function CheckCard({
   id,
   title,
@@ -45,7 +90,7 @@ export function CheckCard({
   status: CardStatus;
   tone?: CardTone;
   meaning: string;
-  /** 只有「检测失败」提供重试；灰卡（需 CLI）是终态，不传此项（规格 4.1）。 */
+  /** 只有「检测失败」提供重试（规格 4.1）。 */
   onRetry?: () => void;
   /**
    * 重试按钮文案。会触发第三方调用的项必须在这里写明调用对象（ADR-0008）——
@@ -58,13 +103,13 @@ export function CheckCard({
   const label = retryLabel ?? COPY.actions.retry;
 
   return (
-    <article className={`card tone-${tone}`}>
-      <header>
+    // aria-busy 而非 role=status：多张卡片近乎同时变化，逐张播报会刷屏；
+    // busy 只告诉辅助技术「这块还在变」，播报交给结论区的 live 区（W2）。
+    <article className={`card tone-${tone}`} aria-busy={status === "running"}>
+      <header className="card-head">
         <span className="card-id">{id}</span>
         <h3>{title}</h3>
-        <span className={`badge badge-${status}`}>
-          {COPY.cardStatus[status]}
-        </span>
+        <span className={`pill pill-${status}`}>{COPY.cardStatus[status]}</span>
       </header>
 
       {children ? <div className="card-body">{children}</div> : null}
@@ -84,8 +129,12 @@ export function CheckCard({
   );
 }
 
-/** 仅 CLI 项的灰卡：终态、无重试入口。安装命令只在落地内容「安装 CLI」段出现一次（规格第 4 节）。 */
-export function CliCard({
+/**
+ * C1–C4 发丝线列表的单行（原型 .cli-list li）：这四项没有运行时状态、没有字段、没有重试——
+ * 永远是同一份终态名册，卡片壳（状态药丸、正文容器）是错的容器，改为一条 id + 标题 + 折叠说明
+ * 的发丝线（规格 §4 要点 6）。检测功能集不变，删的只是卡片形态。
+ */
+export function CliListItem({
   id,
   title,
   meaning,
@@ -97,14 +146,17 @@ export function CliCard({
   const COPY = useCopy();
 
   return (
-    <CheckCard
-      id={id}
-      title={title}
-      status={CLI_CHECK.status}
-      tone="muted"
-      meaning={meaning}
-    >
-      <p className="cli-hint">{COPY.cli.hint}</p>
-    </CheckCard>
+    <li>
+      <span className="card-id">{id}</span>
+      <div>
+        <h3>{title}</h3>
+        <details className="meaning">
+          <summary className="meaning-label">
+            {COPY.actions.meaningLabel}
+          </summary>
+          {meaning}
+        </details>
+      </div>
+    </li>
   );
 }

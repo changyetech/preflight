@@ -376,9 +376,7 @@ article[id] {
 
 /* ---------- 首屏结论控制台 ---------- */
 
-.field-label,
-.meaning-label,
-.card-id {
+.meaning-label {
   font-size: 0.8rem;
   letter-spacing: 0.02em;
   color: var(--text);
@@ -701,7 +699,8 @@ article[id] {
   line-height: 1.6;
 }
 
-.checks-group .cards {
+.checks-group .cards,
+.checks-group .cli-list {
   margin-top: 0.75rem;
 }
 
@@ -709,12 +708,16 @@ article[id] {
   margin-top: 0.75rem;
 }
 
-/* ---------- 卡片流 ---------- */
+/* ---------- 卡片流（O1–O6，照原型 .cards / .card 逐块对齐） ---------- */
 
 .cards {
   display: grid;
-  gap: 0.75rem;
+  gap: 1rem;
   margin-top: 1.25rem;
+  /* auto-fill + minmax(min(21.75rem,100%),1fr)：容器窄于 348px 时轨道跟着收，
+     不会像裸 minmax 那样撑出容器；390px 自然单栏、更宽自然多栏，不必在断点里硬切列数
+     （原型 .cards，规格 §4 要点「auto-fill 栅格」）。 */
+  grid-template-columns: repeat(auto-fill, minmax(min(21.75rem, 100%), 1fr));
 }
 
 .card {
@@ -724,98 +727,159 @@ article[id] {
   flex-direction: column;
   border: 1px solid var(--border);
   border-inline-start: 3px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r);
   padding: 0.9rem 1rem;
-  background: var(--bg);
+  background: var(--surface);
 }
 
 .card.tone-ok {
-  border-inline-start-color: var(--tone-ok);
+  border-inline-start-color: var(--ok);
 }
 
 .card.tone-warn {
-  border-inline-start-color: var(--tone-warn);
+  border-inline-start-color: var(--warn);
 }
 
 .card.tone-danger {
-  border-inline-start-color: var(--tone-danger);
+  border-inline-start-color: var(--danger);
 }
 
-.card.tone-muted {
-  background: var(--muted-bg);
-}
-
-.card header {
+/* flex-start：标题折成两行时，编号块与状态药丸仍咬住首行（原型 .card-head）。 */
+.card-head {
   display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
+  align-items: flex-start;
+  gap: 0.625rem;
 }
 
-.card header h3 {
+.card-head h3 {
   flex: 1;
   margin: 0;
+  margin-inline-end: auto;
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-h);
 }
 
 .card-id {
-  font: 600 0.75rem var(--mono);
+  font: 500 0.6875rem var(--mono);
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  background: var(--sunken);
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  padding: 0.25rem 0.3rem;
 }
 
-.badge {
-  padding: 0.1rem 0.45rem;
+/* 状态药丸（原型 .pill，取代旧的 .badge）：四态各自的底色/边框走判级三色 token。 */
+.pill {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid transparent;
   border-radius: 999px;
-  font-size: 0.75rem;
-  background: var(--chip-bg);
+  font: 500 0.71875rem var(--font-ui);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
-.badge-done {
-  background: var(--tone-ok-bg);
+.pill-idle {
+  color: var(--muted);
+  background: transparent;
+  border-color: var(--border);
 }
 
-.badge-failed {
-  background: var(--tone-warn-bg);
+.pill-running {
+  color: var(--muted);
+  background: var(--sunken);
+  border-color: var(--border);
+}
+
+.pill-done {
+  color: var(--ok);
+  background: var(--ok-bg);
+  border-color: var(--ok-line);
+}
+
+.pill-failed {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: var(--danger-line);
 }
 
 .card-body {
   margin-top: 0.6rem;
 }
 
-.conclusion {
-  margin: 0 0 0.4rem;
-  font-size: 0.9375rem;
-  color: var(--text-h);
+/* 字段列表（原型 .kv：dl/dt/dd），取代逐条独立的 <p class="field">。 */
+.kv {
+  margin: 0;
+  border-top: 1px solid var(--hairline);
 }
 
-.field {
+.kv > div {
   display: flex;
-  gap: 0.5rem;
-  margin: 0.15rem 0;
-  font-size: 0.9375rem;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--hairline);
 }
 
-.field-label {
-  /* 随字号抬档一并放宽，否则「System (browser) timezone」这类长标签会折成三行 */
-  flex: 0 0 8rem;
+.kv dt {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
-.field-value {
-  color: var(--text-h);
+.kv dd {
+  margin: 0;
+  font: 400 0.8125rem/1.5 var(--mono);
+  color: var(--data);
+  text-align: end;
   overflow-wrap: anywhere;
 }
 
-.failure {
-  margin: 0 0 0.4rem;
-  font-size: 0.9375rem;
+.kv dd.em {
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+/* 结论/失败原因（原型 .result）：t-ok/t-warn/t-danger 三档着色，中性省略后缀走默认底色。 */
+.result {
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--hairline);
+  border-radius: 5px;
+  background: var(--sunken);
+  font-size: 0.84375rem;
+  line-height: 1.7;
   color: var(--text-h);
 }
 
-.scope-note,
-.consent-note,
-.cli-hint {
+.result.t-ok {
+  background: var(--ok-bg);
+  border-color: var(--ok-line);
+  color: var(--ok);
+}
+
+.result.t-warn {
+  background: var(--warn-bg);
+  border-color: var(--warn-line);
+  color: var(--warn);
+}
+
+.result.t-danger {
+  background: var(--danger-bg);
+  border-color: var(--danger-line);
+  color: var(--danger);
+}
+
+/* 不参与判定的补充说明（原型 .note）：第三方披露、范围限定、resolver 归属之类；
+   也承接原来 O4 按需描述的角色（原型 .cli-hint 与 .note 视觉等价，不另立第五个结构类）。 */
+.note {
   margin: 0.5rem 0 0;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
+  line-height: 1.7;
+  color: var(--muted);
 }
 
 .meaning {
@@ -834,6 +898,43 @@ article[id] {
 
 .meaning[open] .meaning-label {
   margin-bottom: 0.35rem;
+}
+
+/* ---------- C1–C4 发丝线列表（原型 .cli-list，删除了 CliCard 的卡片形态） ---------- */
+/* 仅 CLI 的四项是终态：没有字段、没有重试、没有状态变化，卡片是错的容器——
+   它承诺「这里会有内容和状态」，而这四项永远只是一份名册。改为发丝线列表，
+   同时去掉了卡内重复四次的同一句提示（分区标题已经讲得更具体，见原型同处注释）。 */
+.cli-list {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.cli-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0 0.875rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.cli-list h3 {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.cli-list .card-id {
+  margin-top: 0.0625rem;
+}
+
+/* 列表行里不需要卡内那条分隔线，折叠项直接跟在标题下 */
+.cli-list .meaning {
+  margin-top: 0.45rem;
+  padding-top: 0;
 }
 
 /* ---------- 控件 ---------- */
@@ -962,10 +1063,6 @@ button {
   .page {
     padding: 2rem 1.5rem 4rem;
   }
-
-  .cards {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 
 /* 顶栏 5 个锚点与结论控制台双栏在同一个断点（56.25rem = 900px）一起收放：
@@ -1019,13 +1116,5 @@ button {
      （之前的真实 bug：390px 视口下三个短字段挤成一行、长值被截断错位）。 */
   .geo-grid > .g-asn {
     grid-column: span 12;
-  }
-}
-
-/* ---------- 超宽视口 ---------- */
-
-@media (min-width: 64rem) {
-  .cards {
-    grid-template-columns: repeat(3, 1fr);
   }
 }

@@ -279,11 +279,6 @@ export const EN = {
     },
   },
 
-  cli: {
-    /** 灰卡是终态，不提供重试（规格 4.1）。安装命令只在落地内容「安装 CLI」段给一次，此处不重复。 */
-    hint: "This item requires reading your local environment — install the CLI to test it.",
-  },
-
   /** 落地内容三段（规格第 4 节第 3 项）。 */
   landing: {
     why: {

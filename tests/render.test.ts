@@ -12,11 +12,19 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { CheckCard, CliCard } from "../src/components/Card";
-import { O3Card, O4Card, O5Card, O6Card } from "../src/components/cards";
+import { CheckCard, CliListItem } from "../src/components/Card";
+import {
+  O1Card,
+  O2Card,
+  O3Card,
+  O4Card,
+  O5Card,
+  O6Card,
+} from "../src/components/cards";
 import { VerdictPanel } from "../src/components/Verdict";
 import type { CoverageCell } from "../src/coverageMeter";
 import { COPY } from "../src/copy";
+import { CLI_CHECK_IDS, ONLINE_CHECK_IDS } from "../src/domain/checks";
 import {
   UDP_EGRESS_STUN_UNANSWERED,
   UDP_EGRESS_WEBRTC_UNAVAILABLE,
@@ -208,12 +216,36 @@ describe("结论区渲染", () => {
   });
 });
 
+describe("卡片自身的 aria-busy（规格 §4 要点 4，检测进行中要有 aria-busy 表达）", () => {
+  it("检测中的卡片挂 aria-busy=true，其余状态挂 false", () => {
+    const running = renderToStaticMarkup(
+      createElement(CheckCard, {
+        id: "O1",
+        title: COPY.checks.O1.title,
+        status: "running",
+        meaning: COPY.checks.O1.meaning,
+      }),
+    );
+    const done = renderToStaticMarkup(
+      createElement(CheckCard, {
+        id: "O1",
+        title: COPY.checks.O1.title,
+        status: "done",
+        meaning: COPY.checks.O1.meaning,
+      }),
+    );
+
+    expect(running).toContain('aria-busy="true"');
+    expect(done).toContain('aria-busy="false"');
+  });
+});
+
 describe("卡片重试入口（规格 4.1）", () => {
   // 安装命令全站只在落地内容「安装 CLI」段出现一次（规格第 4 节第 2 项），
-  // 灰卡内不再重复，因此这里断言灰卡内不含它。
-  it("灰卡是终态，没有重试入口，也不重复安装命令", () => {
+  // C1–C4 的发丝线列表行内不重复，因此这里断言行内不含它；C1–C4 是终态，没有重试入口。
+  it("C1–C4 发丝线列表行是终态，没有重试入口，也不重复安装命令", () => {
     const html = renderToStaticMarkup(
-      createElement(CliCard, {
+      createElement(CliListItem, {
         id: "C1",
         title: COPY.checks.C1.title,
         meaning: COPY.checks.C1.meaning,
@@ -222,8 +254,7 @@ describe("卡片重试入口（规格 4.1）", () => {
 
     expect(html).not.toContain('class="retry"');
     expect(html).not.toContain(esc(COPY.actions.installCommand));
-    expect(html).toContain(esc(COPY.cli.hint));
-    expect(html).toContain(esc(COPY.cardStatus.needCli));
+    expect(html).not.toContain('class="pill');
   });
 
   it("失败卡有重试入口", () => {
@@ -247,7 +278,7 @@ describe("「这意味着什么」折叠（规格 4.2）", () => {
   // 拿掉就等于删了规格 4.2 要求的每卡解释，且爬虫也读不到。
   it("渲染为 details/summary，解释文案仍在 HTML 内", () => {
     const html = renderToStaticMarkup(
-      createElement(CliCard, {
+      createElement(CliListItem, {
         id: "C1",
         title: COPY.checks.C1.title,
         meaning: COPY.checks.C1.meaning,
@@ -547,5 +578,147 @@ describe("O5／O6 第三方披露（ADR-0008）", () => {
     expect(o6).toContain(esc(COPY.checks.O6.thirdPartyNote));
     expect(o6).toContain("stun.cloudflare.com");
     expect(o6).toContain("stun.l.google.com");
+  });
+});
+
+describe("检测失败的项仍被渲染（覆盖度靠数失败项，卡片不得消失或跳过）", () => {
+  // O1／O2 同源失败，卡片壳与失败原因都必须原样渲染出来——覆盖度的「检测失败」
+  // 一栏正是数这些卡片，重排时最容易把失败态漏渲染成空卡。
+  it("O1 失败：pill 显示「检测失败」，失败原因照样在 DOM 内", () => {
+    const html = renderToStaticMarkup(
+      createElement(O1Card, {
+        state: { status: "failed", reason: COPY.errors.unknown },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain(esc(COPY.cardStatus.failed));
+    expect(html).toContain('class="pill pill-failed"');
+    expect(html).toContain(esc(COPY.errors.unknown));
+    expect(html).toContain('class="retry"');
+  });
+
+  it("O2 失败：与 O1 同源失败，同样原样渲染失败原因", () => {
+    const html = renderToStaticMarkup(
+      createElement(O2Card, {
+        state: { status: "failed", reason: COPY.errors.unknown },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain(esc(COPY.cardStatus.failed));
+    expect(html).toContain(esc(COPY.errors.unknown));
+  });
+
+  it("O4 配额耗尽：按「检测失败」渲染，但不给重试——今天重试多少次都一样", () => {
+    const html = renderToStaticMarkup(
+      createElement(O4Card, {
+        state: { status: "done", data: { status: "quotaExhausted" } },
+        onRun: () => {},
+        onFail: () => {},
+      }),
+    );
+
+    expect(html).toContain(esc(COPY.cardStatus.failed));
+    expect(html).toContain(esc(COPY.checks.O4.quotaExhausted));
+    expect(html).not.toContain('class="retry"');
+  });
+});
+
+describe("O5／O2 的降级代理说明必须在位（契约 §5.1／§5.5 呈现约束）", () => {
+  // O2 对应 tzMismatchSystem：$TZ 不可得时的降级代理，契约要求显式说明系统时区
+  // 与命令行 $TZ 的差别，不得因重排而丢失，且不随卡片状态隐藏。
+  it.each(["idle", "running", "failed"] as const)(
+    "O2 在 %s 状态下仍渲染降级代理说明",
+    (status) => {
+      const state =
+        status === "failed"
+          ? ({ status: "failed", reason: COPY.errors.unknown } as const)
+          : ({ status } as const);
+      const html = renderToStaticMarkup(
+        createElement(O2Card, { state, onRetry: () => {} }),
+      );
+
+      expect(html).toContain(esc(COPY.checks.O2.scopeNote));
+    },
+  );
+
+  // O5 是 DNS 出口泄露的降级代理：契约要求显式说明本项测的是浏览器路径，
+  // 与 CLI 走的系统 resolver 不同——同样不得随状态隐藏。
+  it.each(["running", "failed"] as const)(
+    "O5 在 %s 状态下仍渲染降级代理说明",
+    (status) => {
+      const state =
+        status === "failed"
+          ? ({ status: "failed", reason: DNS_EGRESS_PROBE_FAILED } as const)
+          : ({ status } as const);
+      const html = renderToStaticMarkup(
+        createElement(O5Card, { state, onRetry: () => {} }),
+      );
+
+      expect(html).toContain(esc(COPY.checks.O5.scopeNote));
+      expect(html).toContain(esc(COPY.checks.O5.thirdPartyNote));
+    },
+  );
+});
+
+describe("检测项数量恒为 O1–O6 六项 + C1–C4 四项（防止重排时漏掉或多出一项）", () => {
+  it("domain 层的 ID 表恒为 6 项在线 + 4 项仅 CLI", () => {
+    expect(ONLINE_CHECK_IDS).toHaveLength(6);
+    expect(CLI_CHECK_IDS).toHaveLength(4);
+  });
+
+  it("O1–O6 卡片流渲染出恰好 6 张 .card", () => {
+    const cards = [
+      createElement(O1Card, {
+        state: { status: "running" },
+        onRetry: () => {},
+      }),
+      createElement(O2Card, {
+        state: { status: "running" },
+        onRetry: () => {},
+      }),
+      createElement(O3Card, {
+        state: { status: "running" },
+        onRetry: () => {},
+      }),
+      createElement(O4Card, {
+        state: { status: "idle" },
+        onRun: () => {},
+        onFail: () => {},
+      }),
+      createElement(O5Card, {
+        state: { status: "running" },
+        onRetry: () => {},
+      }),
+      createElement(O6Card, {
+        state: { status: "running" },
+        onRetry: () => {},
+      }),
+    ];
+    const html = cards.map((el) => renderToStaticMarkup(el)).join("");
+
+    expect(html.match(/class="card tone-/g) ?? []).toHaveLength(
+      ONLINE_CHECK_IDS.length,
+    );
+  });
+
+  it("C1–C4 发丝线列表渲染出恰好 4 个 <li>", () => {
+    const html = renderToStaticMarkup(
+      createElement(
+        "ul",
+        { className: "cli-list" },
+        CLI_CHECK_IDS.map((id) =>
+          createElement(CliListItem, {
+            key: id,
+            id,
+            title: COPY.checks[id].title,
+            meaning: COPY.checks[id].meaning,
+          }),
+        ),
+      ),
+    );
+
+    expect(html.match(/<li>/g) ?? []).toHaveLength(CLI_CHECK_IDS.length);
   });
 });

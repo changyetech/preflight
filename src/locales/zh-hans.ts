@@ -244,10 +244,6 @@ export const ZH_HANS: Copy = {
     },
   },
 
-  cli: {
-    hint: "本项需要读取本机环境，装 CLI 后可测。",
-  },
-
   landing: {
     why: {
       title: "为什么需要体检",
