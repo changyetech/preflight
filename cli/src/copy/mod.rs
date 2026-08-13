@@ -65,10 +65,6 @@ copy_leaf! {
         config_parse,
         config_write,
         lang_unknown,
-        // 暂无调用点：删除回落机制前，clippy 的 dead-code 检查被 merge() 对全部
-        // Patch 字段的模式匹配掩盖了，这条本就未被消费。留给 C1-C5 CLI 任务决定去留。
-        #[allow(dead_code)]
-        checkup_not_implemented,
     }
 }
 

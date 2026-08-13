@@ -21,7 +21,6 @@ pub const ZH_HANS: Text = Text {
         config_parse: "配置文件不合法",
         config_write: "写不了配置文件",
         lang_unknown: "不支持的语言",
-        checkup_not_implemented: "体检没能跑起来。",
     },
 
     verdict: VerdictText {

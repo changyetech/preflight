@@ -25,7 +25,6 @@ pub const EN: Text = Text {
         config_parse: "The config file is invalid",
         config_write: "Cannot write the config file",
         lang_unknown: "Unsupported language",
-        checkup_not_implemented: "The checkup could not run.",
     },
 
     verdict: VerdictText {
