@@ -5,8 +5,8 @@
 //! O1–O6 的标题必须与 ipcheck Web 的 `src/locales/en.ts` **逐字一致**（契约 1.1）。
 
 use super::{
-    CheckText, ChecksText, ConfigText, CoverageText, DnsEgressText, ErrorText, FailureText,
-    NoteText, Text, UdpEgressText, ValueText, VerdictText,
+    C4FixText, CheckText, ChecksText, ConfigText, CoverageText, DnsEgressText, ErrorText,
+    FailureText, NoteText, O1FieldsText, Text, UdpEgressText, ValueText, VerdictText,
 };
 
 pub const EN: Text = Text {
@@ -42,6 +42,11 @@ pub const EN: Text = Text {
         summary_full_medium: "Suspicious signals found — review the flagged items below.",
         summary_full_high: "Your exit IP is high risk. AI tools are quite likely to trigger anti-abuse controls right now.",
         exit_ip_label: "Exit IP",
+        attention_label: "Needs attention",
+        attention_contributing: "counts toward the verdict",
+        attention_reminder_only: "flagged for awareness only",
+        attention_list_separator: ", ",
+        attention_list_connector: " and ",
     },
 
     coverage: CoverageText {
@@ -53,6 +58,11 @@ pub const EN: Text = Text {
         o1: CheckText {
             title: "Exit IP and Ownership",
             description: "The public address your traffic leaves the proxy with, plus where the IP is registered. This is not the address behind the proxy.",
+        },
+        o1_fields: O1FieldsText {
+            address: "Address",
+            ownership: "Ownership",
+            network: "Network",
         },
         o2: CheckText {
             title: "System Timezone Consistency",
@@ -91,6 +101,13 @@ pub const EN: Text = Text {
             title: "$TZ timezone match",
             description: "Compares $TZ with the timezone of your exit IP. This is the timezone command-line tools actually run in.",
         },
+        c4_fix: C4FixText {
+            explain_prefix: "Command-line tools actually run in ",
+            explain_connector: ", but anti-abuse systems see your exit IP's timezone as ",
+            explain_suffix: ".",
+            fix_label: "Suggested fix",
+            fix_command_prefix: "export TZ=",
+        },
     },
 
     values: ValueText {
@@ -113,6 +130,12 @@ pub const EN: Text = Text {
         abuse_listed: "abuse reports found",
         abuse_clean: "no abuse reports",
         abuse_unknown: "abuse reports unknown",
+        obtained: "Obtained",
+        risk_scale_note: "Medium from 26 · High from 76",
+        risk_level_low: "low",
+        risk_level_medium: "medium",
+        risk_level_high: "high",
+        reference_only: "Reference only",
     },
 
     failures: FailureText {
@@ -138,6 +161,8 @@ pub const EN: Text = Text {
         unknown_exit_country: "The exit IP's country isn't available yet (see the Exit IP check above), so this can't be compared.",
         // 契约 2.1／2.5 硬约束 1：resolver 归属只展示，不参与判定——只有 ECS 判定进综合结论。
         resolver_note: "Shown for reference only — it doesn't affect the verdict. Which country your resolver sits in depends on which DNS provider you picked, not on whether your traffic is proxied.",
+        state_leaked: "leaked",
+        state_not_leaked: "not leaked",
     },
 
     udp_egress: UdpEgressText {
@@ -148,5 +173,7 @@ pub const EN: Text = Text {
         family_mismatch: "Fewer than two reflexive addresses in the same address family as your exit IP (IPv4/IPv6) came back, so there's nothing to compare on equal terms.",
         unknown_exit_ip: "The exit IP isn't available yet (see the Exit IP check above), so this can't be compared.",
         stun_disagree: "The two STUN servers reported different addresses, so there's no single reliable value to compare — this can happen with multi-exit clusters or symmetric NAT.",
+        state_match: "match",
+        state_mismatch: "mismatch",
     },
 };

@@ -2,8 +2,8 @@
 //! 结构体强制译全，不存在字段级回落）。
 
 use super::{
-    CheckText, ChecksText, ConfigText, CoverageText, DnsEgressText, ErrorText, FailureText,
-    NoteText, Text, UdpEgressText, ValueText, VerdictText,
+    C4FixText, CheckText, ChecksText, ConfigText, CoverageText, DnsEgressText, ErrorText,
+    FailureText, NoteText, O1FieldsText, Text, UdpEgressText, ValueText, VerdictText,
 };
 
 pub const ZH_HANS: Text = Text {
@@ -38,6 +38,11 @@ pub const ZH_HANS: Text = Text {
         summary_full_medium: "发现可疑信号，先看下面标出的项。",
         summary_full_high: "你的出口 IP 风险很高，现在用 AI 工具相当可能触发风控。",
         exit_ip_label: "出口 IP",
+        attention_label: "需关注",
+        attention_contributing: "参与综合结论判定",
+        attention_reminder_only: "仅作提醒",
+        attention_list_separator: "、",
+        attention_list_connector: "与",
     },
 
     coverage: CoverageText {
@@ -49,6 +54,11 @@ pub const ZH_HANS: Text = Text {
         o1: CheckText {
             title: "出口 IP 与归属",
             description: "你的流量经代理后离开的公网地址，以及这个 IP 的归属地。这不是代理背后的地址。",
+        },
+        o1_fields: O1FieldsText {
+            address: "地址",
+            ownership: "归属",
+            network: "网络",
         },
         o2: CheckText {
             title: "系统时区一致性",
@@ -87,6 +97,13 @@ pub const ZH_HANS: Text = Text {
             title: "$TZ 时区一致性",
             description: "比对 $TZ 与出口 IP 所在时区。命令行工具实际跑在这个时区里。",
         },
+        c4_fix: C4FixText {
+            explain_prefix: "命令行工具实际跑在 ",
+            explain_connector: "，风控看到的出口却在 ",
+            explain_suffix: "。",
+            fix_label: "建议",
+            fix_command_prefix: "export TZ=",
+        },
     },
 
     values: ValueText {
@@ -109,6 +126,12 @@ pub const ZH_HANS: Text = Text {
         abuse_listed: "有滥用举报记录",
         abuse_clean: "无滥用举报记录",
         abuse_unknown: "滥用记录未知",
+        obtained: "已取得",
+        risk_scale_note: "26 起为中 · 76 起为高",
+        risk_level_low: "低",
+        risk_level_medium: "中",
+        risk_level_high: "高",
+        reference_only: "仅供参考",
     },
 
     failures: FailureText {
@@ -133,6 +156,8 @@ pub const ZH_HANS: Text = Text {
         unmapped_country: "resolver 返回了客户端子网归属地，但我们暂时认不出这个国家名，无法比对。",
         unknown_exit_country: "出口 IP 的归属国尚未取得（见上方「出口 IP 与归属」），暂时无法比对。",
         resolver_note: "仅供参考，不参与判定：resolver 在哪个国家取决于你选了哪家 DNS 服务商，与流量是否走代理无关。",
+        state_leaked: "已泄露",
+        state_not_leaked: "未泄露",
     },
 
     udp_egress: UdpEgressText {
@@ -143,5 +168,7 @@ pub const ZH_HANS: Text = Text {
         family_mismatch: "与出口 IP 同协议族（IPv4/IPv6）的可比对反射地址不足两个，没有可以在同一基准上比较的对象。",
         unknown_exit_ip: "出口 IP 尚未取得（见上方「出口 IP 与归属」），暂时无法比对。",
         stun_disagree: "两个 STUN 服务器给出的地址不一致，没有一个可信的单一值可比——常见于多出口集群或对称 NAT。",
+        state_match: "一致",
+        state_mismatch: "不一致",
     },
 };
