@@ -30,6 +30,7 @@
     "tests/landing.test.ts",
     "tests/footer.test.ts",
     "tests/theme.test.ts",
-    "tests/langSwitch.test.ts"
+    "tests/langSwitch.test.ts",
+    "tests/a11y.test.ts"
   ]
 }
