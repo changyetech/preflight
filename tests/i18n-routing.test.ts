@@ -53,16 +53,31 @@ describe("两语种各自是独立静态资源，不是彼此的软 404 兜底",
   });
 
   it("每个语种页恰好声明 3 条 hreflang：en、zh-Hans、x-default（规格 §3）", async () => {
-    const html = await (
-      await SELF.fetch("https://example.com/zh-hans")
-    ).text();
+    const html = await (await SELF.fetch("https://example.com/zh-hans")).text();
 
-    const hreflangMatches = html.match(/hreflang="/g) ?? [];
-    expect(hreflangMatches).toHaveLength(3);
-    expect(html).toContain('hreflang="en"');
-    expect(html).toContain('hreflang="zh-Hans"');
-    expect(html).toContain(
-      'hreflang="x-default" href="https://ipcheck.omnikit.run/"',
+    // 解析出所有 <link rel="alternate"> 标签本身，再从标签内取 hreflang/href——
+    // 不依赖标签在源码里被 prettier 排成一行还是拆成多行（对格式化不敏感）。
+    const linkTags = html.match(/<link\s+rel="alternate"[^>]*\/?>/g) ?? [];
+    const hreflangToHref = new Map(
+      linkTags.map((tag) => [
+        tag.match(/hreflang="([^"]*)"/)?.[1],
+        tag.match(/href="([^"]*)"/)?.[1],
+      ]),
+    );
+
+    expect(
+      linkTags,
+      `实际 alternate 标签：\n${linkTags.join("\n")}`,
+    ).toHaveLength(3);
+    expect(
+      hreflangToHref,
+      `实际 hreflang→href 映射：${JSON.stringify([...hreflangToHref])}`,
+    ).toEqual(
+      new Map([
+        ["en", "https://ipcheck.omnikit.run/"],
+        ["zh-Hans", "https://ipcheck.omnikit.run/zh-hans"],
+        ["x-default", "https://ipcheck.omnikit.run/"],
+      ]),
     );
   });
 
