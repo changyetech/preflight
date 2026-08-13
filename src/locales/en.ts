@@ -178,6 +178,13 @@ export const EN = {
       noDetection: "None detected",
       hostingNote:
         "A datacenter IP is a per-item flag — it doesn't raise the overall verdict by itself, but it does draw more attention from anti-abuse controls.",
+      /**
+       * 契约 §6 的呈现义务：`anonymous: true` 且分数 51–75 时会出现「结论高 · 分项黄」，
+       * 缺了这句解释，用户看到高风险结论却找不到哪一项显红，会以为结论算错了。
+       * 与 CLI 的 `values.anonymous_flag` 说同一件事，措辞对齐。
+       */
+      anonymousNote:
+        "This IP is currently used as an anonymising address — the high-risk threshold drops to 51 for it.",
       abuse: {
         listed: "Listed",
         clean: "Clean",

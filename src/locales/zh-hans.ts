@@ -153,6 +153,7 @@ export const ZH_HANS: Copy = {
       noDetection: "未检出",
       hostingNote:
         "机房 IP 属于分项提醒，本身不拉高综合结论，但确实更容易被风控盯上。",
+      anonymousNote: "该 IP 正被用作匿名化地址 —— 判高的阈值对它降到 51。",
       abuse: {
         listed: "有收录",
         clean: "无收录",
