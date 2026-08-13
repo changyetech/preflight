@@ -17,6 +17,9 @@
 5. **页脚提示行**（--verbose / --json / config set 配额提示），命令写法以实际子命令语法为准 → 验证：与 `cli/src/` 实际 CLI 接口一致。
 6. 契约呈现约束核查：O1 标明数据来自 proxycheck、O2/C4 双条展示并标明谁进结论、失败项必渲染、`anonymous: true` 51–75 的「结论高·分项黄」解释在位 → 验证：对应单测。
 
+7. **排版对齐原型**（spec §5.7）：分组标题 + 发丝线、卡内标签列对齐、终端列宽按全角两列计（折行与标点禁则）、状态词右对齐、档位徽章 → 验证：分组/对齐/禁则各有单测，`a_full_report_never_exceeds_76_columns` 覆盖两语种 × 彩色 × verbose。
+8. **宽度跟随窗口**（spec §5.7 末条）：`render::Style::sized(color, columns)` 夹 `[40, 110]`，说明文字仍收 76；`main.rs` 用 `terminal_size_of(stdout)` 量一次，非终端落回 `Style::new`（固定 76） → 验证：窄窗（50）无行溢出、宽窗（120）整幅 110 而说明仍 76、超窄夹到 40 且分组标题不消失。
+
 ## 验收
 
 - `make check-cli` 绿

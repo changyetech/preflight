@@ -3,7 +3,8 @@
 
 use super::{
     C4FixText, CheckText, ChecksText, ConfigText, CoverageText, DnsEgressText, ErrorText,
-    FailureText, FooterText, NoteText, O1FieldsText, Text, UdpEgressText, ValueText, VerdictText,
+    FailureText, FooterText, GroupText, NoteText, O1FieldsText, Text, UdpEgressText, ValueText,
+    VerdictText,
 };
 
 pub const ZH_HANS: Text = Text {
@@ -56,6 +57,14 @@ pub const ZH_HANS: Text = Text {
     coverage: CoverageText {
         done: "已完成",
         failed: "检测失败",
+    },
+
+    groups: GroupText {
+        online: "联网检测",
+        local: "本机检测",
+        items: "项",
+        all_done: "全部完成",
+        local_only: "网页版做不到",
     },
 
     checks: ChecksText {
@@ -140,6 +149,11 @@ pub const ZH_HANS: Text = Text {
         risk_level_medium: "中",
         risk_level_high: "高",
         reference_only: "仅供参考",
+        tz_system_label: "系统时区",
+        tz_exit_label: "出口 IP 时区",
+        network_type_label: "IP 类型",
+        detections_label: "代理检出",
+        abuse_label: "滥用举报",
     },
 
     failures: FailureText {

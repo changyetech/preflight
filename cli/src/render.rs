@@ -25,11 +25,37 @@ enum Tone {
 
 pub struct Style {
     color: bool,
+    /// 整幅宽度（列）。窗口宽度已经在构造时夹进 `[MIN_WIDTH, MAX_WIDTH]`。
+    width: usize,
 }
 
 impl Style {
+    /// 固定宽度渲染：拿不到窗口宽度（重定向、CI、测试）时用——管道里的输出必须可复现。
     pub fn new(color: bool) -> Self {
-        Self { color }
+        Self {
+            color,
+            width: DEFAULT_WIDTH,
+        }
+    }
+
+    /// 跟随终端窗口宽度。夹在 `[MIN_WIDTH, MAX_WIDTH]`：再窄要保住标签列，
+    /// 再宽也不摊成一整屏——原型 `.screen{min-width:84ch;max-width:96ch}` 同一立场。
+    pub fn sized(color: bool, columns: usize) -> Self {
+        Self {
+            color,
+            width: columns.clamp(MIN_WIDTH, MAX_WIDTH),
+        }
+    }
+
+    /// 整幅宽度：发丝线、右对齐的状态词、取值行都按它排。
+    fn width(&self) -> usize {
+        self.width
+    }
+
+    /// 说明文字的宽度：整幅再宽也收在 `PROSE_WIDTH` 以内（原型 `.note{max-width:76ch}`）——
+    /// 长行读起来费劲，这条上限与窗口无关。
+    fn prose(&self) -> usize {
+        self.width.min(PROSE_WIDTH)
     }
 
     fn paint(&self, code: &str, body: &str) -> String {
@@ -51,6 +77,21 @@ impl Style {
 
     fn bold(&self, body: &str) -> String {
         self.paint("1", body)
+    }
+
+    /// 结论档位的色块（原型 `.badge`：反白，档位色作底）。`--no-color` 下退回
+    /// 原型同款的 `[ 中风险 ]`——方括号替色块承担「这是个徽章」的语义（点 8）。
+    fn badge(&self, tone: Tone, body: &str) -> String {
+        if !self.color {
+            return format!("[ {body} ]");
+        }
+        let bg = match tone {
+            Tone::Ok => "30;42",
+            Tone::Warn => "30;43",
+            Tone::Bad => "30;41",
+            Tone::Dim => "30;47",
+        };
+        self.paint(bg, &format!(" {body} "))
     }
 }
 
@@ -128,6 +169,26 @@ fn verdict_headline<'a>(
     }
 }
 
+/// 卡片正文的一行（原型 `.cbody` 里的两种行）。
+enum Row {
+    /// 标签 + 取值。同一张卡里所有 `Kv`/`KvOwned` 行对齐到同一标签列（原型 `.kv`
+    /// 网格），标签降 dim；取值折行时悬挂对齐到取值列，不回到标签列。
+    Kv(&'static str, String),
+    /// 标签本身是动态值（C2 的 DNS 服务器地址列），其余同 `Kv`。
+    KvOwned(String, String),
+    /// 比对行（原型 `.cmp`）：两侧各自带标签，中间是 `=`/`≠`。两个裸值读不出
+    /// 谁是谁——O2/C4 的本地侧本就是两个不同的东西（系统时区 vs `$TZ`）。
+    Cmp {
+        left_label: &'static str,
+        left: String,
+        op: &'static str,
+        right_label: &'static str,
+        right: String,
+    },
+    /// 整行文本：整句说明，不参与标签列对齐。
+    Plain(String),
+}
+
 /// 一张检测卡的内容。
 struct Card {
     id: CheckId,
@@ -140,7 +201,7 @@ struct Card {
     /// 「已取得」是纯提示词，不是契约 6 的分项分级评价，不该借用评价色。
     state_tone: Tone,
     /// 主值，一行一条。
-    values: Vec<String>,
+    values: Vec<Row>,
     /// 契约要求必须出现的说明，与 `--verbose` 无关。
     notes: Vec<&'static str>,
     /// 只有 C4 命中不一致时才有（决策 5：只有 C4 给修复命令）。
@@ -152,6 +213,8 @@ struct Card {
 /// （见 `ErrorText` 的注释）不做插值，由调用方拼接固定片段与动态值。
 struct CardFix {
     explain: String,
+    /// 修复行的标签（「建议」），与卡内标签列同样降 dim。
+    label: &'static str,
     command: String,
 }
 
@@ -160,7 +223,7 @@ pub fn report(report: &Report, text: &Text, style: &Style, verbose: bool) -> Str
     let coverage = report.coverage();
     debug_assert!(coverage.is_complete(), "覆盖度不变量被破坏：{coverage:?}");
 
-    let all_cards = cards(report, text);
+    let all_cards = cards(report, text, style);
 
     let mut out = String::new();
     let _ = writeln!(out);
@@ -169,14 +232,67 @@ pub fn report(report: &Report, text: &Text, style: &Style, verbose: bool) -> Str
     );
     let _ = writeln!(out);
 
-    for card in &all_cards {
-        render_card(&mut out, card, style, verbose);
+    // 分组只是呈现上的两段（联网可测 / 仅 CLI 可测），检测项顺序仍固定 O1→C4——
+    // 编号是用户与文档引用的锚点（spec §5.2）。
+    let (online, local) = all_cards.split_at(6);
+    for (cards, group) in [(online, true), (local, false)] {
+        render_group_header(&mut out, cards, group, text, style);
+        let _ = writeln!(out);
+        for card in cards {
+            render_card(&mut out, card, style, verbose);
+            let _ = writeln!(out);
+        }
     }
-    let _ = writeln!(out);
 
     render_footer(&mut out, text, style);
 
     out
+}
+
+/// 分组标题：`联网检测  O1–O6 ────────  6 项 · 全部完成`（原型 `.group`）。
+/// 发丝线把标题与右端的分组统计撑到同一行两端，占满整幅宽度。
+fn render_group_header(out: &mut String, cards: &[Card], online: bool, text: &Text, style: &Style) {
+    let g = &text.groups;
+    let (first, last) = match (cards.first(), cards.last()) {
+        (Some(first), Some(last)) => (first, last),
+        _ => return,
+    };
+    let failed = cards.iter().filter(|c| c.tone == Tone::Dim).count();
+    let name = if online { g.online } else { g.local };
+    // 联网组的右端说的是「这组测完了没有」，本机组说的是「网页版做不到」——
+    // 后者是这组存在的理由，覆盖度里已经报过失败数，不在这里报第二遍。
+    let tail = if online && failed > 0 {
+        format!("{} {failed}", text.coverage.failed)
+    } else if online {
+        g.all_done.to_string()
+    } else {
+        g.local_only.to_string()
+    };
+    let range = format!("{}–{}", first.id.as_str(), last.id.as_str());
+    let meta = format!("{} {} · {tail}", cards.len(), g.items);
+
+    let left = format!("  {name}  {}", style.tone(Tone::Dim, &range));
+    let rule_width = style
+        .width()
+        .saturating_sub(display_width(&left) + display_width(&meta) + 2);
+    if rule_width >= 1 {
+        let _ = writeln!(
+            out,
+            "{left} {} {}",
+            style.tone(Tone::Dim, &"─".repeat(rule_width)),
+            style.tone(Tone::Dim, &meta)
+        );
+    } else {
+        // 窄窗里连一格发丝线都排不下：统计换行右对齐，与标题行的状态词同样处理。
+        let _ = writeln!(out, "{left}");
+        let indent = style.width().saturating_sub(display_width(&meta)).max(2);
+        let _ = writeln!(
+            out,
+            "{}{}",
+            " ".repeat(indent),
+            style.tone(Tone::Dim, &meta)
+        );
+    }
 }
 
 /// 页脚提示行（design：`.footer-hint`）。命令字面量以 `main.rs` 的 `Cli`/
@@ -191,13 +307,21 @@ fn render_footer(out: &mut String, text: &Text, style: &Style) {
     render_wrapped(
         out,
         &format!(
-            "ipcheck --verbose  {}  ·  ipcheck --json  {}",
-            style.tone(Tone::Dim, f.verbose_hint),
-            style.tone(Tone::Dim, f.json_hint)
+            "ipcheck --verbose  {}",
+            style.tone(Tone::Dim, f.verbose_hint)
         ),
         style,
         None,
         FOOTER_INDENT,
+        style.width(),
+    );
+    render_wrapped(
+        out,
+        &format!("ipcheck --json  {}", style.tone(Tone::Dim, f.json_hint)),
+        style,
+        None,
+        FOOTER_INDENT,
+        style.width(),
     );
     render_wrapped(
         out,
@@ -208,6 +332,7 @@ fn render_footer(out: &mut String, text: &Text, style: &Style) {
         style,
         None,
         FOOTER_INDENT,
+        style.width(),
     );
 }
 
@@ -227,12 +352,34 @@ fn render_verdict(
     let has_reminder_only = items.iter().any(|c| !contributing.contains(&c.id));
     let (level, badge, summary) = verdict_headline(verdict, has_reminder_only, text);
 
-    let headline = match badge {
-        Some(badge) => format!("{}  {}", style.bold(level), style.tone(Tone::Dim, badge)),
-        None => style.bold(level),
-    };
-    let _ = writeln!(out, "  {} {headline}", style.tone(tone, marker(tone)));
-    render_wrapped(out, summary, style, None, VERDICT_INDENT);
+    let level_badge = style.badge(tone, level);
+    match badge {
+        // 形态徽章（初步／完整）跟在档位色块后面；窄窗里挤不下就落到下一行，
+        // 不折断色块本身。
+        Some(badge)
+            if 2 + display_width(&level_badge) + 2 + display_width(badge) <= style.width() =>
+        {
+            let _ = writeln!(out, "  {level_badge}  {}", style.tone(Tone::Dim, badge));
+        }
+        Some(badge) => {
+            let _ = writeln!(out, "  {level_badge}");
+            render_wrapped(
+                out,
+                badge,
+                style,
+                Some(Tone::Dim),
+                VERDICT_INDENT,
+                style.prose(),
+            );
+        }
+        None => {
+            let _ = writeln!(out, "  {level_badge}");
+        }
+    }
+    render_wrapped(out, summary, style, None, VERDICT_INDENT, style.prose());
+
+    // facts 网格：四行共用一个标签列（原型 `.facts`），标签 dim、取值常色。
+    let mut facts: Vec<(&str, String)> = Vec::new();
 
     if let Outcome::Done(info) = &report.o1 {
         let mut parts = vec![info.ip.clone()];
@@ -252,12 +399,7 @@ fn render_verdict(
                 parts.push(network.join("  "));
             }
         }
-        let _ = writeln!(
-            out,
-            "    {}  {}",
-            text.verdict.exit_ip_label,
-            parts.join("  ·  ")
-        );
+        facts.push((text.verdict.exit_ip_label, parts.join("  ·  ")));
     }
 
     if let Outcome::Done(risk) = &report.o4 {
@@ -267,30 +409,65 @@ fn render_verdict(
             Level::Medium => Tone::Warn,
             Level::High => Tone::Bad,
         };
-        let _ = writeln!(
-            out,
-            "    {}  {score}/100  {}  {}",
+        facts.push((
             text.verdict.risk_label,
-            risk_bar(score, bar_tone, style),
-            style.tone(Tone::Dim, text.values.risk_scale_note)
-        );
+            format!(
+                "{}  {}  {}",
+                style.tone(bar_tone, &format!("{score}/100")),
+                risk_bar(score, bar_tone, style),
+                style.tone(Tone::Dim, text.values.risk_scale_note)
+            ),
+        ));
     }
 
     // 综合结论永远不得脱离覆盖度单独呈现（ADR-0004）。
-    let _ = writeln!(
-        out,
-        "    {}  {}",
+    facts.push((
         text.verdict.coverage_label,
-        style.tone(
-            Tone::Dim,
-            &format!(
-                "{} {} · {} {}",
-                text.coverage.done, coverage.done, text.coverage.failed, coverage.failed
-            )
-        )
-    );
+        format!(
+            "{} {} · {} {}",
+            text.coverage.done, coverage.done, text.coverage.failed, coverage.failed
+        ),
+    ));
 
-    render_attention(out, &items, &contributing, text, style);
+    // 「需关注」与 facts 共用同一个标签列——它在原型里就是 facts 网格的第四行，
+    // 单独算宽度会让标签列在这一行错位。
+    let attention_width = if items.is_empty() {
+        0
+    } else {
+        display_width(text.verdict.attention_label)
+    };
+    let label_width = facts
+        .iter()
+        .map(|(label, _)| display_width(label))
+        .max()
+        .unwrap_or(0)
+        .max(attention_width);
+    let value_indent = format!("{VERDICT_INDENT}{}", " ".repeat(label_width + 2));
+    for (label, value) in &facts {
+        let first = format!(
+            "{VERDICT_INDENT}{}  ",
+            style.tone(Tone::Dim, &pad_to(label, label_width))
+        );
+        render_wrapped_after(
+            out,
+            value,
+            style,
+            None,
+            &first,
+            &value_indent,
+            style.width(),
+        );
+    }
+
+    render_attention(
+        out,
+        &items,
+        &contributing,
+        label_width,
+        &value_indent,
+        text,
+        style,
+    );
 }
 
 /// 风险分刻度条：20 格块字符，填充比例 = `score / 100`。
@@ -344,6 +521,8 @@ fn render_attention(
     out: &mut String,
     items: &[&Card],
     contributing: &[CheckId],
+    label_width: usize,
+    value_indent: &str,
     text: &Text,
     style: &Style,
 ) {
@@ -351,7 +530,7 @@ fn render_attention(
         return;
     }
 
-    let _ = writeln!(out, "    {}", style.bold(text.verdict.attention_label));
+    let mut entries: Vec<String> = Vec::new();
     for card in items {
         // 清单的 marker 取「清单自身的语义」，不取卡片 tone：卡片 tone 只读分项
         // 分级（契约 6，只看分数），清单要说的是「这项影响了结论/值得看一眼」。
@@ -367,13 +546,30 @@ fn render_attention(
         } else {
             Tone::Warn
         };
-        let _ = writeln!(
-            out,
-            "      {} {}  {}",
+        entries.push(format!(
+            "{} {}  {}",
             style.tone(list_tone, marker(list_tone)),
             style.tone(Tone::Dim, card.id.as_str()),
             card.title,
-        );
+        ));
+    }
+
+    // 一项一行（**偏离原型**：`.attn` 是 flex wrap 横排）。横排在项数多时要靠
+    // marker 去辨认项与项的边界，一行扫过去认不清几项；一行一项，编号列直接对齐。
+    // 首行接在「需关注」标签后面，其余行落在取值列上；窄窗里单项装不下就自己折行。
+    for (i, entry) in entries.iter().enumerate() {
+        if i == 0 {
+            let first = format!(
+                "{VERDICT_INDENT}{}  ",
+                style.tone(
+                    Tone::Dim,
+                    &pad_to(text.verdict.attention_label, label_width)
+                )
+            );
+            render_wrapped_after(out, entry, style, None, &first, value_indent, style.width());
+        } else {
+            render_wrapped(out, entry, style, None, value_indent, style.width());
+        }
     }
 
     let contributing_ids: Vec<CheckId> = items
@@ -388,7 +584,15 @@ fn render_attention(
         .collect();
 
     if let Some(scope) = attention_scope(&contributing_ids, &reminder_ids, &text.verdict) {
-        render_wrapped(out, &scope, style, Some(Tone::Dim), VERDICT_INDENT);
+        // scope 句留在取值列内（原型里它是 facts 网格的空标签行），不回到标签列。
+        render_wrapped(
+            out,
+            &scope,
+            style,
+            Some(Tone::Dim),
+            value_indent,
+            style.prose(),
+        );
     }
 }
 
@@ -483,16 +687,49 @@ fn join_ids(ids: &[CheckId], separator: &str, connector: &str) -> String {
 }
 
 /// 检测卡内的取值与说明文字（`values`/`note`/`description`/C4 成因句）用的缩进——
-/// 折行后的续行悬挂对齐到同一列，不顶格。
-const NOTE_INDENT: &str = "       ";
+/// 折行后的续行悬挂对齐到同一列，不顶格。8 列 = 卡片缩进 2 + marker 1 + 空格 1 +
+/// 编号 2 + 空格 2，正好落在标题的起始列上（原型 `.cbody` 与 `.ctitle` 同一条缩进线）。
+const NOTE_INDENT: &str = "        ";
 /// 结论区正文（摘要句、`attention_scope` 句）的缩进。
 const VERDICT_INDENT: &str = "    ";
 /// 页脚提示行的缩进。
 const FOOTER_INDENT: &str = "  ";
-/// 说明文字收进的总列宽（含缩进），spec §5.5。
-const WRAP_WIDTH: usize = 76;
+/// 说明文字收进的总列宽（含缩进），spec §5.5。窗口再宽也不放开。
+const PROSE_WIDTH: usize = 76;
+/// 整幅宽度上限：取值行、发丝线、状态词右对齐用。
+///
+/// 原型是 96（`.screen{max-width:96ch}`），这里放宽到 110——常见的 120 列窗口
+/// 基本铺满，右侧不留一条空白带。**上限本身不能取消**：整幅宽度决定的是标题行到
+/// 右端状态词的视线距离，超宽屏上拉到 150 列，`✔ O3  IPv6 泄露 … 泄露` 就得横扫
+/// 整屏才对得上。说明文字另有 `PROSE_WIDTH`，不受这条影响。
+const MAX_WIDTH: usize = 110;
+/// 整幅宽度下限：再窄的窗口也按这个排，否则标签列会被压没。
+const MIN_WIDTH: usize = 40;
+/// 拿不到窗口宽度时的固定宽度。
+const DEFAULT_WIDTH: usize = PROSE_WIDTH;
 
-/// 屏幕宽度（字符数），跳过 ANSI 转义序列——`\x1b[2m` 这类控制串不占列。
+/// 单个字符占的终端列数。CJK 全角字符占两列——不认这一点，中文行会折在 152 列
+/// （屏幕外），标签列也对不齐（「地址」4 列 vs「风险评分」8 列，按字符数算都是 2/4）。
+/// 只区分「宽/非宽」，不处理组合字符与 emoji 变体：报告里不出现这类字符。
+fn char_width(ch: char) -> usize {
+    let c = ch as u32;
+    let wide = matches!(c,
+        0x1100..=0x115F
+        | 0x2E80..=0x303E
+        | 0x3041..=0x33FF
+        | 0x3400..=0x4DBF
+        | 0x4E00..=0x9FFF
+        | 0xA000..=0xA4CF
+        | 0xAC00..=0xD7A3
+        | 0xF900..=0xFAFF
+        | 0xFE30..=0xFE4F
+        | 0xFF00..=0xFF60
+        | 0xFFE0..=0xFFE6
+        | 0x20000..=0x3FFFD);
+    if wide { 2 } else { 1 }
+}
+
+/// 屏幕宽度（列数），跳过 ANSI 转义序列——`\x1b[2m` 这类控制串不占列。
 /// 页脚是先上色再折行的（提示词 dim、命令字面量不 dim），拿原始字符数去折
 /// 会把彩色输出提前折断。
 fn display_width(text: &str) -> usize {
@@ -506,41 +743,36 @@ fn display_width(text: &str) -> usize {
                 }
             }
         } else {
-            width += 1;
+            width += char_width(ch);
         }
     }
     width
 }
 
-/// 按空格折行，收进 `WRAP_WIDTH - indent` 列内；不含空格的超宽「词」
-/// （典型是中文长句，中文标点不分隔单词）按字符数强制切分。不处理 CJK
-/// 视觉宽度——文案本身较短，够用即可（brief 要点 4）。
-///
-/// 词间空格**按原样保留**：取值行拿双空格做列内对齐（`Address  1.2.3.4`、
-/// `Asia/Shanghai  ≠  Asia/Tokyo`），归一成单空格等于把对齐拆了。
-fn wrap_lines(text: &str, indent: &str) -> Vec<String> {
-    let avail = WRAP_WIDTH.saturating_sub(indent.chars().count()).max(1);
-
-    // (词, 该词之后的空格串)。`split(' ')` 在连续空格处产出空片段，用它把被吃掉的
-    // 空格逐个补回前一个词的尾部。
-    let mut tokens: Vec<(String, String)> = Vec::new();
-    for (i, part) in text.split(' ').enumerate() {
-        if i > 0
-            && let Some(last) = tokens.last_mut()
-        {
-            last.1.push(' ');
-        }
-        if !part.is_empty() {
-            tokens.push((part.to_string(), String::new()));
-        }
+/// 右补空格到 `width` 列（标签列对齐用）。已经超宽就原样返回。
+fn pad_to(text: &str, width: usize) -> String {
+    let mut out = text.to_string();
+    for _ in display_width(text)..width {
+        out.push(' ');
     }
+    out
+}
+
+/// 按列宽折行，收进 `width - indent` 列内。断行机会有两处：词间空格，以及
+/// 全角字符两侧——中文不用空格分词，只认空格的话「归属数据来自 proxycheck；网页版…」
+/// 会被当成两个巨词，行尾大片留白（原型里 CSS 是按字断的）。
+///
+/// 词间空格**按原样保留**：取值行拿双空格做列内对齐（`Address  1.2.3.4`），
+/// 归一成单空格等于把对齐拆了。
+fn wrap_lines(text: &str, indent: &str, width: usize) -> Vec<String> {
+    let avail = width.saturating_sub(display_width(indent)).max(1);
+    let tokens = break_units(text);
 
     let mut lines = Vec::new();
     let mut current = String::new();
     for (word, spaces) in tokens {
-        let chars: Vec<char> = word.chars().collect();
-        let chunks: Vec<String> = if chars.len() > avail {
-            chars.chunks(avail).map(|c| c.iter().collect()).collect()
+        let chunks: Vec<String> = if display_width(&word) > avail {
+            split_by_width(&word, avail)
         } else {
             vec![word]
         };
@@ -562,49 +794,309 @@ fn wrap_lines(text: &str, indent: &str) -> Vec<String> {
     lines
 }
 
+/// 把一段文本切成「可断单元 + 其后的空格串」。单元内部不允许断行：
+/// 连续的半角字符是一个单元（英文单词、IP、命令），每个全角字符自成单元。
+/// ANSI 转义序列不占列，粘在**后一个**单元的前面——否则断行会把 dim 的起始
+/// 序列留在上一行，颜色跨行泄漏。
+/// 不能出现在行首的全角标点（句读、收尾括号引号）。
+fn no_line_start(ch: char) -> bool {
+    matches!(
+        ch,
+        '。' | '，'
+            | '、'
+            | '；'
+            | '：'
+            | '？'
+            | '！'
+            | '”'
+            | '’'
+            | '」'
+            | '』'
+            | '）'
+            | '】'
+            | '》'
+            | '〉'
+            | '…'
+            | '·'
+            | '～'
+    )
+}
+
+/// 不能出现在行尾的全角标点（起始括号引号）。
+fn no_line_end(ch: char) -> bool {
+    matches!(ch, '“' | '‘' | '「' | '『' | '（' | '【' | '《' | '〈')
+}
+
+fn break_units(text: &str) -> Vec<(String, String)> {
+    let mut units: Vec<(String, String)> = Vec::new();
+    let mut current = String::new();
+    let mut pending = String::new();
+    let mut chars = text.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\x1b' {
+            pending.push(ch);
+            for next in chars.by_ref() {
+                pending.push(next);
+                if next == 'm' {
+                    break;
+                }
+            }
+        } else if ch == ' ' {
+            if !current.is_empty() {
+                units.push((std::mem::take(&mut current), String::new()));
+            }
+            // 行首空格没有可挂靠的单元，直接丢掉——折行结果本就顶格。
+            if let Some(last) = units.last_mut() {
+                last.1.push(' ');
+            }
+        } else if char_width(ch) == 2 {
+            // 标点禁则：句读不能顶行首、开括号不能落行尾——少了它，
+            // 「…代理背后」后面会孤零零折出一行「。」。
+            let after_open = current.chars().last().is_some_and(no_line_end);
+            if no_line_start(ch) || after_open {
+                if current.is_empty()
+                    && let Some(last) = units.last_mut()
+                    && last.1.is_empty()
+                {
+                    last.0.push_str(&std::mem::take(&mut pending));
+                    last.0.push(ch);
+                    continue;
+                }
+                current.push_str(&std::mem::take(&mut pending));
+                current.push(ch);
+                // 句读粘完就闭合单元；开括号继续张着，等下一个字符粘上来。
+                if !no_line_end(ch) {
+                    units.push((std::mem::take(&mut current), String::new()));
+                }
+                continue;
+            }
+            if !current.is_empty() {
+                units.push((std::mem::take(&mut current), String::new()));
+            }
+            let mut unit = std::mem::take(&mut pending);
+            unit.push(ch);
+            if no_line_end(ch) {
+                current = unit;
+            } else {
+                units.push((unit, String::new()));
+            }
+        } else {
+            current.push_str(&std::mem::take(&mut pending));
+            current.push(ch);
+        }
+    }
+    current.push_str(&pending);
+    if !current.is_empty() {
+        units.push((current, String::new()));
+    }
+    units
+}
+
+/// 按列宽把一个无空格可断的长「词」切成多段（超长 URL/ASN 串走这条路）。
+fn split_by_width(word: &str, avail: usize) -> Vec<String> {
+    let mut chunks = Vec::new();
+    let mut current = String::new();
+    let mut width = 0;
+    for ch in word.chars() {
+        let w = char_width(ch);
+        if width + w > avail && !current.is_empty() {
+            chunks.push(std::mem::take(&mut current));
+            width = 0;
+        }
+        current.push(ch);
+        width += w;
+    }
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+    chunks
+}
+
 /// 折行后逐行输出，续行悬挂对齐到 `indent`。`tone` 为 `None` 时不上色
 /// （C4 成因句：原型里它是决定性说明，不是次级提示，不降 dim）。
-fn render_wrapped(out: &mut String, text: &str, style: &Style, tone: Option<Tone>, indent: &str) {
-    for line in wrap_lines(text, indent) {
+fn render_wrapped(
+    out: &mut String,
+    text: &str,
+    style: &Style,
+    tone: Option<Tone>,
+    indent: &str,
+    width: usize,
+) {
+    render_wrapped_after(out, text, style, tone, indent, indent, width);
+}
+
+/// 同 `render_wrapped`，但首行改用 `first`（标签列已经写在里面）。`first` 与
+/// `indent` 必须等宽——取值行的折行宽度是按 `indent` 算的，首行更窄就会越界。
+fn render_wrapped_after(
+    out: &mut String,
+    text: &str,
+    style: &Style,
+    tone: Option<Tone>,
+    first: &str,
+    indent: &str,
+    width: usize,
+) {
+    let lines = wrap_lines(text, indent, width);
+    if lines.is_empty() {
+        let _ = writeln!(out, "{}", first.trim_end());
+        return;
+    }
+    for (i, line) in lines.iter().enumerate() {
+        let prefix = if i == 0 { first } else { indent };
         match tone {
             Some(t) => {
-                let _ = writeln!(out, "{indent}{}", style.tone(t, &line));
+                let _ = writeln!(out, "{prefix}{}", style.tone(t, line));
             }
             None => {
-                let _ = writeln!(out, "{indent}{line}");
+                let _ = writeln!(out, "{prefix}{line}");
             }
         }
     }
 }
 
 fn render_card(out: &mut String, card: &Card, style: &Style, verbose: bool) {
-    let mut head = format!(
-        "{} {}  {}",
+    let head = format!(
+        "  {} {}  {}",
         style.tone(card.tone, marker(card.tone)),
         style.tone(Tone::Dim, card.id.as_str()),
         style.bold(card.title),
     );
-    if let Some(state) = &card.state {
-        let _ = write!(head, "  {}", style.tone(card.state_tone, state));
+    match &card.state {
+        // 状态词右端对齐（原型 `.ctitle{flex:1}` 把它顶到行尾）：扫一列就能读完
+        // 十项结果。标题过长挤不下时退回两格间隔，不折行——状态词是扫读锚点。
+        Some(state) => {
+            let room = style
+                .width()
+                .saturating_sub(display_width(&head) + display_width(state));
+            if room >= 2 {
+                let _ = writeln!(
+                    out,
+                    "{head}{}{}",
+                    " ".repeat(room),
+                    style.tone(card.state_tone, state)
+                );
+            } else {
+                // 窄窗里标题与状态词挤不下：状态词落到下一行，仍然右对齐——
+                // 溢出到窗口外等于把它藏起来，那正是扫读要用的那一列。
+                let _ = writeln!(out, "{head}");
+                let indent = style
+                    .width()
+                    .saturating_sub(display_width(state))
+                    .max(display_width(NOTE_INDENT));
+                let _ = writeln!(
+                    out,
+                    "{}{}",
+                    " ".repeat(indent),
+                    style.tone(card.state_tone, state)
+                );
+            }
+        }
+        None => {
+            let _ = writeln!(out, "{head}");
+        }
     }
-    let _ = writeln!(out, "  {head}");
 
-    for value in &card.values {
+    // 卡内的标签列（原型 `.kv` 网格）：宽度取本卡最宽的标签，各卡自适应——
+    // 固定列宽是「多语言不存在」那个假设的化石（见文件头）。
+    let label_width = card
+        .values
+        .iter()
+        .filter_map(|row| match row {
+            Row::Kv(label, _) => Some(display_width(label)),
+            Row::KvOwned(label, _) => Some(display_width(label)),
+            Row::Cmp { .. } | Row::Plain(_) => None,
+        })
+        .max()
+        .unwrap_or(0);
+    let value_indent = format!("{NOTE_INDENT}{}", " ".repeat(label_width + 2));
+
+    for row in &card.values {
         // 取值行同样折行：C2／C4／O5／O6 把整句说明放在 `values` 里，其中 O5 的
         // 泄露句是全报告最长的一行（原型改版点 05 点名的反面教材）。
-        render_wrapped(out, value, style, None, NOTE_INDENT);
+        match row {
+            Row::Kv(label, value) => {
+                render_kv(out, label, value, label_width, &value_indent, style)
+            }
+            Row::KvOwned(label, value) => {
+                render_kv(out, label, value, label_width, &value_indent, style)
+            }
+            Row::Cmp {
+                left_label,
+                left,
+                op,
+                right_label,
+                right,
+            } => {
+                // 比对符取卡片自身的色调（原型 `.op` 挂状态类），标签降 dim。
+                let line = format!(
+                    "{}  {left}  {}  {}  {right}",
+                    style.tone(Tone::Dim, left_label),
+                    style.tone(card.tone, op),
+                    style.tone(Tone::Dim, right_label),
+                );
+                render_wrapped(out, &line, style, None, NOTE_INDENT, style.width());
+            }
+            // 整句说明走说明宽度，取值行走整幅宽度——原型里也是两条不同的上限。
+            Row::Plain(value) => {
+                render_wrapped(out, value, style, None, NOTE_INDENT, style.prose())
+            }
+        }
     }
     for note in &card.notes {
-        render_wrapped(out, note, style, Some(Tone::Dim), NOTE_INDENT);
+        render_wrapped(
+            out,
+            note,
+            style,
+            Some(Tone::Dim),
+            NOTE_INDENT,
+            style.prose(),
+        );
     }
     if let Some(fix) = &card.fix {
-        render_wrapped(out, &fix.explain, style, None, NOTE_INDENT);
-        // 修复命令不折行——折断的命令复制粘贴过去就跑不了。
-        let _ = writeln!(out, "{NOTE_INDENT}{}", fix.command);
+        render_wrapped(out, &fix.explain, style, None, NOTE_INDENT, style.prose());
+        // 修复命令不折行——折断的命令复制粘贴过去就跑不了。窄窗里标签与命令
+        // 同行放不下时，先出标签再出整条命令；命令本身宁可越界也不断开。
+        let one_line = display_width(NOTE_INDENT) + display_width(fix.label) + 2
+            <= style.width().saturating_sub(display_width(&fix.command));
+        if one_line {
+            let _ = writeln!(
+                out,
+                "{NOTE_INDENT}{}  {}",
+                style.tone(Tone::Dim, fix.label),
+                fix.command
+            );
+        } else {
+            let _ = writeln!(out, "{NOTE_INDENT}{}", style.tone(Tone::Dim, fix.label));
+            let _ = writeln!(out, "{NOTE_INDENT}{}", fix.command);
+        }
     }
     if verbose {
-        render_wrapped(out, card.description, style, Some(Tone::Dim), NOTE_INDENT);
+        render_wrapped(
+            out,
+            card.description,
+            style,
+            Some(Tone::Dim),
+            NOTE_INDENT,
+            style.prose(),
+        );
     }
+}
+
+/// 一条标签行：标签补齐到卡内标签列宽并降 dim，取值折行悬挂在取值列。
+fn render_kv(
+    out: &mut String,
+    label: &str,
+    value: &str,
+    label_width: usize,
+    value_indent: &str,
+    style: &Style,
+) {
+    let first = format!(
+        "{NOTE_INDENT}{}  ",
+        style.tone(Tone::Dim, &pad_to(label, label_width))
+    );
+    render_wrapped_after(out, value, style, None, &first, value_indent, style.width());
 }
 
 fn failure_text(failure: Failure, text: &Text) -> &'static str {
@@ -630,7 +1122,7 @@ fn failed_card(
         // 失败卡不编造状态词/比对符/修复行——brief 要点 7。
         state: None,
         state_tone: Tone::Dim,
-        values: vec![failure_text(failure, text).to_string()],
+        values: vec![Row::Plain(failure_text(failure, text).to_string())],
         notes: if failure == Failure::QuotaExhausted {
             vec![text.notes.quota_shared]
         } else {
@@ -641,12 +1133,12 @@ fn failed_card(
     }
 }
 
-fn cards(report: &Report, text: &Text) -> Vec<Card> {
+fn cards(report: &Report, text: &Text, style: &Style) -> Vec<Card> {
     vec![
         card_o1(&report.o1, text),
         card_timezone(CheckId::O2, &report.o2, text, &text.checks.o2, true),
         card_o3(&report.o3, text),
-        card_o4(&report.o4, text),
+        card_o4(&report.o4, text, style),
         card_o5(&report.o5, text),
         card_o6(&report.o6, text),
         card_c1(&report.c1, text),
@@ -669,7 +1161,7 @@ fn card_o1(outcome: &Outcome<ExitInfo>, text: &Text) -> Card {
     };
 
     let fields = &text.checks.o1_fields;
-    let mut values = vec![format!("{}  {}", fields.address, info.ip)];
+    let mut values = vec![Row::Kv(fields.address, info.ip.clone())];
     let mut notes = Vec::new();
     if let Some(geo) = &info.geo {
         let place: Vec<&str> = [&geo.city_name, &geo.region_name, &geo.country_name]
@@ -677,20 +1169,20 @@ fn card_o1(outcome: &Outcome<ExitInfo>, text: &Text) -> Card {
             .filter_map(|f| f.as_deref())
             .collect();
         if !place.is_empty() {
-            values.push(format!("{}  {}", fields.ownership, place.join(", ")));
+            values.push(Row::Kv(fields.ownership, place.join(", ")));
         }
         let network: Vec<&str> = [&geo.asn, &geo.organisation]
             .into_iter()
             .filter_map(|f| f.as_deref())
             .collect();
         if !network.is_empty() {
-            values.push(format!("{}  {}", fields.network, network.join("  ")));
+            values.push(Row::Kv(fields.network, network.join("  ")));
         }
         // 契约 5.4：必须标明归属来自 proxycheck，否则用户拿两边结果对不上时
         // 会以为有一边算错了。
         notes.push(text.notes.geo_source);
     } else {
-        values.push(format!("{}  {}", fields.ownership, text.values.unknown));
+        values.push(Row::Kv(fields.ownership, text.values.unknown.to_string()));
     }
 
     Card {
@@ -743,7 +1235,22 @@ fn card_timezone(
         Some(false) => "≠",
         None => marker(Tone::Dim),
     };
-    let detail = format!("{local}  {op}  {exit}");
+    // 比对行两侧都带标签（原型 `.cmp`）：两个裸时区名读不出谁是谁，而 O2/C4 的
+    // 本地侧本就是两个不同的东西（系统时区 vs 命令行进程认的 $TZ）。
+    // C4 的本地侧标签是字面量 `$TZ`——shell 变量名不随语种变化，同 `render_footer`
+    // 里的命令字面量，不进 Copy。
+    let local_label = if desktop_note {
+        text.values.tz_system_label
+    } else {
+        "$TZ"
+    };
+    let detail = Row::Cmp {
+        left_label: local_label,
+        left: local.to_string(),
+        op,
+        right_label: text.values.tz_exit_label,
+        right: exit.to_string(),
+    };
 
     // 只有 C4（`desktop_note == false`）命中不一致且出口 IP 时区名已知时才给
     // 修复建议（决策 5：只有 C4 给修复命令；spec §5.4 的「已知」条件显式核对，
@@ -756,7 +1263,8 @@ fn card_timezone(
                     "{}{local}{}{exit_tz}{}",
                     cf.explain_prefix, cf.explain_connector, cf.explain_suffix
                 ),
-                command: format!("{}  {}{exit_tz}", cf.fix_label, cf.fix_command_prefix),
+                label: cf.fix_label,
+                command: format!("{}{exit_tz}", cf.fix_command_prefix),
             }
         })
     } else {
@@ -820,14 +1328,15 @@ fn card_o3(outcome: &Outcome<ipify::Ipv6>, text: &Text) -> Card {
         // 已经是「未启用」/「泄露」这类短词，不需要 C2 另开一份同义文案。
         state: Some(state.to_string()),
         state_tone: tone,
-        values: vec![value],
+        // 标签是协议名 `IPv6`，两语种同形，不进 Copy（同 C4 的 `$TZ`）。
+        values: vec![Row::Kv("IPv6", value)],
         notes: Vec::new(),
         fix: None,
         description: meta.description,
     }
 }
 
-fn card_o4(outcome: &Outcome<Risk>, text: &Text) -> Card {
+fn card_o4(outcome: &Outcome<Risk>, text: &Text, style: &Style) -> Card {
     let meta = &text.checks.o4;
     let Outcome::Done(result) = outcome else {
         return failed_card(
@@ -847,9 +1356,12 @@ fn card_o4(outcome: &Outcome<Risk>, text: &Text) -> Card {
         Level::High => (Tone::Bad, text.values.risk_level_high),
     };
 
-    let mut values = vec![format!("{score}/100")];
+    let mut values = vec![Row::Kv(
+        text.verdict.risk_label,
+        format!("{score}/100  {}", risk_bar(score, tone, style)),
+    )];
     if let Some(kind) = &result.risk.network_type {
-        values.push(kind.clone());
+        values.push(Row::Kv(text.values.network_type_label, kind.clone()));
     }
     let flags: Vec<&str> = [
         ("proxy", result.risk.proxy),
@@ -861,23 +1373,27 @@ fn card_o4(outcome: &Outcome<Risk>, text: &Text) -> Card {
     .filter_map(|(name, hit)| hit.then_some(name))
     .collect();
     if !flags.is_empty() {
-        values.push(flags.join("  "));
+        values.push(Row::Kv(text.values.detections_label, flags.join("  ")));
     }
+
+    values.push(Row::Kv(
+        text.values.abuse_label,
+        match &result.abuse {
+            // 未知不冒充「无收录」（契约 2.3）。
+            None => text.values.abuse_unknown.to_string(),
+            Some(abuse) if abuse.listed => {
+                format!("{} ({})", text.values.abuse_listed, abuse.frequency)
+            }
+            Some(_) => text.values.abuse_clean.to_string(),
+        },
+    ));
 
     // anonymous 决定判「高」的阈值（契约 3.1）。不显示它，用户就看不出同样的分数
-    // 为什么这次判了高——那是把判据藏起来。
+    // 为什么这次判了高——那是把判据藏起来。整句排在标签列网格之后，不夹在中间
+    // 把网格断成两截。
     if result.risk.anonymous {
-        values.push(text.values.anonymous_flag.to_string());
+        values.push(Row::Plain(text.values.anonymous_flag.to_string()));
     }
-
-    values.push(match &result.abuse {
-        // 未知不冒充「无收录」（契约 2.3）。
-        None => text.values.abuse_unknown.to_string(),
-        Some(abuse) if abuse.listed => {
-            format!("{} ({})", text.values.abuse_listed, abuse.frequency)
-        }
-        Some(_) => text.values.abuse_clean.to_string(),
-    });
 
     Card {
         id: CheckId::O4,
@@ -915,17 +1431,24 @@ fn card_o5(outcome: &Outcome<dns_egress::DnsEgress>, text: &Text) -> Card {
         } => {
             let tone = if *leak { Tone::Warn } else { Tone::Ok };
             let op = if *leak { "≠" } else { "=" };
-            let comparison_line = format!(
-                "{}  {}  {op}  {}  {}",
-                dt.ecs_label, ecs_country, dt.exit_label, exit_country,
-            );
+            let comparison_line = Row::Cmp {
+                left_label: dt.ecs_label,
+                left: ecs_country.clone(),
+                op,
+                right_label: dt.exit_label,
+                right: exit_country.clone(),
+            };
             let leak_message = if *leak { dt.leak } else { dt.no_leak };
             let state = if *leak {
                 dt.state_leaked
             } else {
                 dt.state_not_leaked
             };
-            (tone, state, vec![comparison_line, leak_message.to_string()])
+            (
+                tone,
+                state,
+                vec![comparison_line, Row::Plain(leak_message.to_string())],
+            )
         }
         dns_egress::Comparison::NotComparable(reason) => {
             // 三种「无从比对」各自的说明，绝不回退成「泄露」或「未泄露」（契约 2.5 硬约束 3）。
@@ -940,7 +1463,7 @@ fn card_o5(outcome: &Outcome<dns_egress::DnsEgress>, text: &Text) -> Card {
             (
                 Tone::Dim,
                 text.values.timezone_indeterminate,
-                vec![message.to_string()],
+                vec![Row::Plain(message.to_string())],
             )
         }
     };
@@ -949,14 +1472,16 @@ fn card_o5(outcome: &Outcome<dns_egress::DnsEgress>, text: &Text) -> Card {
     // 挂一个「仅供参考」pill 在值旁边（原型 refs/cli-report-redesign.html:392-394
     // 的位置关系）；notes 里的 resolver_note 整句保留不动——两者并存是原型的
     // 设计，不是待消除的重复：pill 挂在值本身供扫读，note 是解释句供细读。
-    values.push(format!(
-        "{}  {}  {}",
+    values.push(Row::Kv(
         dt.resolver_label,
-        result
-            .resolver_geo
-            .as_deref()
-            .unwrap_or(text.values.unknown),
-        text.values.reference_only,
+        format!(
+            "{}  {}",
+            result
+                .resolver_geo
+                .as_deref()
+                .unwrap_or(text.values.unknown),
+            text.values.reference_only,
+        ),
     ));
 
     Card {
@@ -993,10 +1518,13 @@ fn card_o6(outcome: &Outcome<udp_egress::UdpEgress>, text: &Text) -> Card {
         } => {
             let tone = if *mismatch { Tone::Warn } else { Tone::Ok };
             let op = if *mismatch { "≠" } else { "=" };
-            let comparison_line = format!(
-                "{}  {}  {op}  {}  {}",
-                ut.reflexive_label, reflexive_ip, ut.exit_label, exit_ip,
-            );
+            let comparison_line = Row::Cmp {
+                left_label: ut.reflexive_label,
+                left: reflexive_ip.to_string(),
+                op,
+                right_label: ut.exit_label,
+                right: exit_ip.to_string(),
+            };
             let mismatch_message = if *mismatch {
                 ut.mismatch
             } else {
@@ -1010,7 +1538,7 @@ fn card_o6(outcome: &Outcome<udp_egress::UdpEgress>, text: &Text) -> Card {
             (
                 tone,
                 state,
-                vec![comparison_line, mismatch_message.to_string()],
+                vec![comparison_line, Row::Plain(mismatch_message.to_string())],
             )
         }
         udp_egress::UdpEgress::NotComparable(reason) => {
@@ -1024,7 +1552,7 @@ fn card_o6(outcome: &Outcome<udp_egress::UdpEgress>, text: &Text) -> Card {
             (
                 Tone::Dim,
                 text.values.timezone_indeterminate,
-                vec![message.to_string()],
+                vec![Row::Plain(message.to_string())],
             )
         }
     };
@@ -1052,7 +1580,7 @@ fn card_c1(outcome: &Outcome<String>, text: &Text) -> Card {
             // 同 O1：没有 ok/warn/bad 分支，「已取得」是提示词而非评价，固定 Dim。
             state: Some(text.values.obtained.to_string()),
             state_tone: Tone::Dim,
-            values: vec![ip.clone()],
+            values: vec![Row::Kv(text.checks.o1_fields.address, ip.clone())],
             notes: Vec::new(),
             fix: None,
             description: meta.description,
@@ -1076,18 +1604,21 @@ fn card_c2(outcome: &Outcome<Vec<dns::Server>>, text: &Text) -> Card {
     };
 
     let domestic = servers.iter().any(|s| s.domestic);
+    // 地址占标签列、说明占取值列（原型 `.kv`）——多台 DNS 时说明才对得齐。
+    // 地址是动态值，`Row::Kv` 的标签是 `&'static str`，这里用 Plain 自己拼一列
+    // 不成立（宽度要跨行统一），因此把说明放在取值列、地址放标签列的语义由
+    // `Row::KvOwned` 承担。
     let values = servers
         .iter()
         .map(|server| {
-            let mut line = server.address.clone();
-            if let Some(label) = server.label {
-                line.push_str("  ");
-                line.push_str(label);
+            let note = if let Some(label) = server.label {
+                Some(label)
             } else if server.private {
-                line.push_str("  ");
-                line.push_str(text.values.dns_router);
-            }
-            line
+                Some(text.values.dns_router)
+            } else {
+                None
+            };
+            Row::KvOwned(server.address.clone(), note.unwrap_or("").to_string())
         })
         .collect();
 
@@ -1134,25 +1665,19 @@ fn card_c3(outcome: &Outcome<proxy::Status>, text: &Text) -> Card {
     };
 
     // 只报开关状态，绝不显示地址——把 127.0.0.1:7890 打出来等于替用户泄露配置。
-    let mut values = vec![format!(
-        "{}  {}",
+    let mut values = vec![Row::Kv(
         text.values.proxy_env,
-        state_label(&status.env_state())
+        state_label(&status.env_state()).to_string(),
     )];
-    let mut system = format!(
-        "{}  {}",
-        text.values.proxy_system,
-        state_label(&status.system)
-    );
+    let mut system = state_label(&status.system).to_string();
     if !status.system_kinds.is_empty() {
         system.push_str("  ");
         system.push_str(&status.system_kinds.join(" "));
     }
-    values.push(system);
-    values.push(format!(
-        "{}  {}",
+    values.push(Row::Kv(text.values.proxy_system, system));
+    values.push(Row::Kv(
         text.values.proxy_tun,
-        state_label(&status.tun)
+        state_label(&status.tun).to_string(),
     ));
 
     let tone = match status.tun_off() {
@@ -1290,11 +1815,19 @@ mod tests {
     /// 英文按空格折行，拼回时补单空格能精确复原原文；中文长句会被强制按字符切分
     /// （无空格可依），拼回会插入原文没有的空格，因此不适用于中文断言。
     /// 断点落在**双空格**上的文本（页脚的对齐空格）同样复原不了，那里另有断言。
+    /// 中文按字折行，断点两侧都是全角字符时**不补空格**——补了就复原不出原句。
     fn dewrap(out: &str) -> String {
-        out.lines()
-            .map(|line| line.trim_start())
-            .collect::<Vec<_>>()
-            .join(" ")
+        let mut flat = String::new();
+        for line in out.lines() {
+            let line = line.trim_start();
+            let joins_cjk = flat.chars().last().is_some_and(|c| char_width(c) == 2)
+                && line.chars().next().is_some_and(|c| char_width(c) == 2);
+            if !flat.is_empty() && !joins_cjk {
+                flat.push(' ');
+            }
+            flat.push_str(line);
+        }
+        flat
     }
 
     #[test]
@@ -1339,13 +1872,190 @@ mod tests {
                         .filter(|l| !facts.iter().any(|label| l.trim_start().starts_with(label)))
                     {
                         assert!(
-                            display_width(line) <= WRAP_WIDTH,
+                            display_width(line) <= PROSE_WIDTH,
                             "超出 76 列（{} 列）：{line:?}",
                             display_width(line)
                         );
                     }
                 }
             }
+        }
+    }
+
+    /// 分组标题行（发丝线那一行）。
+    fn group_line<'a>(out: &'a str, name: &str) -> &'a str {
+        out.lines()
+            .find(|line| line.contains(name) && line.contains('─'))
+            .unwrap_or_else(|| panic!("找不到分组标题：{out}"))
+    }
+
+    #[test]
+    fn the_report_follows_the_window_width() {
+        let text = copy::text(Lang::En);
+
+        // 窄窗：整份报告收进窗口，发丝线跟着缩。
+        let out = super::report(&full(), &text, &Style::sized(false, 50), true);
+        for line in out.lines() {
+            assert!(display_width(line) <= 50, "超出 50 列：{line:?}");
+        }
+        assert_eq!(
+            display_width(group_line(&out, text.groups.online)),
+            50,
+            "{out}"
+        );
+
+        // 宽窗：整幅张到上限，**说明文字不跟着摊开**——两条上限是分开的
+        // （原型 `.screen{max-width:96ch}` vs `.note{max-width:76ch}`）。
+        let out = super::report(&full(), &text, &Style::sized(false, 120), true);
+        for line in out.lines() {
+            assert!(display_width(line) <= MAX_WIDTH, "超出整幅上限：{line:?}");
+        }
+        assert_eq!(
+            display_width(group_line(&out, text.groups.online)),
+            MAX_WIDTH,
+            "{out}"
+        );
+        assert!(
+            !out.contains(text.notes.geo_source),
+            "说明文字整句没被折行，说明它跟着窗口摊开了：{out}"
+        );
+        assert!(dewrap(&out).contains(text.notes.geo_source), "{out}");
+
+        // 比窗口下限还窄：夹到 MIN_WIDTH。发丝线此时排不下，分组统计换行右对齐，
+        // 但没有任何一行溢出。
+        let out = super::report(&full(), &text, &Style::sized(false, 10), false);
+        for line in out.lines() {
+            assert!(display_width(line) <= MIN_WIDTH, "超出下限：{line:?}");
+        }
+        assert!(
+            out.lines().any(|l| l.contains(text.groups.online)),
+            "分组标题不能因为窄窗消失：{out}"
+        );
+    }
+
+    #[test]
+    fn a_state_word_that_cannot_share_the_title_line_moves_down_instead_of_overflowing() {
+        // 窄窗里「标题 + 状态词」挤不下时，状态词换行右对齐——溢出到窗口外
+        // 等于把扫读用的那一列藏起来。
+        let text = copy::text(Lang::En);
+        let out = super::report(&full(), &text, &Style::sized(false, 44), false);
+        let head = head_line(&out, "C2");
+        assert!(!head.contains(text.values.dns_domestic), "{out}");
+        let state_line = out
+            .lines()
+            .skip_while(|l| *l != head)
+            .nth(1)
+            .expect("状态词必须紧跟在标题行之后");
+        assert!(
+            state_line.trim_start().ends_with(text.values.dns_domestic),
+            "{out}"
+        );
+        assert_eq!(display_width(state_line), 44, "{out}");
+    }
+
+    #[test]
+    fn checks_are_split_into_an_online_and_a_local_group() {
+        // 原型 `.group`：两条发丝线把十项分成「联网可测」与「仅 CLI 可测」，
+        // 右端各自交代这组的量与性质。检测项顺序不变，分组只是呈现。
+        for lang in [Lang::En, Lang::ZhHans] {
+            let text = copy::text(lang);
+            let out = super::report(&full(), &text, &Style::new(false), false);
+            let online = out
+                .lines()
+                .find(|l| l.contains(text.groups.online))
+                .expect("联网组标题必须在");
+            let local = out
+                .lines()
+                .find(|l| l.contains(text.groups.local))
+                .expect("本机组标题必须在");
+            assert!(online.contains("O1–O6"), "{out}");
+            assert!(online.contains(text.groups.all_done), "{out}");
+            assert!(local.contains("C1–C4"), "{out}");
+            assert!(local.contains(text.groups.local_only), "{out}");
+            // 发丝线把两端撑满整幅宽度，两组的右端因此对齐在同一列。
+            assert_eq!(display_width(online), PROSE_WIDTH, "{out}");
+            assert_eq!(display_width(local), PROSE_WIDTH, "{out}");
+            // 分组标题必须在它那组的第一张卡之前。
+            let online_at = out.find(text.groups.online).unwrap();
+            let local_at = out.find(text.groups.local).unwrap();
+            assert!(online_at < out.find("O1").unwrap(), "{out}");
+            assert!(out.find(" O6  ").unwrap() < local_at, "{out}");
+            assert!(local_at < out.find(" C1  ").unwrap(), "{out}");
+        }
+    }
+
+    #[test]
+    fn a_failed_online_check_is_counted_in_its_group_header() {
+        // 判别力对照：全测成才说「全部完成」，有失败就报失败数——分组统计不能是
+        // 写死的装饰。
+        let mut report = full();
+        report.o3 = Outcome::Failed(Failure::Upstream);
+        let text = copy::text(Lang::En);
+        let out = super::report(&report, &text, &Style::new(false), false);
+        let online = out
+            .lines()
+            .find(|l| l.contains(text.groups.online))
+            .unwrap();
+        assert!(
+            online.contains(&format!("{} 1", text.coverage.failed)),
+            "{out}"
+        );
+        assert!(!online.contains(text.groups.all_done), "{out}");
+    }
+
+    #[test]
+    fn value_labels_inside_a_card_line_up_in_one_column() {
+        // 原型 `.kv` 网格：O4 卡内标签宽度不一（「IP 类型」7 列 vs「风险评分」8 列），
+        // 取值必须落在同一列上，否则就是散行。
+        let text = copy::text(Lang::ZhHans);
+        let out = super::report(&full(), &text, &Style::new(false), false);
+        let labels = [
+            text.verdict.risk_label,
+            text.values.network_type_label,
+            text.values.detections_label,
+            text.values.abuse_label,
+        ];
+        let widest = labels.iter().map(|l| display_width(l)).max().unwrap();
+        assert!(
+            labels.iter().map(|l| display_width(l)).min().unwrap() < widest,
+            "这几个标签必须宽度不一，否则这条测试证明不了补齐"
+        );
+
+        for label in labels {
+            let line = out
+                .lines()
+                .find(|l| l.starts_with(&format!("{NOTE_INDENT}{label}")))
+                .unwrap_or_else(|| panic!("{label} 行必须在：{out}"));
+            let after_label = &line[NOTE_INDENT.len() + label.len()..];
+            let padding = after_label.len() - after_label.trim_start_matches(' ').len();
+            // 取值起始列 = 缩进 + 最宽标签 + 两格间隔，四行都一样。
+            assert_eq!(
+                display_width(NOTE_INDENT) + display_width(label) + padding,
+                display_width(NOTE_INDENT) + widest + 2,
+                "{label} 的取值没落在公共列上：{out}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_verdict_level_reads_as_a_badge_without_color() {
+        // 原型 `.badge` 是反白色块；`--no-color` 下退回 `[ … ]`，语义不靠颜色
+        // 承载（点 8）。
+        let text = copy::text(Lang::En);
+        let out = render(&full(), false, false);
+        assert!(out.contains(&format!("[ {} ]", text.verdict.high)), "{out}");
+    }
+
+    #[test]
+    fn cjk_lines_never_start_with_closing_punctuation() {
+        // 中文按字折行后必须守标点禁则，否则会折出孤零零一行「。」。
+        let out = super::report(&full(), &copy::text(Lang::ZhHans), &Style::new(false), true);
+        for line in out.lines() {
+            let first = line.trim_start().chars().next();
+            assert!(
+                !first.is_some_and(no_line_start),
+                "行首出现了禁则标点：{line:?}"
+            );
         }
     }
 
@@ -1946,19 +2656,39 @@ mod tests {
 
     #[test]
     fn o2_uses_equals_for_a_match_and_not_equals_for_a_mismatch() {
+        // 比对行两侧各自带标签（原型 `.cmp`）：O2 的本地侧是系统时区，
+        // C4 的是字面量 $TZ，两个裸时区名读不出谁是谁。
+        let text = copy::text(Lang::En);
+        let system = text.values.tz_system_label;
+        let exit = text.values.tz_exit_label;
+
         let mut report = blank();
         report.o2 = tz("Asia/Shanghai", Some("Asia/Shanghai"), Some(true));
+        let out = render(&report, false, false);
         assert!(
-            render(&report, false, false).contains("Asia/Shanghai  =  Asia/Shanghai"),
-            "{}",
-            render(&report, false, false)
+            out.contains(&format!(
+                "{system}  Asia/Shanghai  =  {exit}  Asia/Shanghai"
+            )),
+            "{out}"
         );
 
         let mut report = blank();
         report.o2 = tz("Asia/Shanghai", Some("Asia/Tokyo"), Some(false));
         let out = render(&report, false, false);
-        assert!(out.contains("Asia/Shanghai  ≠  Asia/Tokyo"), "{out}");
-        assert!(!out.contains("Asia/Shanghai  =  Asia/Tokyo"), "{out}");
+        assert!(
+            out.contains(&format!("{system}  Asia/Shanghai  ≠  {exit}  Asia/Tokyo")),
+            "{out}"
+        );
+        assert!(!out.contains("  =  "), "{out}");
+
+        // C4 的本地侧标签是 $TZ 字面量，不随语种变化。
+        let mut report = blank();
+        report.c4 = tz("Asia/Shanghai", Some("Asia/Tokyo"), Some(false));
+        let out = render(&report, false, false);
+        assert!(
+            out.contains(&format!("$TZ  Asia/Shanghai  ≠  {exit}  Asia/Tokyo")),
+            "{out}"
+        );
     }
 
     #[test]
@@ -1969,7 +2699,13 @@ mod tests {
         let out = render(&report, false, false);
         assert!(!out.contains("  =  "), "{out}");
         assert!(!out.contains("  ≠  "), "{out}");
-        assert!(out.contains("Asia/Shanghai  ·  unknown"), "{out}");
+        assert!(
+            out.contains(&format!(
+                "Asia/Shanghai  ·  {}  unknown",
+                copy::text(Lang::En).values.tz_exit_label
+            )),
+            "{out}"
+        );
     }
 
     #[test]
@@ -2051,21 +2787,34 @@ mod tests {
         report.o3 = Outcome::Done(ipify::Ipv6::Disabled);
         let text = copy::text(Lang::En);
         let out = render(&report, false, false);
+        // 状态词顶到行尾（原型 `.ctitle{flex:1}`），标题与状态词之间是对齐空格，
+        // 不是固定的两格——锁「同一行、标题在左、状态词收在 76 列」这三件事。
         assert!(
-            out.contains(&format!("IPv6 Leak  {}", text.values.ipv6_disabled)),
+            head_line(&out, "O3").ends_with(text.values.ipv6_disabled),
             "{out}"
         );
+        assert!(head_line(&out, "O3").contains("IPv6 Leak"), "{out}");
+        assert_eq!(display_width(head_line(&out, "O3")), PROSE_WIDTH, "{out}");
 
         // O4：{分数}/100 {分级词}，不带「风险」后缀。33 分落在 26–75，判 medium。
         let report = risk_report(33, false);
         let out = render(&report, false, false);
         assert!(
-            out.contains(&format!(
-                "IP Type & Risk  33/100 {}",
-                text.values.risk_level_medium
-            )),
+            head_line(&out, "O4").ends_with(&format!("33/100 {}", text.values.risk_level_medium)),
             "{out}"
         );
+    }
+
+    /// 某张检测卡的标题行（`  ✔ O3  …`）。
+    fn head_line<'a>(out: &'a str, id: &str) -> &'a str {
+        // 「需关注」清单里也有 `! O4  …`，因此锁死行首两格 + marker + 编号的完整形状。
+        let heads: Vec<String> = ["✔", "!", "✖", "·"]
+            .iter()
+            .map(|marker| format!("  {marker} {id}  "))
+            .collect();
+        out.lines()
+            .find(|line| heads.iter().any(|head| line.starts_with(head)))
+            .unwrap_or_else(|| panic!("找不到 {id} 的标题行：{out}"))
     }
 
     #[test]
@@ -2127,11 +2876,13 @@ mod tests {
         // 只检查检测卡内被本任务折行的说明行（以 NOTE_INDENT 起始）——结论区的
         // 摘要句不属于 C4 的范围（render_verdict 是 C3 的地盘，本任务不动）。
         for line in out.lines().filter(|l| l.starts_with(NOTE_INDENT)) {
-            assert!(line.chars().count() <= WRAP_WIDTH, "超出 76 列：{line:?}");
+            assert!(line.chars().count() <= PROSE_WIDTH, "超出 76 列：{line:?}");
         }
         // geo_source（102 字符）必然被折成至少两行；续行悬挂缩进到 NOTE_INDENT，不顶格。
         assert!(
-            out.contains("\n       database, so the two can disagree."),
+            out.contains(&format!(
+                "\n{NOTE_INDENT}database, so the two can disagree."
+            )),
             "{out}"
         );
     }
@@ -2171,15 +2922,16 @@ mod tests {
             let out = super::report(&blank(), &text, &Style::new(false), false);
             // 用完整行匹配而非松散 contains——命令字面量若被改错一个字符，
             // 单独的子串断言可能仍然因为是另一处的前缀而碰巧通过。
-            // 第一行 en 下有 84 列，会被折到两行（zh 不会），因此期望值先按同一
-            // 折行规则拆开，再逐行连着页脚缩进整行匹配：命令字面量、提示词、
-            // 缩进列三者仍然被锁死，只是不再假设它一定是一行。
-            let hints = format!(
-                "ipcheck --verbose  {}  ·  ipcheck --json  {}",
-                text.footer.verbose_hint, text.footer.json_hint
-            );
-            for line in wrap_lines(&hints, FOOTER_INDENT) {
-                assert!(out.contains(&format!("\n{FOOTER_INDENT}{line}\n")), "{out}");
+            // --verbose 与 --json 各占一行；期望值仍按同一折行规则拆开后逐行
+            // 连着页脚缩进整行匹配：命令字面量、提示词、缩进列三者都被锁死。
+            let hints = [
+                format!("ipcheck --verbose  {}", text.footer.verbose_hint),
+                format!("ipcheck --json  {}", text.footer.json_hint),
+            ];
+            for hint in &hints {
+                for line in wrap_lines(hint, FOOTER_INDENT, PROSE_WIDTH) {
+                    assert!(out.contains(&format!("\n{FOOTER_INDENT}{line}\n")), "{out}");
+                }
             }
             assert!(
                 out.contains(&format!(

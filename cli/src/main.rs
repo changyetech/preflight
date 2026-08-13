@@ -26,7 +26,7 @@ use lang::{Lang, LangError};
     version,
     // GNU 惯例：版权信息进 `--version`（`-V` 仍是短版本号），日常报告输出保持干净。
     long_version = long_version(),
-    about = "Check your network environment before launching AI tools"
+    about = "Check your network environment before using IP-sensitive tools"
 )]
 struct Cli {
     /// Interface language: en / zh-hans
@@ -156,10 +156,16 @@ fn run_checkup(cli: &Cli, text: &Text, settings: &Settings) -> Result<i32> {
     } else {
         // 非 TTY 自动关色：重定向到文件不该满屏转义序列。
         let color = !settings.no_color && std::io::stdout().is_terminal();
-        print!(
-            "{}",
-            render::report(&report, text, &render::Style::new(color), cli.verbose)
-        );
+        // 宽度跟随窗口，量的是 **stdout** 那一端：重定向到文件/管道时拿不到宽度，
+        // 落回固定宽度——`ipcheck > report.txt` 的产物不该随当时的窗口大小变化。
+        // 只在渲染前量一次，不监听 SIGWINCH：报告是一次性输出，不重排。
+        let style = match terminal_size::terminal_size_of(std::io::stdout()) {
+            Some((terminal_size::Width(columns), _)) => {
+                render::Style::sized(color, columns as usize)
+            }
+            None => render::Style::new(color),
+        };
+        print!("{}", render::report(&report, text, &style, cli.verbose));
     }
 
     Ok(match report.verdict() {

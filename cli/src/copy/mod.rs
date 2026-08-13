@@ -190,6 +190,21 @@ copy_node! {
 }
 
 copy_leaf! {
+    /// 检测卡的两个分组标题（原型 `.group`）：联网可测 vs 仅 CLI 可测。
+    /// 编号区间（`O1–O6`）由渲染层从卡片列表派生，不是文案。
+    GroupText {
+        online,
+        local,
+        /// 分组统计里的「项」量词，与项数拼接（`6 项` / `6 checks`）。
+        items,
+        /// 联网组全部完成时的右端说明；有失败项时改用 `coverage.failed` + 数量。
+        all_done,
+        /// 本机组的右端说明——这组存在的理由就是网页版做不到。
+        local_only,
+    }
+}
+
+copy_leaf! {
     /// 检测项的取值与提示。
     ValueText {
         /// 探测进行中的提示，只往 stderr 打。
@@ -224,6 +239,15 @@ copy_leaf! {
         /// 「仅供参考」短标签（如 O5 resolver 归属旁的 pill），与整句
         /// `dns_egress.resolver_note` 并存，不是同一样东西的重复定义。
         reference_only,
+        /// O2 比对行的本地侧标签（系统时区）。C4 的本地侧是字面量 `$TZ`，
+        /// 是 shell 变量名不是词，写死在渲染层。
+        tz_system_label,
+        /// O2／C4 比对行的出口侧标签。两项共用——比对的是同一个东西。
+        tz_exit_label,
+        /// O4 值行标签：网络类型 / 代理检出 / 滥用举报。
+        network_type_label,
+        detections_label,
+        abuse_label,
     }
 }
 
@@ -306,6 +330,7 @@ copy_node! {
         errors: ErrorText,
         verdict: VerdictText,
         coverage: CoverageText,
+        groups: GroupText,
         checks: ChecksText,
         values: ValueText,
         failures: FailureText,

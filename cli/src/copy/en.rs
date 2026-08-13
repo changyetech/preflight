@@ -6,7 +6,8 @@
 
 use super::{
     C4FixText, CheckText, ChecksText, ConfigText, CoverageText, DnsEgressText, ErrorText,
-    FailureText, FooterText, NoteText, O1FieldsText, Text, UdpEgressText, ValueText, VerdictText,
+    FailureText, FooterText, GroupText, NoteText, O1FieldsText, Text, UdpEgressText, ValueText,
+    VerdictText,
 };
 
 pub const EN: Text = Text {
@@ -62,6 +63,14 @@ pub const EN: Text = Text {
     coverage: CoverageText {
         done: "Done",
         failed: "Check failed",
+    },
+
+    groups: GroupText {
+        online: "Online checks",
+        local: "Local checks",
+        items: "checks",
+        all_done: "all complete",
+        local_only: "not possible in the browser",
     },
 
     checks: ChecksText {
@@ -146,6 +155,11 @@ pub const EN: Text = Text {
         risk_level_medium: "medium",
         risk_level_high: "high",
         reference_only: "Reference only",
+        tz_system_label: "System timezone",
+        tz_exit_label: "Exit IP timezone",
+        network_type_label: "IP type",
+        detections_label: "Proxy detections",
+        abuse_label: "Abuse reports",
     },
 
     failures: FailureText {

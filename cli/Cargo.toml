@@ -22,5 +22,8 @@ rpassword = "7.5.4"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 sys-locale = "0.3.2"
+# 报告宽度跟随窗口。手写 TIOCGWINSZ 要 unsafe 且覆盖不到 Windows 目标，
+# 这个 crate 是 clap 自己也在用的那一份。
+terminal_size = "0.4.4"
 toml = "1.1.4"
 ureq = { version = "3.4.0", default-features = false, features = ["rustls", "platform-verifier", "gzip", "json"] }
