@@ -136,11 +136,8 @@ copy_leaf! {
     /// O1 卡片值行的三个标签（地址 / 归属 / 网络）。只有 O1 需要，不塞进通用
     /// `CheckText`——那样另外 9 项都要陪它填一个用不上的值（spec §5.1）。
     O1FieldsText {
-        #[allow(dead_code)]
         address,
-        #[allow(dead_code)]
         ownership,
-        #[allow(dead_code)]
         network,
     }
 }
@@ -151,20 +148,15 @@ copy_leaf! {
     /// 拆成固定片段，动态值由调用方拼接在中间（同 `ErrorText` 的注释）。
     C4FixText {
         /// 成因句里，本地时区值之前的部分。
-        #[allow(dead_code)]
         explain_prefix,
         /// 成因句里，本地时区值与出口 IP 时区值之间的部分。
-        #[allow(dead_code)]
         explain_connector,
         /// 成因句的收尾标点。
-        #[allow(dead_code)]
         explain_suffix,
         /// 修复建议行的标签（如「建议」）。仅当 tzMismatchCliEnv 命中且出口 IP
         /// 时区名已知时渲染——「无从比对」不给建议（spec §5.4）。
-        #[allow(dead_code)]
         fix_label,
         /// `export TZ=` 前缀，时区名由调用方追加在其后，不做插值。
-        #[allow(dead_code)]
         fix_command_prefix,
     }
 }
@@ -173,8 +165,7 @@ copy_node! {
     /// 10 个检测项。O1–O6 的标题必须与 ipcheck Web 逐字一致（契约 1.1）。
     ChecksText {
         o1: CheckText,
-        // O1 值行标签，只服务 o1，见 `O1FieldsText`。待 C3-C5 消费。
-        #[allow(dead_code)]
+        // O1 值行标签，只服务 o1，见 `O1FieldsText`。
         o1_fields: O1FieldsText,
         o2: CheckText,
         o3: CheckText,
@@ -185,8 +176,7 @@ copy_node! {
         c2: CheckText,
         c3: CheckText,
         c4: CheckText,
-        // C4 成因句与修复建议，只服务 c4，见 `C4FixText`。待 C3-C5 消费。
-        #[allow(dead_code)]
+        // C4 成因句与修复建议，只服务 c4，见 `C4FixText`。
         c4_fix: C4FixText,
     }
 }
@@ -209,8 +199,6 @@ copy_leaf! {
         state_off,
         state_unsupported,
         dns_router,
-        // 暂无调用点，原因同上一条 checkup_not_implemented 的注释。
-        #[allow(dead_code)]
         dns_domestic,
         anonymous_flag,
         abuse_listed,
@@ -218,16 +206,12 @@ copy_leaf! {
         abuse_unknown,
         /// 标题行右端的通用「已完成」状态词，给没有 ok/warn/bad 分支的检测项用
         /// （目前只有 O1、C1，spec §5.1「各检测项标题行状态词」）。
-        #[allow(dead_code)]
         obtained,
         /// 风险分刻度说明，对应契约 §6 分项分级（`<26` 绿 / `<76` 黄 / `≥76` 红）。
         risk_scale_note,
         /// O4 标题行右端的风险分级短词（不带「风险」后缀，区别于 `verdict.low/medium/high`）。
-        #[allow(dead_code)]
         risk_level_low,
-        #[allow(dead_code)]
         risk_level_medium,
-        #[allow(dead_code)]
         risk_level_high,
         /// 「仅供参考」短标签（如 O5 resolver 归属旁的 pill），与整句
         /// `dns_egress.resolver_note` 并存，不是同一样东西的重复定义。
@@ -273,9 +257,7 @@ copy_leaf! {
         /// 标明 resolver 归属只展示、不参与判定。
         resolver_note,
         /// 标题行右端的短状态词，区别于整句的 `leak`/`no_leak`（spec §5.1）。
-        #[allow(dead_code)]
         state_leaked,
-        #[allow(dead_code)]
         state_not_leaked,
     }
 }
@@ -291,9 +273,7 @@ copy_leaf! {
         unknown_exit_ip,
         stun_disagree,
         /// 标题行右端的短状态词，区别于整句的 `mismatch`/`no_mismatch`（spec §5.1）。
-        #[allow(dead_code)]
         state_match,
-        #[allow(dead_code)]
         state_mismatch,
     }
 }
