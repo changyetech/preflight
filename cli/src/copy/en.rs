@@ -82,7 +82,7 @@ pub const EN: Text = Text {
         },
         c1: CheckText {
             title: "Real public IP",
-            description: "Obtained from a domestic echo service that rule-based proxies route directly, so it reveals your real ISP exit even with a VPN running.",
+            description: "Obtained from an echo service in mainland China, which rule-based proxies route directly — so it reveals your real ISP exit even with a VPN running. If your proxy rules don't route mainland China directly, this simply shows your exit IP again.",
         },
         c2: CheckText {
             // 契约收缩：DNS 泄露判定拆到 O5，本项只剩「本地 DNS 服务器配置」（ADR-0014）。

@@ -229,7 +229,7 @@ export const EN = {
     C1: {
       title: "Real Public IP",
       meaning:
-        "Your real public IP, obtained via a domestic direct-connect echo. A webpage can only see the exit IP, not the machine behind the proxy — that's a capability boundary, not something we skipped.",
+        "Your real public IP, obtained via a direct-connect echo service in mainland China — rule-based proxies route it directly. A webpage can only see the exit IP, not the machine behind the proxy — that's a capability boundary, not something we skipped.",
     },
     C2: {
       /** 契约 §1 收缩：DNS 泄露判定拆到 O5，本项只剩「本地 DNS 服务器配置」（ADR-0014）。 */

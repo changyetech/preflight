@@ -92,7 +92,7 @@ pub const ZH_HANS: TextPatch = TextPatch {
         c1: CheckTextPatch {
             title: Some("本机真实 IP"),
             description: Some(
-                "经国内直连回显取得。规则代理对国内 IP 走直连，因此即使开着 VPN 也能露出真实 ISP 出口。",
+                "经中国大陆的直连回显服务取得。规则代理默认对大陆 IP 走直连，因此即使开着 VPN 也能露出真实 ISP 出口；分流规则不含大陆直连时，本项只会再次显示出口 IP。",
             ),
         },
         c2: CheckTextPatch {
