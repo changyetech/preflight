@@ -13,6 +13,7 @@ export const ZH_HANS: Copy = {
 
   nav: {
     language: "语言",
+    skipToContent: "跳到主要内容",
     brand: "ipcheck",
     checks: "网页检测",
     cliChecks: "需 CLI",
@@ -50,9 +51,15 @@ export const ZH_HANS: Copy = {
     exitIpLabel: "出口 IP",
     exitIpUnknown: "未能取得",
     exitIpNote: "这是你流量离开代理后的公网地址，不是代理背后的本机地址。",
+    summaryLabel: "综合结论",
+    live: {
+      checking: "检测中",
+      ready: "已就绪",
+    },
   },
 
   coverage: {
+    label: "覆盖度",
     done: "已完成",
     needCli: "需 CLI",
     failed: "检测失败",

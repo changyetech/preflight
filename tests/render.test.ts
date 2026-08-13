@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 import { CheckCard, CliCard } from "../src/components/Card";
 import { O3Card, O4Card, O5Card, O6Card } from "../src/components/cards";
 import { VerdictPanel } from "../src/components/Verdict";
+import type { CoverageCell } from "../src/coverageMeter";
 import { COPY } from "../src/copy";
 import {
   UDP_EGRESS_STUN_UNANSWERED,
@@ -53,16 +54,31 @@ function esc(text: string): string {
 }
 
 const COVERAGE: Coverage = { done: 3, needCli: 4, failed: 0, pending: 1 };
+/** 与 COVERAGE 对应的 10 格状态：3 已完成 + 4 需 CLI + 0 失败 + 1 按需未测 + 2 进行中。 */
+const CELLS: CoverageCell[] = [
+  "done",
+  "done",
+  "done",
+  "ondemand",
+  "running",
+  "running",
+  "cli",
+  "cli",
+  "cli",
+  "cli",
+];
 
 function renderVerdict(
   verdict: Verdict,
   coverage: Coverage = COVERAGE,
+  cells: CoverageCell[] = CELLS,
 ): string {
   return renderToStaticMarkup(
     createElement(VerdictPanel, {
       geo: { status: "done", data: GEO },
       verdict,
       coverage,
+      cells,
     }),
   );
 }
@@ -84,11 +100,17 @@ describe("结论区渲染", () => {
   it("覆盖度四档与分母都必须渲染在结论旁（ADR-0004）", () => {
     const html = renderVerdict({ stage: "preliminary", level: "low" });
 
-    expect(html).toContain(`${COPY.coverage.done} 3`);
-    expect(html).toContain(`${COPY.coverage.needCli} 4`);
-    expect(html).toContain(`${COPY.coverage.failed} 0`);
-    expect(html).toContain(`${COPY.coverage.pending} 1`);
+    expect(html).toContain(esc(COPY.coverage.done));
+    expect(html).toContain("<b>3</b>");
+    expect(html).toContain(esc(COPY.coverage.needCli));
+    expect(html).toContain("<b>4</b>");
+    expect(html).toContain(esc(COPY.coverage.failed));
+    expect(html).toContain("<b>0</b>");
+    expect(html).toContain(esc(COPY.coverage.pending));
+    expect(html).toContain("<b>1</b>");
     expect(html).toContain(esc(COPY.coverage.total));
+    // 10 格 meter 恒渲染 10 个格子（规格 §4 要点 5）。
+    expect(html.match(/class="cov-cell /g) ?? []).toHaveLength(10);
   });
 
   it("数据不足时不得出现「低风险」字样与低风险配色（C-1）", () => {
@@ -99,8 +121,8 @@ describe("结论区渲染", () => {
     expect(html).not.toContain(esc(COPY.verdict.level.low));
     expect(html).not.toContain(esc(COPY.verdict.summary.preliminaryLow));
     // 配色类名也不许落到低风险绿——用户读色块的速度快过读字。
-    expect(html).not.toContain("verdict-low");
-    expect(html).not.toContain("level-low");
+    // v-low 是唯一挂着绿色 CSS 规则的类名（.v-low .level），数据不足时它不该出现。
+    expect(html).not.toContain("v-low");
     // 还没有结论，就不该挂「初步 / 完整」这种描述结论成色的标注。
     expect(html).not.toContain(esc(COPY.verdict.preliminaryBadge));
     expect(html).not.toContain(esc(COPY.verdict.fullBadge));
@@ -109,16 +131,39 @@ describe("结论区渲染", () => {
   it("数据不足时覆盖度照常呈现（ADR-0004 不因无结论而豁免）", () => {
     const html = renderVerdict(
       { stage: "insufficient" },
-      {
-        done: 0,
-        needCli: 5,
-        failed: 3,
-        pending: 1,
-      },
+      { done: 0, needCli: 5, failed: 3, pending: 1 },
+      [
+        "failed",
+        "failed",
+        "failed",
+        "ondemand",
+        "running",
+        "cli",
+        "cli",
+        "cli",
+        "cli",
+        "cli",
+      ],
     );
 
-    expect(html).toContain(`${COPY.coverage.failed} 3`);
-    expect(html).toContain(`${COPY.coverage.done} 0`);
+    expect(html).toContain(esc(COPY.coverage.failed));
+    expect(html).toContain("<b>3</b>");
+    expect(html).toContain(esc(COPY.coverage.done));
+    expect(html).toContain("<b>0</b>");
+  });
+
+  it("控制台恒挂 v-none/v-low/v-medium/v-high 之一，永远不脱离覆盖度单独出现", () => {
+    for (const verdict of [
+      { stage: "insufficient" } as const,
+      { stage: "preliminary", level: "low" } as const,
+      { stage: "preliminary", level: "medium" } as const,
+      { stage: "full", level: "high" } as const,
+    ]) {
+      const html = renderVerdict(verdict);
+      // section 与 cov（覆盖度小节）必须同时出现在同一份 HTML 里。
+      expect(html).toContain('class="console v-');
+      expect(html).toContain('class="cov"');
+    }
   });
 });
 

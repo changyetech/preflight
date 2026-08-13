@@ -12,6 +12,8 @@ export const EN = {
   nav: {
     /** 右上角语言菜单的标签（规格第 7 节）。各语言的自称写在 LOCALES 表里，不在文案里翻译。 */
     language: "Language",
+    /** 跳过导航链接（规格 §4 要点 6）：键盘用户可跳过顶栏 5 个锚点直达正文。 */
+    skipToContent: "Skip to main content",
     /** 顶栏品牌名与锚点标签：短于 landing 各段标题，顶栏放不下长标题。 */
     brand: "ipcheck",
     checks: "Web checks",
@@ -59,9 +61,18 @@ export const EN = {
     /** 「真实 IP」一词禁用（CONTEXT.md）。 */
     exitIpNote:
       "This is the public address your traffic leaves the proxy with, not the machine address behind the proxy.",
+    /** 控制台右栏 eyebrow（原型「综合结论」），非「分档」本身的文案。 */
+    summaryLabel: "Overall verdict",
+    /** 控制台顶部运行指示（原型 .live）：是否还有在线项在检测中。 */
+    live: {
+      checking: "Checking",
+      ready: "Ready",
+    },
   },
 
   coverage: {
+    /** 控制台右栏覆盖度小节的 eyebrow。 */
+    label: "Coverage",
     done: "Done",
     needCli: "Needs CLI",
     failed: "Check failed",

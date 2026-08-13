@@ -7,69 +7,109 @@
   padding: 1.25rem 1rem 3rem;
 }
 
-/* ---------- 顶部 sticky 导航 ---------- */
-
-.site-nav {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  border-bottom: 1px solid var(--border);
-  /* 半透明毛玻璃；不支持 backdrop-filter 时退化为上面的实色背景 */
-  background: color-mix(in srgb, var(--bg) 85%, transparent);
-  backdrop-filter: blur(8px);
+main:focus {
+  /* 跳转落点接收焦点后不该再画一圈环——它是容器不是控件 */
+  outline: none;
 }
 
-.site-nav-inner {
+/* ---------- 跳过导航 ---------- */
+/* 顶栏是 sticky 且带 5 个锚点，键盘用户每次进页面都要穿过它；平时移出视口，聚焦时落下。 */
+
+.skip {
+  position: absolute;
+  inset-inline-start: 1rem;
+  top: 0.65rem;
+  z-index: 60;
+  transform: translateY(-200%);
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--fg);
+  text-decoration: none;
+  transition: transform 0.12s;
+}
+
+.skip:focus-visible {
+  transform: translateY(0);
+}
+
+/* ---------- 顶部 sticky 导航 ---------- */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: var(--nav-h);
+  border-bottom: 1px solid var(--border);
+  /* 半透明毛玻璃；不支持 backdrop-filter 时退化为上面的实色背景 */
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.nav-in {
   display: flex;
   align-items: center;
   gap: 1rem;
+  height: 100%;
   /* 导航比内容容器宽一档，形成「导航通栏、内容聚焦」的层次 */
   max-width: 90rem;
   margin: 0 auto;
-  padding: 0.55rem 1rem;
+  padding: 0 1rem;
 }
 
-.site-nav-brand {
+.brand {
   display: flex;
   align-items: center;
   gap: 0.45rem;
   font: 600 1rem var(--mono);
-  color: var(--text-h);
+  color: var(--fg);
   text-decoration: none;
+  flex-shrink: 0;
 }
 
-.site-nav-brand:hover {
+.brand:hover {
   opacity: 0.75;
 }
 
-.site-nav-links {
-  display: flex;
+/* 窄屏放不下 5 个锚点：隐藏而不是横向滚动或换行撑高顶栏——移动端本就靠垂直滚动
+   就能看到下面的分区，锚点在窄屏收益有限，不值得为它单独挤出交互空间。
+   ≥56.25rem（900px）时随导航一起展开，见宽视口媒体查询。 */
+.nav-links {
+  display: none;
   flex: 1;
   gap: 1rem;
-  /* 窄屏放不下四个锚点时横向滚动，而不是换行把顶栏撑高 */
-  overflow-x: auto;
-  scrollbar-width: none;
-  white-space: nowrap;
 }
 
-.site-nav-links::-webkit-scrollbar {
-  display: none;
-}
-
-.site-nav-links a {
+.nav-links a {
   /* 导航链接比正文小半档，避免顶栏被撑得过重 */
   font-size: 0.875rem;
-  color: var(--text);
+  color: var(--muted);
   text-decoration: none;
 }
 
-.site-nav-links a:hover {
-  color: var(--text-h);
+.nav-links a:hover {
+  color: var(--fg);
 }
 
-/* 吸顶条会盖住锚点目标，锚点滚动时预留出它的高度 */
-:target {
-  scroll-margin-top: 4rem;
+/* 主题与语言是同一组顶栏工具，用 8px 贴近；nav-in 的 1rem 是分隔品牌/链接/工具区这三块的，
+   不该落到组内两个控件之间。 */
+.nav-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* 吸顶条会盖住锚点目标，任何带 id 的地标滚动过去时都要预留出它的高度——
+   不用 :target 是因为它只在「当前 URL 片段正好是这个 id」时才生效，
+   程序化 scrollIntoView（比如跳过导航落点）不经过 URL 片段，同样需要这条规则。 */
+main[id],
+section[id],
+article[id] {
+  scroll-margin-top: calc(var(--nav-h) + 1rem);
 }
 
 /* ---------- 回顶按钮 ---------- */
@@ -119,25 +159,32 @@
   .back-to-top {
     transition: none;
   }
+
+  /* 「进行中」的运行指示与覆盖度格子共用同一条 blip 呼吸动画 */
+  .live i,
+  .cov-cell {
+    animation: none;
+  }
 }
 
 /* ---------- 站头 ---------- */
 
-.site-header {
+.masthead {
   padding: 0.5rem 0 1rem;
 }
 
-.site-header h1 {
+.masthead h1 {
   margin: 0;
   /* 正文抬档后同步上调，保持与卡片标题的层级差 */
   font-size: 1.15rem;
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--fg);
 }
 
-.site-header p {
+.masthead p {
   margin: 0.25rem 0 0;
   font-size: 0.9375rem;
+  color: var(--muted);
 }
 
 /* ---------- 语言切换 ---------- */
@@ -327,17 +374,8 @@
   visibility: visible;
 }
 
-/* ---------- 首屏结论区 ---------- */
+/* ---------- 首屏结论控制台 ---------- */
 
-.verdict {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1.25rem;
-  background: var(--bg);
-  box-shadow: var(--shadow);
-}
-
-.exit-ip-label,
 .field-label,
 .meaning-label,
 .card-id {
@@ -346,106 +384,302 @@
   color: var(--text);
 }
 
-.exit-ip-label {
-  margin: 0;
+.console {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
 }
 
-.exit-ip {
-  margin: 0.15rem 0 0;
-  font: 600 clamp(1.6rem, 7vw, 2.4rem) / 1.15 var(--mono);
-  color: var(--text-h);
+.console-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.55rem 1.1rem;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--sunken);
+}
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-inline-start: auto;
+  font: 500 0.7rem var(--mono);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.live i {
+  display: block;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.live[data-live="true"] i {
+  background: var(--ok);
+  animation: blip 1.4s ease-in-out infinite;
+}
+
+@keyframes blip {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* 移动端单列：两栏挤在窄屏里，出口 IP 与结论都会被压到不可读的宽度。
+   ≥56.25rem（900px）展开双栏，见宽视口媒体查询。 */
+.console-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.console-left {
+  padding: 1.6rem 1.75rem 1.5rem;
+  border-block-end: 1px solid var(--hairline);
+}
+
+.console-right {
+  padding: 1.6rem 1.75rem 1.5rem;
+}
+
+.eyebrow {
+  font: 500 0.7rem var(--mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ip-value {
+  margin: 0.6rem 0 0.1rem;
+  font: 500 clamp(1.75rem, 4.2vw, 2.75rem) / 1.15 var(--mono);
+  letter-spacing: -0.02em;
+  color: var(--fg);
   overflow-wrap: anywhere;
 }
 
-.exit-location {
-  margin: 0.15rem 0 0;
-  font-size: 1rem;
-  color: var(--text-h);
+.ip-value.is-pending {
+  color: var(--muted);
 }
 
-.exit-ip-note {
-  margin: 0.35rem 0 0;
-  font-size: 0.8rem;
+.ip-loc {
+  font-size: 0.875rem;
+  color: var(--fg);
+}
+
+.ip-note {
+  margin-top: 0.6rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+/* 移动端每条独占一行竖排；≥35rem（560px）起收成 12 栏：三个短值并排一行，
+   运营商/ASN（最长的值）独占整行——见宽视口媒体查询。 */
+.geo-grid {
+  margin: 1.25rem 0 0;
+  padding: 0;
+  border-top: 1px solid var(--hairline);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.geo-grid > div {
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.geo-grid dt {
+  margin: 0;
+  font: 500 0.7rem var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.geo-grid dd {
+  margin: 0.2rem 0 0;
+  font: 400 0.85rem/1.5 var(--mono);
+  color: var(--data);
+}
+
+.level-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
 }
 
 .level {
-  display: flex;
-  flex-wrap: wrap;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: 1rem 0 0;
-  font-size: 1.1rem;
+  gap: 0.6rem;
+  font-size: 1.85rem;
   font-weight: 600;
-  color: var(--text-h);
+  line-height: 1.3;
+  color: var(--muted);
 }
 
 .level-dot {
-  width: 0.7rem;
-  height: 0.7rem;
+  width: 0.75rem;
+  height: 0.75rem;
   border-radius: 50%;
-  background: var(--tone-ok);
+  background: var(--muted);
 }
 
-.level-medium {
-  background: var(--tone-warn);
+/* 配色只在这三档下存在，`.v-none`（数据不足）没有对应规则可继承——
+   结构上就拿不到低风险的绿，不靠一处判断把它挡住（C-1）。 */
+.v-low .level {
+  color: var(--ok);
 }
-
-.level-high {
-  background: var(--tone-danger);
+.v-low .level-dot {
+  background: var(--ok);
 }
-
-/* 数据不足：中性灰。绝不借用低风险的绿——那正是把「没测成」说成「没问题」。 */
-.level-none {
-  background: var(--text);
+.v-medium .level {
+  color: var(--warn);
+}
+.v-medium .level-dot {
+  background: var(--warn);
+}
+.v-high .level {
+  color: var(--danger);
+}
+.v-high .level-dot {
+  background: var(--danger);
 }
 
 .stage-badge {
-  padding: 0.15rem 0.5rem;
+  padding: 0.3rem 0.5rem;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--text);
+  border-radius: 4px;
+  font: 500 0.72rem/1 var(--mono);
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .summary {
-  margin: 0.4rem 0 0;
-  font-size: 0.9375rem;
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--fg);
+  text-wrap: pretty;
 }
 
 /* ---------- 覆盖度（永远与结论同屏，ADR-0004） ---------- */
 
-.coverage {
+.cov {
+  margin-top: 1.4rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.cov-meter {
+  display: flex;
+  gap: 3px;
+  margin: 0.6rem 0 0.75rem;
+}
+
+.cov-cell {
+  flex: 1;
+  height: 0.625rem;
+  border-radius: 2px;
+  background: var(--hairline);
+  transition: background 0.3s ease;
+}
+
+.cov-cell.is-running {
+  background: var(--border);
+  animation: blip 1.1s ease-in-out infinite;
+}
+
+.cov-cell.is-done {
+  background: var(--data);
+}
+
+.cov-cell.is-failed {
+  background: var(--danger);
+}
+
+.cov-cell.is-cli {
+  background: var(--border);
+}
+
+.cov-cell.is-ondemand {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--border) 0 3px,
+    transparent 3px 6px
+  );
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.cov-chips {
   display: flex;
   flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+}
+
+.cov-chip {
+  display: inline-flex;
+  align-items: center;
   gap: 0.4rem;
-  margin: 0.9rem 0 0;
-}
-
-.chip {
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
   font-size: 0.8rem;
-  background: var(--chip-bg);
-  color: var(--text-h);
+  color: var(--muted);
 }
 
-.chip-done {
-  background: var(--tone-ok-bg);
+.cov-chip b {
+  font: 500 0.8rem var(--mono);
+  color: var(--fg);
 }
 
-.chip-failed {
-  background: var(--tone-warn-bg);
+/* 失败为 0 时把数字调暗，而不是把整块染成警示色——0 个失败不该看起来像个警告。 */
+.cov-chip[data-zero="true"] b {
+  color: var(--muted);
 }
 
-.chip-total {
-  background: transparent;
-  color: var(--text);
+.cov-chip i {
+  display: block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 2px;
 }
 
-.coverage-hint {
-  margin: 0.5rem 0 0;
-  font-size: 0.8rem;
+.sw-done {
+  background: var(--data);
+}
+.sw-cli {
+  background: var(--border);
+}
+.sw-failed {
+  background: var(--danger);
+}
+.sw-ondemand {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--border) 0 3px,
+    transparent 3px 6px
+  );
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.cov-chip-total {
+  margin-inline-start: auto;
+}
+
+.cov-hint {
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-wrap: pretty;
 }
 
 /* ---------- 检测分区 ---------- */
@@ -729,12 +963,62 @@ button {
     padding: 2rem 1.5rem 4rem;
   }
 
-  .site-nav-inner {
-    padding: 0.6rem 1.5rem;
-  }
-
   .cards {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* 顶栏 5 个锚点与结论控制台双栏在同一个断点（56.25rem = 900px）一起收放：
+   窄屏放不下 5 个链接又要维持双栏，二者是同一个「够不够宽」的问题。 */
+@media (min-width: 56.25rem) {
+  .nav-in {
+    padding: 0 1.5rem;
+  }
+
+  .nav-links {
+    display: flex;
+  }
+
+  .console-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  }
+
+  .console-left {
+    border-inline-end: 1px solid var(--hairline);
+    border-block-end: 0;
+  }
+}
+
+/* 出口 IP 归属：12 栏里三个值并排，窄屏下 IP 时区格子放不下 America/Los_Angeles 这种长值，
+   改为逐条竖排，每条独占整行——先在这个断点以下把 geo-grid 收成单列，上面的宽屏断点再展开。 */
+@media (min-width: 35rem) {
+  .geo-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .geo-grid > .g-loc {
+    grid-column: span 4;
+    padding-inline-end: 1rem;
+  }
+
+  .geo-grid > .g-tz {
+    grid-column: span 5;
+    padding-inline: 1rem;
+    border-inline-start: 1px solid var(--hairline);
+  }
+
+  .geo-grid > .g-colo {
+    grid-column: span 3;
+    padding-inline-start: 1rem;
+    border-inline-start: 1px solid var(--hairline);
+  }
+
+  /* 显式 span 只在这个断点有意义：12 栏基底在这里才存在。移动端单列布局下
+     不能出现在无条件生效的规则里——即便其它字段没有显式 span，单条 span:12
+     规则也会逼浏览器为满足它而生成 12 条隐式列，把上面几个字段挤进同一行
+     （之前的真实 bug：390px 视口下三个短字段挤成一行、长值被截断错位）。 */
+  .geo-grid > .g-asn {
+    grid-column: span 12;
   }
 }
 
