@@ -1845,4 +1845,81 @@ mod tests {
         assert!(dewrap(&out).contains(text.notes.geo_source), "{out}");
         assert!(dewrap(&out).contains(text.notes.o2_desktop_only), "{out}");
     }
+
+    #[test]
+    fn the_footer_hint_uses_the_real_cli_syntax_and_shows_in_every_language() {
+        // 命令字面量以 main.rs 的 Cli/Command/ConfigAction/SettableKey 定义为准：
+        // --verbose/--json 是顶层 flag，config set proxycheck-key 是 SettableKey
+        // 目前唯一枚举的键（`#[value(name = "proxycheck-key")]`）。
+        for lang in [Lang::En, Lang::ZhHans] {
+            let text = copy::text(lang);
+            let out = super::report(&blank(), &text, &Style::new(false), false);
+            // 用完整行匹配而非松散 contains——命令字面量若被改错一个字符，
+            // 单独的子串断言可能仍然因为是另一处的前缀而碰巧通过。
+            assert!(
+                out.contains(&format!(
+                    "  ipcheck --verbose  {}  ·  ipcheck --json  {}\n",
+                    text.footer.verbose_hint, text.footer.json_hint
+                )),
+                "{out}"
+            );
+            assert!(
+                out.contains(&format!(
+                    "  ipcheck config set proxycheck-key  {}\n",
+                    text.footer.quota_hint
+                )),
+                "{out}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_footer_hint_never_leaks_into_json_output() {
+        // --json 走 json::report，完全不经过 render::report——这里断言机器可读
+        // 输出里没有页脚的字面命令串，锁住这条天然屏障，不只是靠代码路径隔离。
+        let payload = serde_json::to_string_pretty(&crate::json::report(&blank())).unwrap();
+        assert!(!payload.contains("ipcheck --verbose"), "{payload}");
+        assert!(!payload.contains("ipcheck --json"), "{payload}");
+        assert!(
+            !payload.contains("ipcheck config set proxycheck-key"),
+            "{payload}"
+        );
+    }
+
+    #[test]
+    fn anonymous_51_to_75_shows_a_high_verdict_with_a_yellow_o4_card_and_its_explanation() {
+        // 契约 §6：`anonymous: true` 且分数落在 51–75 时会出现「结论高 · 分项黄」。
+        // 呈现层必须在 O4 卡片内说明这个 IP 正被用作匿名化地址、判高的阈值对它
+        // 降到 51——否则用户看到高风险结论却找不到哪一项显红，会以为结论算错了。
+        // 三件事一起断言：结论区档位是「高」、O4 卡片自身仍是黄（不是红），
+        // 卡片里带着 anonymous_flag 这句解释——不能只看其中一件就当作满足契约。
+        let report = risk_report(60, true);
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+
+        assert_eq!(report.verdict(), Verdict::Full(Level::High));
+        assert!(out.contains(text.verdict.high), "{out}");
+
+        // 卡片流以「· O1」定位（risk_report 只覆盖 o4，O1 仍是失败卡，Dim marker
+        // 「·」），与既有测试 `low_score_but_abuse_listed_...` 同一手法——避开
+        // 「需关注」清单里同样出现的 " O4  " 子串，只在卡片流本身里核对 O4。
+        let cards_start = out.find("· O1").expect("O1 卡片必须存在（cards 流起点）");
+        let cards_block = &out[cards_start..];
+        let o4_start = cards_block.find(" O4  ").expect("O4 卡片必须存在");
+        let o4_end = cards_block[o4_start..]
+            .find("\n\n")
+            .map(|i| o4_start + i)
+            .unwrap_or(cards_block.len());
+        let o4_card = &cards_block[o4_start..o4_end];
+        let marker_before_o4 = cards_block[..o4_start].chars().last();
+        assert_eq!(
+            marker_before_o4,
+            Some('!'),
+            "O4 卡片自身应仍是黄色 marker（分项分级只看分数，60 分落在 26–75）：{o4_card}"
+        );
+        assert!(
+            o4_card.contains(text.values.anonymous_flag),
+            "O4 卡片必须解释判高阈值降到 51 这件事：{o4_card}"
+        );
+    }
 }
