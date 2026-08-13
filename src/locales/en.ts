@@ -10,8 +10,11 @@ export const EN = {
   },
 
   nav: {
-    /** 右上角语言菜单的标签（规格第 7 节）。各语言的自称写在 LOCALES 表里，不在文案里翻译。 */
-    language: "Language",
+    /** 语言切换器无障碍名称的前缀，后接目标语种自称（在 LOCALES 表里，不在文案里翻译），
+     *  拼成「Switch language to 简体中文」（规格 §2 决策 8：单键直切）。 */
+    switchLanguageTo: "Switch language to",
+    /** 跳过导航链接（规格 §4 要点 6）：键盘用户可跳过顶栏 5 个锚点直达正文。 */
+    skipToContent: "Skip to main content",
     /** 顶栏品牌名与锚点标签：短于 landing 各段标题，顶栏放不下长标题。 */
     brand: "ipcheck",
     checks: "Web checks",
@@ -21,6 +24,13 @@ export const EN = {
     compare: "Comparison",
     /** 回顶按钮只有图标，标签给读屏用。 */
     backToTop: "Back to top",
+    /** 主题切换器：三态下拉（浅色/深色/跟随系统），规格 §2 决策 1。 */
+    theme: {
+      label: "Theme",
+      light: "Light",
+      dark: "Dark",
+      system: "Follow system",
+    },
   },
 
   verdict: {
@@ -52,9 +62,18 @@ export const EN = {
     /** 「真实 IP」一词禁用（CONTEXT.md）。 */
     exitIpNote:
       "This is the public address your traffic leaves the proxy with, not the machine address behind the proxy.",
+    /** 控制台右栏 eyebrow（原型「综合结论」），非「分档」本身的文案。 */
+    summaryLabel: "Overall verdict",
+    /** 控制台顶部运行指示（原型 .live）：是否还有在线项在检测中。 */
+    live: {
+      checking: "Checking",
+      ready: "Ready",
+    },
   },
 
   coverage: {
+    /** 控制台右栏覆盖度小节的 eyebrow。 */
+    label: "Coverage",
     done: "Done",
     needCli: "Needs CLI",
     failed: "Check failed",
@@ -159,6 +178,13 @@ export const EN = {
       noDetection: "None detected",
       hostingNote:
         "A datacenter IP is a per-item flag — it doesn't raise the overall verdict by itself, but it does draw more attention from anti-abuse controls.",
+      /**
+       * 契约 §6 的呈现义务：`anonymous: true` 且分数 51–75 时会出现「结论高 · 分项黄」，
+       * 缺了这句解释，用户看到高风险结论却找不到哪一项显红，会以为结论算错了。
+       * 与 CLI 的 `values.anonymous_flag` 说同一件事，措辞对齐。
+       */
+      anonymousNote:
+        "This IP is currently used as an anonymising address — the high-risk threshold drops to 51 for it.",
       abuse: {
         listed: "Listed",
         clean: "Clean",
@@ -261,20 +287,41 @@ export const EN = {
     },
   },
 
-  cli: {
-    /** 灰卡是终态，不提供重试（规格 4.1）。安装命令只在落地内容「安装 CLI」段给一次，此处不重复。 */
-    hint: "This item requires reading your local environment — install the CLI to test it.",
-  },
-
   /** 落地内容三段（规格第 4 节第 3 项）。 */
   landing: {
     why: {
       title: "Why you need a checkup",
-      body: "AI tools are sensitive to your network environment. The most common pitfalls fall into four categories: exit IP type or abuse history that triggers anti-abuse controls; a mismatch between system and exit IP timezone; IPv6 quietly bypassing the proxy and exposing your real location; and local DNS exposing the domains you visit to your local ISP. This site can check the first three online; your local DNS server's configuration requires reading your local environment, which a webpage structurally cannot access — that's a CLI-only item.",
+      /** 四栏枚举前的引导句（原型 .why-lede，新增结构性文案）。 */
+      lede: "AI tools are sensitive to your network environment. The most common pitfalls fall into four categories.",
+      /** 四栏枚举，顺序与 O4/O2/O3/C2 对应（原型 .why-grid）。措辞取自对应检测项的 meaning 文案，不新造事实。 */
+      items: [
+        {
+          title: "Exit IP type & abuse history",
+          body: "Datacenter IPs, public proxies, and heavily abused IPs are the most direct trigger for anti-abuse controls.",
+        },
+        {
+          title: "System vs. exit IP timezone",
+          body: "A timezone mismatch is one of the most common proxy tells: the IP says United States, but the system clock says Beijing time — anti-abuse controls catch that instantly.",
+        },
+        {
+          title: "IPv6 leak",
+          body: "Most proxies only handle IPv4. If your machine has IPv6, some traffic slips past the proxy and goes out directly, exposing an address from a different location.",
+        },
+        {
+          title: "Local DNS exposure",
+          body: "Your local ISP can see which domains you resolve, even once your other traffic is proxied.",
+        },
+      ],
+      /** 前三项标签后缀（原型「网页可测」）；第四项（CLI-only）复用 coverage.needCli，不新造近义词。 */
+      checkedOnlineTag: "Checked online",
+      /** 段尾收束句，逐字取自原 why.body 的后半句。 */
+      foot: "This site can check the first three online; your local DNS server's configuration requires reading your local environment, which a webpage structurally cannot access — that's a CLI-only item.",
     },
     install: {
       title: "Install the CLI for all 10 checks",
       body: "The web version is a quick first look — it covers 6 items. The CLI covers all 10, including your real public IP, local DNS configuration, proxy/TUN detection, and the $TZ timezone check.",
+      /** 安装命令的适用平台（原型 .install-meta .plat）。brew 安装仅覆盖 macOS/Linux，与 Cargo.toml 的 dist targets 一致。 */
+      platforms: "macOS · Linux",
     },
     compare: {
       title: "Web vs. CLI: Full Feature Comparison",
@@ -293,10 +340,15 @@ export const EN = {
     },
   },
 
+  /** 页脚双栏披露（原型 .footer-cols）：按「自动发起／需手动触发」拆开，原文一字未改，只是分段。 */
   footer: {
     privacy: "This site stores none of your check results.",
-    thirdParty:
-      "Three checks run automatically as soon as the page loads, directly from your browser: the IPv6 check queries ipify, the DNS egress check queries ip-api.com, and the UDP egress check queries stun.cloudflare.com and stun.l.google.com. The IP risk check requires you to trigger it manually, at which point Cloudflare Turnstile loads for bot verification first, then your exit IP is sent to proxycheck.io and StopForumSpam.",
+    autoLabel: "Runs automatically",
+    autoBody:
+      "Three checks run automatically as soon as the page loads, directly from your browser: the IPv6 check queries ipify, the DNS egress check queries ip-api.com, and the UDP egress check queries stun.cloudflare.com and stun.l.google.com.",
+    onDemandLabel: "Triggered manually",
+    onDemandBody:
+      "The IP risk check requires you to trigger it manually, at which point Cloudflare Turnstile loads for bot verification first, then your exit IP is sent to proxycheck.io and StopForumSpam.",
   },
 
   errors: {
@@ -326,10 +378,3 @@ type Widen<T> = T extends string
     : { [K in keyof T]: Widen<T[K]> };
 
 export type Copy = Widen<typeof EN>;
-
-type DeepPartial<T> = {
-  [K in keyof T]?: T[K] extends string ? string : DeepPartial<T[K]>;
-};
-
-/** 尚未译全的语种用它：只写已翻好的字段，其余逐字段回落英文（规格第 7 节）。 */
-export type PartialCopy = DeepPartial<Copy>;

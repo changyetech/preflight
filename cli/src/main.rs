@@ -27,7 +27,7 @@ use lang::{Lang, LangError};
     about = "Check your network environment before launching AI tools"
 )]
 struct Cli {
-    /// Interface language: en / zh-hans / zh-hant / ru
+    /// Interface language: en / zh-hans
     #[arg(long, global = true, value_name = "LANG")]
     lang: Option<String>,
 
@@ -110,11 +110,6 @@ fn run() -> Result<i32> {
     .map_err(|err| render_lang_error(err, system_locale.as_deref()))?;
 
     let text = copy::text(settings.lang);
-
-    // 未译全的语种打一行提示。网页悄悄回落英文没关系，CLI 里用户配了却看到英文会像是坏了。
-    if !settings.lang.is_fully_translated() {
-        eprintln!("{}", text.lang.partial_notice);
-    }
 
     match cli.command {
         Some(Command::Config { action }) => {
@@ -229,16 +224,11 @@ fn annotate_config_error(
 fn render_lang_error(err: LangError, system_locale: Option<&str>) -> anyhow::Error {
     let text = fallback_text(None, system_locale);
     match err {
-        LangError::ArabicUnsupported => {
-            anyhow::anyhow!("{}", text.errors.lang_arabic_unsupported)
-        }
         LangError::Unknown(value) => anyhow::anyhow!(
-            "{}: {value} ({} / {} / {} / {})",
+            "{}: {value} ({} / {})",
             text.errors.lang_unknown,
             Lang::En,
             Lang::ZhHans,
-            Lang::ZhHant,
-            Lang::Ru,
         ),
     }
 }
@@ -286,7 +276,20 @@ mod tests {
 
     #[test]
     fn lang_flag_is_accepted_before_and_after_subcommands() {
-        assert!(Cli::try_parse_from(["ipcheck", "--lang", "ru"]).is_ok());
-        assert!(Cli::try_parse_from(["ipcheck", "config", "path", "--lang", "ru"]).is_ok());
+        assert!(Cli::try_parse_from(["ipcheck", "--lang", "zh-hans"]).is_ok());
+        assert!(Cli::try_parse_from(["ipcheck", "config", "path", "--lang", "zh-hans"]).is_ok());
+    }
+
+    #[test]
+    fn unsupported_lang_error_lists_supported_values() {
+        // 显式给了不支持的语言（含已删除的 zh-hant / ru / ar）时，
+        // 错误信息必须列出受支持的取值，而不是只说"不支持"就完事。
+        let err = render_lang_error(LangError::Unknown("ar".to_string()), None);
+        let message = err.to_string();
+        assert!(message.contains("en"), "错误信息应包含 en：{message}");
+        assert!(
+            message.contains("zh-hans"),
+            "错误信息应包含 zh-hans：{message}"
+        );
     }
 }

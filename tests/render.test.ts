@@ -12,17 +12,26 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { CheckCard, CliCard } from "../src/components/Card";
-import { O3Card, O4Card, O5Card, O6Card } from "../src/components/cards";
+import { CheckCard, CliListItem } from "../src/components/Card";
+import {
+  O1Card,
+  O2Card,
+  O3Card,
+  O4Card,
+  O5Card,
+  O6Card,
+} from "../src/components/cards";
 import { VerdictPanel } from "../src/components/Verdict";
+import type { CoverageCell } from "../src/coverageMeter";
 import { COPY } from "../src/copy";
+import { CLI_CHECK_IDS, ONLINE_CHECK_IDS } from "../src/domain/checks";
 import {
   UDP_EGRESS_STUN_UNANSWERED,
   UDP_EGRESS_WEBRTC_UNAVAILABLE,
 } from "../src/domain/udpEgress";
 import { DNS_EGRESS_PROBE_FAILED } from "../src/domain/dnsEgress";
 import type { Coverage } from "../src/domain/coverage";
-import type { GeoData } from "../src/domain/types";
+import type { GeoData, RiskData } from "../src/domain/types";
 import type { Verdict } from "../src/domain/verdict";
 
 const GEO: GeoData = {
@@ -53,16 +62,31 @@ function esc(text: string): string {
 }
 
 const COVERAGE: Coverage = { done: 3, needCli: 4, failed: 0, pending: 1 };
+/** 与 COVERAGE 对应的 10 格状态：3 已完成 + 4 需 CLI + 0 失败 + 1 按需未测 + 2 进行中。 */
+const CELLS: CoverageCell[] = [
+  "done",
+  "done",
+  "done",
+  "ondemand",
+  "running",
+  "running",
+  "cli",
+  "cli",
+  "cli",
+  "cli",
+];
 
 function renderVerdict(
   verdict: Verdict,
   coverage: Coverage = COVERAGE,
+  cells: CoverageCell[] = CELLS,
 ): string {
   return renderToStaticMarkup(
     createElement(VerdictPanel, {
       geo: { status: "done", data: GEO },
       verdict,
       coverage,
+      cells,
     }),
   );
 }
@@ -84,11 +108,17 @@ describe("结论区渲染", () => {
   it("覆盖度四档与分母都必须渲染在结论旁（ADR-0004）", () => {
     const html = renderVerdict({ stage: "preliminary", level: "low" });
 
-    expect(html).toContain(`${COPY.coverage.done} 3`);
-    expect(html).toContain(`${COPY.coverage.needCli} 4`);
-    expect(html).toContain(`${COPY.coverage.failed} 0`);
-    expect(html).toContain(`${COPY.coverage.pending} 1`);
+    expect(html).toContain(esc(COPY.coverage.done));
+    expect(html).toContain("<b>3</b>");
+    expect(html).toContain(esc(COPY.coverage.needCli));
+    expect(html).toContain("<b>4</b>");
+    expect(html).toContain(esc(COPY.coverage.failed));
+    expect(html).toContain("<b>0</b>");
+    expect(html).toContain(esc(COPY.coverage.pending));
+    expect(html).toContain("<b>1</b>");
     expect(html).toContain(esc(COPY.coverage.total));
+    // 10 格 meter 恒渲染 10 个格子（规格 §4 要点 5）。
+    expect(html.match(/class="cov-cell /g) ?? []).toHaveLength(10);
   });
 
   it("数据不足时不得出现「低风险」字样与低风险配色（C-1）", () => {
@@ -99,8 +129,8 @@ describe("结论区渲染", () => {
     expect(html).not.toContain(esc(COPY.verdict.level.low));
     expect(html).not.toContain(esc(COPY.verdict.summary.preliminaryLow));
     // 配色类名也不许落到低风险绿——用户读色块的速度快过读字。
-    expect(html).not.toContain("verdict-low");
-    expect(html).not.toContain("level-low");
+    // v-low 是唯一挂着绿色 CSS 规则的类名（.v-low .level），数据不足时它不该出现。
+    expect(html).not.toContain("v-low");
     // 还没有结论，就不该挂「初步 / 完整」这种描述结论成色的标注。
     expect(html).not.toContain(esc(COPY.verdict.preliminaryBadge));
     expect(html).not.toContain(esc(COPY.verdict.fullBadge));
@@ -109,25 +139,113 @@ describe("结论区渲染", () => {
   it("数据不足时覆盖度照常呈现（ADR-0004 不因无结论而豁免）", () => {
     const html = renderVerdict(
       { stage: "insufficient" },
-      {
-        done: 0,
-        needCli: 5,
-        failed: 3,
-        pending: 1,
-      },
+      { done: 0, needCli: 5, failed: 3, pending: 1 },
+      [
+        "failed",
+        "failed",
+        "failed",
+        "ondemand",
+        "running",
+        "cli",
+        "cli",
+        "cli",
+        "cli",
+        "cli",
+      ],
     );
 
-    expect(html).toContain(`${COPY.coverage.failed} 3`);
-    expect(html).toContain(`${COPY.coverage.done} 0`);
+    expect(html).toContain(esc(COPY.coverage.failed));
+    expect(html).toContain("<b>3</b>");
+    expect(html).toContain(esc(COPY.coverage.done));
+    expect(html).toContain("<b>0</b>");
+  });
+
+  it("控制台恒挂 v-none/v-low/v-medium/v-high 之一，永远不脱离覆盖度单独出现", () => {
+    for (const verdict of [
+      { stage: "insufficient" } as const,
+      { stage: "preliminary", level: "low" } as const,
+      { stage: "preliminary", level: "medium" } as const,
+      { stage: "full", level: "high" } as const,
+    ]) {
+      const html = renderVerdict(verdict);
+      // section 与 cov（覆盖度小节）必须同时出现在同一份 HTML 里。
+      expect(html).toContain('class="console v-');
+      expect(html).toContain('class="cov"');
+    }
+  });
+
+  it("控制台在有在线项检测中时挂 aria-busy=true，检测都结束后挂 false（规格 §4 要点 7）", () => {
+    const runningCells: CoverageCell[] = [
+      "running",
+      "done",
+      "done",
+      "ondemand",
+      "done",
+      "done",
+      "cli",
+      "cli",
+      "cli",
+      "cli",
+    ];
+    const idleCells: CoverageCell[] = [
+      "done",
+      "done",
+      "done",
+      "ondemand",
+      "done",
+      "done",
+      "cli",
+      "cli",
+      "cli",
+      "cli",
+    ];
+    const running = renderVerdict(
+      { stage: "insufficient" },
+      COVERAGE,
+      runningCells,
+    );
+    const idle = renderVerdict(
+      { stage: "preliminary", level: "low" },
+      COVERAGE,
+      idleCells,
+    );
+
+    expect(running).toContain('aria-busy="true"');
+    expect(idle).not.toContain('aria-busy="true"');
+    expect(idle).toContain('aria-busy="false"');
+  });
+});
+
+describe("卡片自身的 aria-busy（规格 §4 要点 4，检测进行中要有 aria-busy 表达）", () => {
+  it("检测中的卡片挂 aria-busy=true，其余状态挂 false", () => {
+    const running = renderToStaticMarkup(
+      createElement(CheckCard, {
+        id: "O1",
+        title: COPY.checks.O1.title,
+        status: "running",
+        meaning: COPY.checks.O1.meaning,
+      }),
+    );
+    const done = renderToStaticMarkup(
+      createElement(CheckCard, {
+        id: "O1",
+        title: COPY.checks.O1.title,
+        status: "done",
+        meaning: COPY.checks.O1.meaning,
+      }),
+    );
+
+    expect(running).toContain('aria-busy="true"');
+    expect(done).toContain('aria-busy="false"');
   });
 });
 
 describe("卡片重试入口（规格 4.1）", () => {
   // 安装命令全站只在落地内容「安装 CLI」段出现一次（规格第 4 节第 2 项），
-  // 灰卡内不再重复，因此这里断言灰卡内不含它。
-  it("灰卡是终态，没有重试入口，也不重复安装命令", () => {
+  // C1–C4 的发丝线列表行内不重复，因此这里断言行内不含它；C1–C4 是终态，没有重试入口。
+  it("C1–C4 发丝线列表行是终态，没有重试入口，也不重复安装命令", () => {
     const html = renderToStaticMarkup(
-      createElement(CliCard, {
+      createElement(CliListItem, {
         id: "C1",
         title: COPY.checks.C1.title,
         meaning: COPY.checks.C1.meaning,
@@ -136,8 +254,7 @@ describe("卡片重试入口（规格 4.1）", () => {
 
     expect(html).not.toContain('class="retry"');
     expect(html).not.toContain(esc(COPY.actions.installCommand));
-    expect(html).toContain(esc(COPY.cli.hint));
-    expect(html).toContain(esc(COPY.cardStatus.needCli));
+    expect(html).not.toContain('class="pill');
   });
 
   it("失败卡有重试入口", () => {
@@ -161,7 +278,7 @@ describe("「这意味着什么」折叠（规格 4.2）", () => {
   // 拿掉就等于删了规格 4.2 要求的每卡解释，且爬虫也读不到。
   it("渲染为 details/summary，解释文案仍在 HTML 内", () => {
     const html = renderToStaticMarkup(
-      createElement(CliCard, {
+      createElement(CliListItem, {
         id: "C1",
         title: COPY.checks.C1.title,
         meaning: COPY.checks.C1.meaning,
@@ -232,6 +349,78 @@ describe("O4 第三方披露（ADR-0008）", () => {
     expect(html).toContain(esc(COPY.cardStatus.failed));
     expect(html).toContain(esc(COPY.checks.O4.quotaExhausted));
     expect(html).not.toContain('class="retry"');
+  });
+});
+
+describe("O4 分项配色与契约 §6 的解释义务（终审修复波）", () => {
+  /** 只改要点的 O4 「ok」数据；默认是一份干干净净、riskLevel low 的住宅 IP。 */
+  function riskData(
+    over: Partial<Extract<RiskData, { status: "ok" }>> = {},
+  ): Extract<RiskData, { status: "ok" }> {
+    return {
+      status: "ok",
+      ip: "1.2.3.4",
+      networkType: "Residential",
+      proxy: false,
+      vpn: false,
+      tor: false,
+      scraper: false,
+      riskScore: 10,
+      riskLevel: "low",
+      anonymous: false,
+      abuseListed: false,
+      ...over,
+    };
+  }
+
+  function renderO4(data: Extract<RiskData, { status: "ok" }>): string {
+    return renderToStaticMarkup(
+      createElement(O4Card, {
+        state: { status: "done", data },
+        onRun: () => {},
+        onFail: () => {},
+      }),
+    );
+  }
+
+  it("abuseListed 把卡片从绿拉成黄——它是真的贡献综合结论的信号", () => {
+    // riskScore 10 ⇒ riskLevel low ⇒ 卡片本来是绿的，而 computeVerdict 因为
+    // abuseListed 已经把综合结论判到「中风险」。卡片继续显绿，用户就找不到
+    // 结论为什么是黄的（契约 §6 点名的失败模式）。
+    const html = renderO4(riskData({ abuseListed: true }));
+
+    expect(html).toContain('class="card tone-warn"');
+    expect(html).not.toContain('class="card tone-ok"');
+  });
+
+  it("判别力对照：同一份数据、abuseListed 为 false 时仍是绿卡", () => {
+    const html = renderO4(riskData({ abuseListed: false }));
+
+    expect(html).toContain('class="card tone-ok"');
+    expect(html).not.toContain('class="card tone-warn"');
+  });
+
+  it("abuseListed 未知（第三方不可用）不当作有收录，卡片仍是绿的", () => {
+    const html = renderO4(riskData({ abuseListed: null }));
+
+    expect(html).toContain('class="card tone-ok"');
+  });
+
+  it("anonymous 时卡内出现降阈值的解释（契约 §6：结论高 · 分项黄）", () => {
+    // 60 分 + anonymous ⇒ 综合结论判高（阈值降到 51），而分项分级只看分数，
+    // riskLevel 仍是 medium（黄）。这一档缺了文字就说不通。
+    const html = renderO4(
+      riskData({ riskScore: 60, riskLevel: "medium", anonymous: true }),
+    );
+
+    expect(html).toContain(esc(COPY.checks.O4.anonymousNote));
+    expect(html).toContain('class="card tone-warn"');
+  });
+
+  it("判别力对照：anonymous 为 false 时不出这句解释", () => {
+    const html = renderO4(riskData({ riskScore: 60, riskLevel: "medium" }));
+
+    expect(html).not.toContain(esc(COPY.checks.O4.anonymousNote));
   });
 });
 
@@ -461,5 +650,187 @@ describe("O5／O6 第三方披露（ADR-0008）", () => {
     expect(o6).toContain(esc(COPY.checks.O6.thirdPartyNote));
     expect(o6).toContain("stun.cloudflare.com");
     expect(o6).toContain("stun.l.google.com");
+  });
+});
+
+describe("检测失败的项仍被渲染（覆盖度靠数失败项，卡片不得消失或跳过）", () => {
+  // O1／O2 同源失败，卡片壳与失败原因都必须原样渲染出来——覆盖度的「检测失败」
+  // 一栏正是数这些卡片，重排时最容易把失败态漏渲染成空卡。
+  it("O1 失败：pill 显示「检测失败」，失败原因照样在 DOM 内", () => {
+    const html = renderToStaticMarkup(
+      createElement(O1Card, {
+        state: { status: "failed", reason: COPY.errors.unknown },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain(esc(COPY.cardStatus.failed));
+    expect(html).toContain('class="pill pill-failed"');
+    expect(html).toContain(esc(COPY.errors.unknown));
+    expect(html).toContain('class="retry"');
+  });
+
+  it("O2 失败：与 O1 同源失败，同样原样渲染失败原因", () => {
+    const html = renderToStaticMarkup(
+      createElement(O2Card, {
+        state: { status: "failed", reason: COPY.errors.unknown },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain(esc(COPY.cardStatus.failed));
+    expect(html).toContain(esc(COPY.errors.unknown));
+  });
+
+  it("O4 配额耗尽：按「检测失败」渲染，但不给重试——今天重试多少次都一样", () => {
+    const html = renderToStaticMarkup(
+      createElement(O4Card, {
+        state: { status: "done", data: { status: "quotaExhausted" } },
+        onRun: () => {},
+        onFail: () => {},
+      }),
+    );
+
+    expect(html).toContain(esc(COPY.cardStatus.failed));
+    expect(html).toContain(esc(COPY.checks.O4.quotaExhausted));
+    expect(html).not.toContain('class="retry"');
+  });
+});
+
+describe("O5／O2 的降级代理说明必须在位（契约 §5.1／§5.5 呈现约束）", () => {
+  // O2 对应 tzMismatchSystem：$TZ 不可得时的降级代理，契约要求显式说明系统时区
+  // 与命令行 $TZ 的差别，不得因重排而丢失，且不随卡片状态隐藏。
+  it.each(["idle", "running", "failed"] as const)(
+    "O2 在 %s 状态下仍渲染降级代理说明",
+    (status) => {
+      const state =
+        status === "failed"
+          ? ({ status: "failed", reason: COPY.errors.unknown } as const)
+          : ({ status } as const);
+      const html = renderToStaticMarkup(
+        createElement(O2Card, { state, onRetry: () => {} }),
+      );
+
+      expect(html).toContain(esc(COPY.checks.O2.scopeNote));
+    },
+  );
+
+  // O5 是 DNS 出口泄露的降级代理：契约要求显式说明本项测的是浏览器路径，
+  // 与 CLI 走的系统 resolver 不同——同样不得随状态隐藏。
+  it.each(["running", "failed"] as const)(
+    "O5 在 %s 状态下仍渲染降级代理说明",
+    (status) => {
+      const state =
+        status === "failed"
+          ? ({ status: "failed", reason: DNS_EGRESS_PROBE_FAILED } as const)
+          : ({ status } as const);
+      const html = renderToStaticMarkup(
+        createElement(O5Card, { state, onRetry: () => {} }),
+      );
+
+      expect(html).toContain(esc(COPY.checks.O5.scopeNote));
+      expect(html).toContain(esc(COPY.checks.O5.thirdPartyNote));
+    },
+  );
+});
+
+describe("O2「无从比对」不得渲染绿色（review 修复：Result 把结论包进实心底色框后放大了这个信号）", () => {
+  it("match === null 时结论不带 t-ok，落到中性 result", () => {
+    const html = renderToStaticMarkup(
+      createElement(O2Card, {
+        state: {
+          status: "done",
+          data: {
+            browserTimezone: "Asia/Shanghai",
+            exitTimezone: null,
+            match: null,
+          },
+        },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain(esc(COPY.checks.O2.unknown));
+    expect(html).not.toContain('class="result t-ok"');
+    expect(html).toContain('class="result"');
+  });
+
+  it("match === true 时才带 t-ok", () => {
+    const html = renderToStaticMarkup(
+      createElement(O2Card, {
+        state: {
+          status: "done",
+          data: {
+            browserTimezone: "Asia/Shanghai",
+            exitTimezone: "Asia/Shanghai",
+            match: true,
+          },
+        },
+        onRetry: () => {},
+      }),
+    );
+
+    expect(html).toContain('class="result t-ok"');
+  });
+});
+
+describe("检测项数量恒为 O1–O6 六项 + C1–C4 四项（防止重排时漏掉或多出一项）", () => {
+  it("domain 层的 ID 表恒为 6 项在线 + 4 项仅 CLI", () => {
+    expect(ONLINE_CHECK_IDS).toHaveLength(6);
+    expect(CLI_CHECK_IDS).toHaveLength(4);
+  });
+
+  it("O1–O6 卡片流渲染出恰好 6 张 .card", () => {
+    const cards = [
+      createElement(O1Card, {
+        state: { status: "running" },
+        onRetry: () => {},
+      }),
+      createElement(O2Card, {
+        state: { status: "running" },
+        onRetry: () => {},
+      }),
+      createElement(O3Card, {
+        state: { status: "running" },
+        onRetry: () => {},
+      }),
+      createElement(O4Card, {
+        state: { status: "idle" },
+        onRun: () => {},
+        onFail: () => {},
+      }),
+      createElement(O5Card, {
+        state: { status: "running" },
+        onRetry: () => {},
+      }),
+      createElement(O6Card, {
+        state: { status: "running" },
+        onRetry: () => {},
+      }),
+    ];
+    const html = cards.map((el) => renderToStaticMarkup(el)).join("");
+
+    expect(html.match(/class="card tone-/g) ?? []).toHaveLength(
+      ONLINE_CHECK_IDS.length,
+    );
+  });
+
+  it("C1–C4 发丝线列表渲染出恰好 4 个 <li>", () => {
+    const html = renderToStaticMarkup(
+      createElement(
+        "ul",
+        { className: "cli-list" },
+        CLI_CHECK_IDS.map((id) =>
+          createElement(CliListItem, {
+            key: id,
+            id,
+            title: COPY.checks[id].title,
+            meaning: COPY.checks[id].meaning,
+          }),
+        ),
+      ),
+    );
+
+    expect(html.match(/<li>/g) ?? []).toHaveLength(CLI_CHECK_IDS.length);
   });
 });

@@ -18,24 +18,29 @@
     />
     <link
       rel="alternate"
-      hreflang="zh-Hant"
-      href="https://ipcheck.omnikit.run/zh-hant"
-    />
-    <link
-      rel="alternate"
-      hreflang="ru"
-      href="https://ipcheck.omnikit.run/ru"
-    />
-    <link
-      rel="alternate"
-      hreflang="ar"
-      href="https://ipcheck.omnikit.run/ar"
-    />
-    <link
-      rel="alternate"
       hreflang="x-default"
       href="https://ipcheck.omnikit.run/"
     />
+    <!-- 防闪白：必须内联、必须在任何样式表加载/渲染前执行。读取 localStorage 里的主题偏好，
+         立刻在 <html> 上打好 data-theme-pref（三态偏好）/ data-theme（二态生效值），
+         CSS 只认后者，深色 token 不必再靠 prefers-color-scheme 驱动。
+         localStorage 访问容错：隐私模式等场景下可能直接抛异常，不能让整页脚本挂掉。 -->
+    <script>
+      (function () {
+        var pref = null;
+        try {
+          pref = localStorage.getItem("ipcheck-theme");
+        } catch (e) {}
+        if (pref !== "light" && pref !== "dark") pref = "system";
+        var dark =
+          pref === "dark" ||
+          (pref === "system" &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        var el = document.documentElement;
+        el.setAttribute("data-theme-pref", pref);
+        el.setAttribute("data-theme", dark ? "dark" : "light");
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

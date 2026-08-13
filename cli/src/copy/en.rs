@@ -5,15 +5,11 @@
 //! O1–O6 的标题必须与 ipcheck Web 的 `src/locales/en.ts` **逐字一致**（契约 1.1）。
 
 use super::{
-    CheckText, ChecksText, ConfigText, CoverageText, DnsEgressText, ErrorText, FailureText,
-    LangText, NoteText, Text, UdpEgressText, ValueText, VerdictText,
+    C4FixText, CheckText, ChecksText, ConfigText, CoverageText, DnsEgressText, ErrorText,
+    FailureText, FooterText, NoteText, O1FieldsText, Text, UdpEgressText, ValueText, VerdictText,
 };
 
 pub const EN: Text = Text {
-    lang: LangText {
-        partial_notice: "This language is only partially translated; untranslated items are shown in English.",
-    },
-
     config: ConfigText {
         path_label: "Config file",
         key_state_set: "proxycheck key: set",
@@ -28,10 +24,7 @@ pub const EN: Text = Text {
         config_read: "Cannot read the config file",
         config_parse: "The config file is invalid",
         config_write: "Cannot write the config file",
-        lang_unknown: "Unknown language",
-        // ar 是显式拒绝而不是静默回落：配了却看到英文，会让人以为工具坏了。
-        lang_arabic_unsupported: "Arabic is not supported in the terminal: mixing right-to-left text with left-to-right values (IP addresses, IANA timezone names, ASN numbers) renders inconsistently across terminal emulators. The website does support Arabic.",
-        checkup_not_implemented: "The checkup could not run.",
+        lang_unknown: "Unsupported language",
     },
 
     verdict: VerdictText {
@@ -43,11 +36,25 @@ pub const EN: Text = Text {
         full_badge: "Full · IP risk score included",
         summary_insufficient: "Nothing could be measured — no verdict. This is not a clean bill of health; retry the failed items below.",
         summary_preliminary_low: "No anomalies found so far. The IP risk score isn't included yet, so this verdict is preliminary.",
+        summary_preliminary_low_reminders: "Nothing that counts toward the verdict so far; some items below are flagged for awareness only. The IP risk score isn't included yet, so this verdict is preliminary.",
         summary_preliminary_medium: "Suspicious signals found — review the flagged items below.",
         summary_full_low: "No anomalies found in any check.",
+        summary_full_low_reminders: "Nothing that counts toward the verdict was found. Some items below are flagged for awareness only.",
         summary_full_medium: "Suspicious signals found — review the flagged items below.",
         summary_full_high: "Your exit IP is high risk. AI tools are quite likely to trigger anti-abuse controls right now.",
         exit_ip_label: "Exit IP",
+        risk_label: "Risk score",
+        coverage_label: "Coverage",
+        attention_label: "Needs attention",
+        // 分词形式，与 `attention_reminder_only` 同构：ID 列表可以是一项也可以是多项，
+        // 限定动词（counts / count）会在其中一侧写错主谓一致。
+        attention_contributing: "counted toward the verdict",
+        attention_reminder_only: "flagged for awareness only",
+        attention_list_separator: ", ",
+        attention_list_connector: " and ",
+        attention_prefix: "Only ",
+        attention_clause_separator: "; ",
+        attention_suffix: ".",
     },
 
     coverage: CoverageText {
@@ -59,6 +66,11 @@ pub const EN: Text = Text {
         o1: CheckText {
             title: "Exit IP and Ownership",
             description: "The public address your traffic leaves the proxy with, plus where the IP is registered. This is not the address behind the proxy.",
+        },
+        o1_fields: O1FieldsText {
+            address: "Address",
+            ownership: "Ownership",
+            network: "Network",
         },
         o2: CheckText {
             title: "System Timezone Consistency",
@@ -97,6 +109,13 @@ pub const EN: Text = Text {
             title: "$TZ timezone match",
             description: "Compares $TZ with the timezone of your exit IP. This is the timezone command-line tools actually run in.",
         },
+        c4_fix: C4FixText {
+            explain_prefix: "Command-line tools actually run in ",
+            explain_connector: ", but anti-abuse systems see your exit IP's timezone as ",
+            explain_suffix: ".",
+            fix_label: "Suggested fix",
+            fix_command_prefix: "export TZ=",
+        },
     },
 
     values: ValueText {
@@ -119,6 +138,12 @@ pub const EN: Text = Text {
         abuse_listed: "abuse reports found",
         abuse_clean: "no abuse reports",
         abuse_unknown: "abuse reports unknown",
+        obtained: "Obtained",
+        risk_scale_note: "Medium from 26 · High from 76",
+        risk_level_low: "low",
+        risk_level_medium: "medium",
+        risk_level_high: "high",
+        reference_only: "Reference only",
     },
 
     failures: FailureText {
@@ -133,6 +158,12 @@ pub const EN: Text = Text {
         quota_shared: "Without an API key proxycheck allows 100 queries per day, counted per exit IP — you share it with anyone else on the same proxy node. Run `ipcheck config set proxycheck-key` to raise it to 1,000.",
     },
 
+    footer: FooterText {
+        verbose_hint: "explain every check",
+        json_hint: "machine-readable output",
+        quota_hint: "proxycheck quota 100/day → 1,000/day",
+    },
+
     dns_egress: DnsEgressText {
         resolver_label: "Resolver location",
         ecs_label: "DNS client subnet country",
@@ -144,6 +175,8 @@ pub const EN: Text = Text {
         unknown_exit_country: "The exit IP's country isn't available yet (see the Exit IP check above), so this can't be compared.",
         // 契约 2.1／2.5 硬约束 1：resolver 归属只展示，不参与判定——只有 ECS 判定进综合结论。
         resolver_note: "Shown for reference only — it doesn't affect the verdict. Which country your resolver sits in depends on which DNS provider you picked, not on whether your traffic is proxied.",
+        state_leaked: "leaked",
+        state_not_leaked: "not leaked",
     },
 
     udp_egress: UdpEgressText {
@@ -154,5 +187,7 @@ pub const EN: Text = Text {
         family_mismatch: "Fewer than two reflexive addresses in the same address family as your exit IP (IPv4/IPv6) came back, so there's nothing to compare on equal terms.",
         unknown_exit_ip: "The exit IP isn't available yet (see the Exit IP check above), so this can't be compared.",
         stun_disagree: "The two STUN servers reported different addresses, so there's no single reliable value to compare — this can happen with multi-exit clusters or symmetric NAT.",
+        state_match: "match",
+        state_mismatch: "mismatch",
     },
 };

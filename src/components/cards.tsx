@@ -3,10 +3,13 @@
 // 状态到卡片的映射规则：
 //   - 「检测失败」一律给重试入口，并原样展示失败原因；失败绝不呈现为「没查出问题」
 //   - 分项颜色（tone）只影响这张卡，不参与综合结论（规格 3.2）
+//
+// 正文顺序统一为 kv → result → note（原型 refs/ipcheck-web-redesign.html 的 landO1~landO6 范式）：
+// 字段列表在前、着色结论居中、不参与判定的补充说明收在最后。
 
 import { useRef, useState } from "react";
 
-import { CheckCard, type CardTone } from "./Card";
+import { CheckCard, Kv, KvRow, Note, Result, type CardTone } from "./Card";
 import { useCopy } from "../i18n";
 import type { OnlineCheck } from "../domain/checks";
 import { UDP_EGRESS_WEBRTC_UNAVAILABLE } from "../domain/udpEgress";
@@ -19,19 +22,6 @@ import type {
   UdpEgressResult,
 } from "../domain/types";
 import { requestTurnstileToken, turnstileConfigured } from "../turnstile";
-
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <p className="field">
-      <span className="field-label">{label}</span>
-      <span className="field-value">{value}</span>
-    </p>
-  );
-}
-
-function Failure({ reason }: { reason: string }) {
-  return <p className="failure">{reason}</p>;
-}
 
 export function O1Card({
   state,
@@ -52,10 +42,12 @@ export function O1Card({
       meaning={copy.meaning}
       onRetry={state.status === "failed" ? onRetry : undefined}
     >
-      {state.status === "failed" ? <Failure reason={state.reason} /> : null}
+      {state.status === "failed" ? (
+        <Result tone="danger">{state.reason}</Result>
+      ) : null}
       {state.status === "done" ? (
-        <>
-          <Field
+        <Kv>
+          <KvRow
             label={copy.fields.location}
             value={
               // 城市与地区常常同名（如 Osaka · Osaka），去重免得读起来像故障。
@@ -69,8 +61,9 @@ export function O1Card({
                 ),
               ].join(" · ") || unknown
             }
+            emphasis
           />
-          <Field
+          <KvRow
             label={copy.fields.asn}
             value={
               state.data.asOrganization
@@ -78,12 +71,12 @@ export function O1Card({
                 : unknown
             }
           />
-          <Field
+          <KvRow
             label={copy.fields.timezone}
             value={state.data.timezone ?? unknown}
           />
-          <Field label={copy.fields.colo} value={state.data.colo ?? unknown} />
-        </>
+          <KvRow label={copy.fields.colo} value={state.data.colo ?? unknown} />
+        </Kv>
       ) : null}
     </CheckCard>
   );
@@ -99,8 +92,11 @@ export function O2Card({
   const COPY = useCopy();
   const copy = COPY.checks.O2;
   const data = state.status === "done" ? state.data : null;
+  // match === null 是「无从比对」（边缘未给出出口 IP 时区），既非一致也非不一致——
+  // 中性色，不得落到绿色（review 修复：Result 把这句话包进实心 t-ok 底色框后，
+  // 原先 `data ? "ok" : "neutral"` 的写法会让「无从比对」被渲染成显著的绿色结论）。
   const tone: CardTone =
-    data?.match === false ? "warn" : data ? "ok" : "neutral";
+    data?.match === false ? "warn" : data?.match === true ? "ok" : "neutral";
 
   return (
     <CheckCard
@@ -111,25 +107,34 @@ export function O2Card({
       meaning={copy.meaning}
       onRetry={state.status === "failed" ? onRetry : undefined}
     >
-      {state.status === "failed" ? <Failure reason={state.reason} /> : null}
+      {state.status === "failed" ? (
+        <Result tone="danger">{state.reason}</Result>
+      ) : null}
       {data ? (
         <>
-          <p className="conclusion">
+          <Kv>
+            <KvRow
+              label={copy.browserLabel}
+              value={data.browserTimezone}
+              emphasis
+            />
+            <KvRow
+              label={copy.exitLabel}
+              value={data.exitTimezone ?? COPY.checks.O1.unknown}
+              emphasis
+            />
+          </Kv>
+          <Result tone={tone}>
             {data.match === null
               ? copy.unknown
               : data.match
                 ? copy.match
                 : copy.mismatch}
-          </p>
-          <Field label={copy.browserLabel} value={data.browserTimezone} />
-          <Field
-            label={copy.exitLabel}
-            value={data.exitTimezone ?? COPY.checks.O1.unknown}
-          />
+          </Result>
         </>
       ) : null}
       {/* 验收标准 2：必须显式区分两个时区来源，否则 CLI 用户会误以为 $TZ 已被检查。 */}
-      <p className="scope-note">{copy.scopeNote}</p>
+      <Note>{copy.scopeNote}</Note>
     </CheckCard>
   );
 }
@@ -159,17 +164,21 @@ export function O3Card({
       retryLabel={copy.retryLabel}
     >
       {/* 失败态说的是「无法判定」，绝不能滑向「没有 IPv6」（验收标准 3）。 */}
-      {state.status === "failed" ? <Failure reason={copy.failed} /> : null}
+      {state.status === "failed" ? (
+        <Result tone="danger">{copy.failed}</Result>
+      ) : null}
       {data ? (
         <>
-          <p className="conclusion">{data.leak ? copy.leak : copy.disabled}</p>
           {data.leak ? (
-            <Field label={copy.ipv6Label} value={data.ipv6} />
+            <Kv>
+              <KvRow label={copy.ipv6Label} value={data.ipv6} emphasis />
+            </Kv>
           ) : null}
+          <Result tone={tone}>{data.leak ? copy.leak : copy.disabled}</Result>
         </>
       ) : null}
       {/* 无控件的自动检测项，披露只能就地放在说明位（终审修复波：ipify 无就地披露）。 */}
-      <p className="scope-note">{copy.thirdPartyNote}</p>
+      <Note>{copy.thirdPartyNote}</Note>
     </CheckCard>
   );
 }
@@ -183,35 +192,45 @@ function RiskDetail({ data }: { data: Extract<RiskData, { status: "ok" }> }) {
 
   return (
     <>
-      <Field
-        label={copy.fields.networkType}
-        value={
-          data.networkType
-            ? copy.networkType[data.networkType]
-            : copy.networkType.unknown
-        }
-      />
-      <Field label={copy.fields.riskScore} value={`${data.riskScore} / 100`} />
-      <Field
-        label={copy.fields.detections}
-        value={
-          detections.length > 0
-            ? detections.map((key) => copy.detectionLabels[key]).join(" · ")
-            : copy.noDetection
-        }
-      />
-      <Field
-        label={copy.fields.abuse}
-        value={
-          data.abuseListed === null
-            ? copy.abuse.unknown
-            : data.abuseListed
-              ? copy.abuse.listed
-              : copy.abuse.clean
-        }
-      />
+      <Kv>
+        <KvRow
+          label={copy.fields.networkType}
+          value={
+            data.networkType
+              ? copy.networkType[data.networkType]
+              : copy.networkType.unknown
+          }
+          emphasis
+        />
+        <KvRow
+          label={copy.fields.riskScore}
+          value={`${data.riskScore} / 100`}
+          emphasis
+        />
+        <KvRow
+          label={copy.fields.detections}
+          value={
+            detections.length > 0
+              ? detections.map((key) => copy.detectionLabels[key]).join(" · ")
+              : copy.noDetection
+          }
+        />
+        <KvRow
+          label={copy.fields.abuse}
+          value={
+            data.abuseListed === null
+              ? copy.abuse.unknown
+              : data.abuseListed
+                ? copy.abuse.listed
+                : copy.abuse.clean
+          }
+        />
+      </Kv>
+      {/* 契约 §6：51–75 分且 anonymous 时结论判高而本项仍是黄，缺了这句解释，
+          用户看到高风险却找不到哪一项显红。判据本身不在这里算，只是把它说出来。 */}
+      {data.anonymous ? <Note>{copy.anonymousNote}</Note> : null}
       {data.networkType === "Hosting" || detections.length > 0 ? (
-        <p className="scope-note">{copy.hostingNote}</p>
+        <Note>{copy.hostingNote}</Note>
       ) : null}
     </>
   );
@@ -235,11 +254,17 @@ export function O4Card({
   const ok = data?.status === "ok" ? data : null;
   // 分项颜色直接吃契约给的 riskLevel（docs/api.md 3.1 已按规格 3.2 的阈值分好级），
   // 不在前端拿 riskScore 再算一遍——同一套阈值放两处迟早会分叉。
-  // 唯一的本地叠加：Hosting 与代理检出把绿拉成黄（规格 3.2 的分项提醒），但不拉高综合结论。
+  // 本地叠加的都是**布尔信号**，不是阈值，与上面那句不冲突：
+  // - Hosting 与代理检出把绿拉成黄（契约 §2.1 明列的分项提醒，不进综合结论）；
+  // - abuseListed 同样把绿拉成黄，但它是**真的贡献综合结论**的信号
+  //   （domain/verdict.ts：`medium || abuseListed === true`）。分数低时 riskLevel
+  //   仍是 low，卡片会绿着，而结论区已经是黄的「中风险」——正是契约 §6 点名的
+  //   失败模式：结论变色了却没有任何一项告诉用户为什么。
   const tone: CardTone = ok
     ? ok.riskLevel === "high"
       ? "danger"
       : ok.riskLevel === "medium" ||
+          ok.abuseListed === true ||
           ok.networkType === "Hosting" ||
           ok.proxy ||
           ok.vpn ||
@@ -282,11 +307,13 @@ export function O4Card({
       // 重试同样会把出口 IP 发往 proxycheck.io，披露必须跟着这个按钮走（ADR-0008）。
       retryLabel={copy.consentButton}
     >
-      {state.status === "idle" ? (
-        <p className="conclusion">{copy.idle}</p>
+      {state.status === "idle" ? <Note>{copy.idle}</Note> : null}
+      {state.status === "failed" ? (
+        <Result tone="danger">{state.reason}</Result>
       ) : null}
-      {state.status === "failed" ? <Failure reason={state.reason} /> : null}
-      {quotaExhausted ? <Failure reason={copy.quotaExhausted} /> : null}
+      {quotaExhausted ? (
+        <Result tone="danger">{copy.quotaExhausted}</Result>
+      ) : null}
       {ok ? <RiskDetail data={ok} /> : null}
 
       {state.status === "idle" ? (
@@ -300,14 +327,12 @@ export function O4Card({
           >
             {copy.consentButton}
           </button>
-          <p className="consent-note">{copy.consentNote}</p>
+          <Note>{copy.consentNote}</Note>
         </>
       ) : null}
       {/* 失败态的触发控件是 CheckCard 的重试按钮（文案已换成 consentButton），
           这里补上第二个第三方 StopForumSpam 的披露，与首次触发时看到的一致。 */}
-      {state.status === "failed" ? (
-        <p className="consent-note">{copy.consentNote}</p>
-      ) : null}
+      {state.status === "failed" ? <Note>{copy.consentNote}</Note> : null}
 
       <div ref={turnstileRef} className="turnstile" />
     </CheckCard>
@@ -344,39 +369,51 @@ export function O5Card({
       retryLabel={copy.retryLabel}
     >
       {/* 探测本身失败，唯一失败原因，不必按 reason 分支（契约 §2.5 判定表最后一行）。 */}
-      {state.status === "failed" ? <Failure reason={copy.failed} /> : null}
-      {comparison ? (
-        <>
-          <p className="conclusion">
-            {comparison.comparable
-              ? comparison.leak
-                ? copy.leak
-                : copy.noLeak
-              : comparison.reason === "noEcs"
-                ? copy.noEcs
-                : comparison.reason === "unmappedCountry"
-                  ? copy.unmappedCountry
-                  : copy.unknownExitCountry}
-          </p>
-          {comparison.comparable ? (
+      {state.status === "failed" ? (
+        <Result tone="danger">{copy.failed}</Result>
+      ) : null}
+      {/* ECS／出口国与 resolver 归属同属「字段列表」，收进同一个 kv（原型 landO5）；
+          resolver 归属不参与判定，说明紧跟在字段后面（契约 §2.1／§2.5 硬约束 1）。 */}
+      {data ? (
+        <Kv>
+          {comparison?.comparable ? (
             <>
-              <Field label={copy.ecsLabel} value={comparison.ecsCountry} />
-              <Field label={copy.exitLabel} value={comparison.exitCountry} />
+              <KvRow
+                label={copy.ecsLabel}
+                value={comparison.ecsCountry}
+                emphasis
+              />
+              <KvRow
+                label={copy.exitLabel}
+                value={comparison.exitCountry}
+                emphasis
+              />
             </>
           ) : null}
-        </>
+          <KvRow
+            label={copy.resolverLabel}
+            value={data.resolverGeo ?? COPY.checks.O1.unknown}
+          />
+        </Kv>
       ) : null}
-      {data ? (
-        <Field
-          label={copy.resolverLabel}
-          value={data.resolverGeo ?? COPY.checks.O1.unknown}
-        />
+      {comparison ? (
+        <Result tone={tone}>
+          {comparison.comparable
+            ? comparison.leak
+              ? copy.leak
+              : copy.noLeak
+            : comparison.reason === "noEcs"
+              ? copy.noEcs
+              : comparison.reason === "unmappedCountry"
+                ? copy.unmappedCountry
+                : copy.unknownExitCountry}
+        </Result>
       ) : null}
-      {/* resolver 归属只展示不判定，紧跟在字段后面说明理由（契约 §2.1／§2.5 硬约束 1）。 */}
-      {data ? <p className="scope-note">{copy.resolverNote}</p> : null}
-      {/* 无控件的自动检测项，第三方披露就地放在说明位（与 O3 同一套处理）。 */}
-      <p className="scope-note">{copy.thirdPartyNote}</p>
-      <p className="scope-note">{copy.scopeNote}</p>
+      {data ? <Note>{copy.resolverNote}</Note> : null}
+      {/* 无控件的自动检测项，第三方披露就地放在说明位（与 O3 同一套处理）。
+          thirdPartyNote／scopeNote 恒渲染，不随状态隐藏——O5 的降级代理说明必须始终在位。 */}
+      <Note>{copy.thirdPartyNote}</Note>
+      <Note>{copy.scopeNote}</Note>
     </CheckCard>
   );
 }
@@ -407,17 +444,25 @@ export function O6Card({
     >
       {/* 两个失败原因文案不同：浏览器不允许 vs 探测超时，刷新的可恢复性相反（契约 §5.6）。 */}
       {state.status === "failed" ? (
-        <Failure
-          reason={
-            state.reason === UDP_EGRESS_WEBRTC_UNAVAILABLE
-              ? copy.webrtcUnavailable
-              : copy.stunUnanswered
-          }
-        />
+        <Result tone="danger">
+          {state.reason === UDP_EGRESS_WEBRTC_UNAVAILABLE
+            ? copy.webrtcUnavailable
+            : copy.stunUnanswered}
+        </Result>
       ) : null}
       {data ? (
         <>
-          <p className="conclusion">
+          {data.comparable ? (
+            <Kv>
+              <KvRow
+                label={copy.reflexiveLabel}
+                value={data.reflexiveIp}
+                emphasis
+              />
+              <KvRow label={copy.exitLabel} value={data.exitIp} emphasis />
+            </Kv>
+          ) : null}
+          <Result tone={tone}>
             {data.comparable
               ? data.mismatch
                 ? copy.mismatch
@@ -427,16 +472,10 @@ export function O6Card({
                 : data.reason === "unknownExitIp"
                   ? copy.unknownExitIp
                   : copy.stunDisagree}
-          </p>
-          {data.comparable ? (
-            <>
-              <Field label={copy.reflexiveLabel} value={data.reflexiveIp} />
-              <Field label={copy.exitLabel} value={data.exitIp} />
-            </>
-          ) : null}
+          </Result>
         </>
       ) : null}
-      <p className="scope-note">{copy.thirdPartyNote}</p>
+      <Note>{copy.thirdPartyNote}</Note>
     </CheckCard>
   );
 }

@@ -12,7 +12,8 @@ export const ZH_HANS: Copy = {
   },
 
   nav: {
-    language: "语言",
+    switchLanguageTo: "切换语言到",
+    skipToContent: "跳到主要内容",
     brand: "ipcheck",
     checks: "网页检测",
     cliChecks: "需 CLI",
@@ -20,6 +21,12 @@ export const ZH_HANS: Copy = {
     install: "安装 CLI",
     compare: "对照表",
     backToTop: "回到顶部",
+    theme: {
+      label: "主题",
+      light: "浅色",
+      dark: "深色",
+      system: "跟随系统",
+    },
   },
 
   verdict: {
@@ -44,9 +51,15 @@ export const ZH_HANS: Copy = {
     exitIpLabel: "出口 IP",
     exitIpUnknown: "未能取得",
     exitIpNote: "这是你流量离开代理后的公网地址，不是代理背后的本机地址。",
+    summaryLabel: "综合结论",
+    live: {
+      checking: "检测中",
+      ready: "已就绪",
+    },
   },
 
   coverage: {
+    label: "覆盖度",
     done: "已完成",
     needCli: "需 CLI",
     failed: "检测失败",
@@ -140,6 +153,7 @@ export const ZH_HANS: Copy = {
       noDetection: "未检出",
       hostingNote:
         "机房 IP 属于分项提醒，本身不拉高综合结论，但确实更容易被风控盯上。",
+      anonymousNote: "该 IP 正被用作匿名化地址 —— 判高的阈值对它降到 51。",
       abuse: {
         listed: "有收录",
         clean: "无收录",
@@ -231,18 +245,35 @@ export const ZH_HANS: Copy = {
     },
   },
 
-  cli: {
-    hint: "本项需要读取本机环境，装 CLI 后可测。",
-  },
-
   landing: {
     why: {
       title: "为什么需要体检",
-      body: "AI 工具对访问环境很敏感，最容易踩雷的集中在四类：出口 IP 类型与历史滥用记录过高触发风控、系统与出口 IP 时区不一致露出破绽、IPv6 悄悄绕过代理暴露真实位置、本地 DNS 把你访问过的域名暴露给本地运营商。本站可在线检测前三类；本地 DNS 服务器配置需要读取本机环境，网页结构性拿不到，属于仅 CLI 项。",
+      lede: "AI 工具对访问环境很敏感，最容易踩雷的集中在四类。",
+      items: [
+        {
+          title: "出口 IP 类型与滥用记录",
+          body: "机房 IP、公开代理、被大量滥用过的 IP，是触发风控最直接的原因。",
+        },
+        {
+          title: "系统与出口 IP 时区不一致",
+          body: "时区对不上是最常见的代理特征之一：IP 显示在美国、系统却是北京时间，风控一眼就能看出来。",
+        },
+        {
+          title: "IPv6 泄露",
+          body: "多数代理只接管 IPv4。一旦本机有 IPv6，部分流量会绕过代理直接出去，暴露另一个地区的地址。",
+        },
+        {
+          title: "本地 DNS 暴露访问记录",
+          body: "即使其他流量已经走了代理，本地运营商仍能看到你解析过的域名。",
+        },
+      ],
+      checkedOnlineTag: "网页可测",
+      foot: "本站可在线检测前三类；本地 DNS 服务器配置需要读取本机环境，网页结构性拿不到，属于仅 CLI 项。",
     },
     install: {
       title: "安装 CLI 补全全部 10 项",
       body: "网页版是快速摸底，能测 6 项；CLI 覆盖全部 10 项，包括本机真实 IP、本地 DNS 配置、代理与 TUN 检测、$TZ 时区一致性。",
+      platforms: "macOS · Linux",
     },
     compare: {
       title: "Web 与 CLI 完整功能对照表",
@@ -259,8 +290,12 @@ export const ZH_HANS: Copy = {
 
   footer: {
     privacy: "本站不存储任何检测结果。",
-    thirdParty:
-      "页面加载后会自动发起三项检测，均由浏览器直接发出：IPv6 检测访问 ipify，DNS 出口检测访问 ip-api.com，UDP 出口检测访问 stun.cloudflare.com 与 stun.l.google.com。IP 风险检测需你手动触发，届时会先加载 Cloudflare Turnstile 人机验证，随后出口 IP 会被发送至 proxycheck.io 与 StopForumSpam。",
+    autoLabel: "自动发起",
+    autoBody:
+      "页面加载后会自动发起三项检测，均由浏览器直接发出：IPv6 检测访问 ipify，DNS 出口检测访问 ip-api.com，UDP 出口检测访问 stun.cloudflare.com 与 stun.l.google.com。",
+    onDemandLabel: "需手动触发",
+    onDemandBody:
+      "IP 风险检测需你手动触发，届时会先加载 Cloudflare Turnstile 人机验证，随后出口 IP 会被发送至 proxycheck.io 与 StopForumSpam。",
   },
 
   errors: {

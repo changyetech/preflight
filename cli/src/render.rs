@@ -76,7 +76,16 @@ fn verdict_tone(verdict: &Verdict) -> Tone {
     }
 }
 
-fn verdict_headline<'a>(verdict: &Verdict, text: &'a Text) -> (&'a str, Option<&'a str>, &'a str) {
+/// 结论区的档位词、形态徽章与摘要句。
+///
+/// `has_reminder_only` = 「需关注」清单里存在仅提醒项。低档的默认摘要说「未发现异常」，
+/// 与同屏的仅提醒清单自相矛盾（O2 系统时区、C2 国内 DNS 都是常态），因此低档两个形态
+/// 各有一条专用摘要。判级逻辑一行不动——矛盾出在文案，不在判据。
+fn verdict_headline<'a>(
+    verdict: &Verdict,
+    has_reminder_only: bool,
+    text: &'a Text,
+) -> (&'a str, Option<&'a str>, &'a str) {
     match verdict {
         Verdict::Insufficient => (
             text.verdict.insufficient,
@@ -86,7 +95,11 @@ fn verdict_headline<'a>(verdict: &Verdict, text: &'a Text) -> (&'a str, Option<&
         Verdict::Preliminary(PreliminaryLevel::Low) => (
             text.verdict.low,
             Some(text.verdict.preliminary_badge),
-            text.verdict.summary_preliminary_low,
+            if has_reminder_only {
+                text.verdict.summary_preliminary_low_reminders
+            } else {
+                text.verdict.summary_preliminary_low
+            },
         ),
         Verdict::Preliminary(PreliminaryLevel::Medium) => (
             text.verdict.medium,
@@ -96,7 +109,11 @@ fn verdict_headline<'a>(verdict: &Verdict, text: &'a Text) -> (&'a str, Option<&
         Verdict::Full(Level::Low) => (
             text.verdict.low,
             Some(text.verdict.full_badge),
-            text.verdict.summary_full_low,
+            if has_reminder_only {
+                text.verdict.summary_full_low_reminders
+            } else {
+                text.verdict.summary_full_low
+            },
         ),
         Verdict::Full(Level::Medium) => (
             text.verdict.medium,
@@ -116,11 +133,26 @@ struct Card {
     id: CheckId,
     tone: Tone,
     title: &'static str,
+    /// 标题行右端的状态词（spec §5.1）。失败卡没有状态词——不给失败卡编造状态
+    /// （brief 要点 7），失败原因已经在 `values` 里。
+    state: Option<String>,
+    /// 状态词的展示色调。多数情况下与 `tone` 相同；O1/C1 固定用 `Tone::Dim`——
+    /// 「已取得」是纯提示词，不是契约 6 的分项分级评价，不该借用评价色。
+    state_tone: Tone,
     /// 主值，一行一条。
     values: Vec<String>,
     /// 契约要求必须出现的说明，与 `--verbose` 无关。
     notes: Vec<&'static str>,
+    /// 只有 C4 命中不一致时才有（决策 5：只有 C4 给修复命令）。
+    fix: Option<CardFix>,
     description: &'static str,
+}
+
+/// C4 专属：成因句 + 修复命令。两者都含动态时区名，按仓库既有风格
+/// （见 `ErrorText` 的注释）不做插值，由调用方拼接固定片段与动态值。
+struct CardFix {
+    explain: String,
+    command: String,
 }
 
 pub fn report(report: &Report, text: &Text, style: &Style, verbose: bool) -> String {
@@ -128,17 +160,55 @@ pub fn report(report: &Report, text: &Text, style: &Style, verbose: bool) -> Str
     let coverage = report.coverage();
     debug_assert!(coverage.is_complete(), "覆盖度不变量被破坏：{coverage:?}");
 
+    let all_cards = cards(report, text);
+
     let mut out = String::new();
     let _ = writeln!(out);
-    render_verdict(&mut out, &verdict, &coverage, report, text, style);
+    render_verdict(
+        &mut out, &verdict, &coverage, report, &all_cards, text, style,
+    );
     let _ = writeln!(out);
 
-    for card in cards(report, text) {
-        render_card(&mut out, &card, style, verbose);
+    for card in &all_cards {
+        render_card(&mut out, card, style, verbose);
     }
     let _ = writeln!(out);
 
+    render_footer(&mut out, text, style);
+
     out
+}
+
+/// 页脚提示行（design：`.footer-hint`）。命令字面量以 `main.rs` 的 `Cli`/
+/// `Command`/`ConfigAction`/`SettableKey` 定义为准：`--verbose`/`--json` 是
+/// 顶层 flag，`config set proxycheck-key` 是 `SettableKey` 目前唯一枚举的键。
+/// 只在 `render::report` 里调用——`--json` 走 `json::report`，完全不经过这里，
+/// 提示行天然不会混进机器可读输出。
+fn render_footer(out: &mut String, text: &Text, style: &Style) {
+    let f = &text.footer;
+    // 先上色再折行：`render_wrapped` 的宽度计算跳过转义序列（`display_width`），
+    // 提示词的 dim 与命令字面量的常色都得以保留。
+    render_wrapped(
+        out,
+        &format!(
+            "ipcheck --verbose  {}  ·  ipcheck --json  {}",
+            style.tone(Tone::Dim, f.verbose_hint),
+            style.tone(Tone::Dim, f.json_hint)
+        ),
+        style,
+        None,
+        FOOTER_INDENT,
+    );
+    render_wrapped(
+        out,
+        &format!(
+            "ipcheck config set proxycheck-key  {}",
+            style.tone(Tone::Dim, f.quota_hint)
+        ),
+        style,
+        None,
+        FOOTER_INDENT,
+    );
 }
 
 fn render_verdict(
@@ -146,27 +216,71 @@ fn render_verdict(
     verdict: &Verdict,
     coverage: &Coverage,
     report: &Report,
+    all_cards: &[Card],
     text: &Text,
     style: &Style,
 ) {
     let tone = verdict_tone(verdict);
-    let (level, badge, summary) = verdict_headline(verdict, text);
+    // 摘要句要知道清单里有没有仅提醒项，因此候选集合先算——`render_attention`
+    // 复用同一份结果，不重算第二遍（两遍算法迟早分叉）。
+    let (items, contributing) = attention_items(all_cards, report, verdict);
+    let has_reminder_only = items.iter().any(|c| !contributing.contains(&c.id));
+    let (level, badge, summary) = verdict_headline(verdict, has_reminder_only, text);
 
     let headline = match badge {
         Some(badge) => format!("{}  {}", style.bold(level), style.tone(Tone::Dim, badge)),
         None => style.bold(level),
     };
     let _ = writeln!(out, "  {} {headline}", style.tone(tone, marker(tone)));
-    let _ = writeln!(out, "    {summary}");
+    render_wrapped(out, summary, style, None, VERDICT_INDENT);
 
     if let Outcome::Done(info) = &report.o1 {
-        let _ = writeln!(out, "    {}  {}", text.verdict.exit_ip_label, info.ip);
+        let mut parts = vec![info.ip.clone()];
+        if let Some(geo) = &info.geo {
+            let place: Vec<&str> = [&geo.city_name, &geo.region_name, &geo.country_name]
+                .into_iter()
+                .filter_map(|f| f.as_deref())
+                .collect();
+            if !place.is_empty() {
+                parts.push(place.join(", "));
+            }
+            let network: Vec<&str> = [&geo.asn, &geo.organisation]
+                .into_iter()
+                .filter_map(|f| f.as_deref())
+                .collect();
+            if !network.is_empty() {
+                parts.push(network.join("  "));
+            }
+        }
+        let _ = writeln!(
+            out,
+            "    {}  {}",
+            text.verdict.exit_ip_label,
+            parts.join("  ·  ")
+        );
+    }
+
+    if let Outcome::Done(risk) = &report.o4 {
+        let score = risk.risk.risk_score;
+        let bar_tone = match verdict::risk_level(score) {
+            Level::Low => Tone::Ok,
+            Level::Medium => Tone::Warn,
+            Level::High => Tone::Bad,
+        };
+        let _ = writeln!(
+            out,
+            "    {}  {score}/100  {}  {}",
+            text.verdict.risk_label,
+            risk_bar(score, bar_tone, style),
+            style.tone(Tone::Dim, text.values.risk_scale_note)
+        );
     }
 
     // 综合结论永远不得脱离覆盖度单独呈现（ADR-0004）。
     let _ = writeln!(
         out,
-        "    {}",
+        "    {}  {}",
+        text.verdict.coverage_label,
         style.tone(
             Tone::Dim,
             &format!(
@@ -175,24 +289,321 @@ fn render_verdict(
             )
         )
     );
+
+    render_attention(out, &items, &contributing, text, style);
+}
+
+/// 风险分刻度条：20 格块字符，填充比例 = `score / 100`。
+///
+/// `--no-color` 下也能读懂——填充长度本身传递信息，不依赖颜色（点 8）。
+fn risk_bar(score: u32, tone: Tone, style: &Style) -> String {
+    const WIDTH: usize = 20;
+    let filled = ((score as usize) * WIDTH + 50) / 100;
+    let filled = filled.min(WIDTH);
+    let empty = WIDTH - filled;
+    format!(
+        "{}{}",
+        style.tone(tone, &"█".repeat(filled)),
+        style.tone(Tone::Dim, &"░".repeat(empty))
+    )
+}
+
+/// 「需关注」清单的候选集合，以及其中实际贡献综合结论的检测项。
+///
+/// 判据是「信号是否实际被 compute() 消费并命中」，不是卡片 tone——一张
+/// Warn/Bad 卡可能来自契约 2.1 明列的纯提醒信号。不在这里重算 51/76 阈值：
+/// O4 是否贡献综合结论，直接读 compute() 的结果（只有 O4 的风险分能把结论
+/// 判到 Full(High)，这是判级契约 3.2 的不变量，不是这里现算的）。
+fn attention_items<'a>(
+    all_cards: &'a [Card],
+    report: &Report,
+    verdict: &Verdict,
+) -> (Vec<&'a Card>, Vec<CheckId>) {
+    let contributing = contributing_ids(&report.signals(), verdict);
+
+    // 候选集合不能只看 tone：O4 卡片的 tone 只读 risk_score（契约 6），完全不读
+    // abuse_listed；但 abuse_listed 是独立于分数的贡献信号（滥用收录来自
+    // StopForumSpam，风险分来自 proxycheck，两个第三方彼此解耦）。分数低、
+    // tone=Ok 时 O4 卡片可能仍然贡献了综合结论——这种情形必须进候选集合，
+    // 否则会把「真的贡献了」的项完全隐去，比误判成「参与」更糟。
+    let mut items: Vec<&Card> = all_cards
+        .iter()
+        .filter(|c| c.tone == Tone::Warn || c.tone == Tone::Bad || contributing.contains(&c.id))
+        .collect();
+    // bad 先于 warn（含 tone=Ok 但贡献的项，按非 bad 处理），同级按 ALL_CHECKS
+    // （O1→C4）固定顺序——`cards()` 本就按此顺序构建，`sort_by_key` 是稳定排序，
+    // 同级元素的相对顺序保持不变。
+    items.sort_by_key(|c| if c.tone == Tone::Bad { 0 } else { 1 });
+
+    (items, contributing)
+}
+
+/// 「需关注」清单从卡片 tone 派生（spec 5.2），不写死检测项列表。
+/// 无 warn/bad 项时整块（含 attention_scope 句）不出。
+fn render_attention(
+    out: &mut String,
+    items: &[&Card],
+    contributing: &[CheckId],
+    text: &Text,
+    style: &Style,
+) {
+    if items.is_empty() {
+        return;
+    }
+
+    let _ = writeln!(out, "    {}", style.bold(text.verdict.attention_label));
+    for card in items {
+        // 清单的 marker 取「清单自身的语义」，不取卡片 tone：卡片 tone 只读分项
+        // 分级（契约 6，只看分数），清单要说的是「这项影响了结论/值得看一眼」。
+        // 一张卡片能进这份清单，只有两种原因——tone 本身是 Warn/Bad，或者
+        // tone=Ok 但因为其他信号（如 abuse_listed）贡献了综合结论；后一种
+        // 情形如果继续显示卡片自己的绿色 marker，会在标题为「需关注」的清单里
+        // 出现一行「没问题」，逻辑自相矛盾。两种情形在清单里统一按 warn 处理
+        // （bad 除外，bad 仍是 bad）——不引入第三种视觉状态。
+        // 卡片自身的渲染（`render_card`）不受影响，仍然按契约 6 显示真实 tone：
+        // 「这项分数不高」和「这项影响了结论」是两句都对的话，各自在各自的位置上。
+        let list_tone = if card.tone == Tone::Bad {
+            Tone::Bad
+        } else {
+            Tone::Warn
+        };
+        let _ = writeln!(
+            out,
+            "      {} {}  {}",
+            style.tone(list_tone, marker(list_tone)),
+            style.tone(Tone::Dim, card.id.as_str()),
+            card.title,
+        );
+    }
+
+    let contributing_ids: Vec<CheckId> = items
+        .iter()
+        .map(|c| c.id)
+        .filter(|id| contributing.contains(id))
+        .collect();
+    let reminder_ids: Vec<CheckId> = items
+        .iter()
+        .map(|c| c.id)
+        .filter(|id| !contributing.contains(id))
+        .collect();
+
+    if let Some(scope) = attention_scope(&contributing_ids, &reminder_ids, &text.verdict) {
+        render_wrapped(out, &scope, style, Some(Tone::Dim), VERDICT_INDENT);
+    }
+}
+
+/// `attention_scope` 句：固定短语（前缀/分句标点/收尾标点）+ 已有的 ID 列表拼接
+/// 与贡献词/仅提醒词，不引入任何占位符替换或模板语法——与拼 ID 列表用的是
+/// 同一套「固定片段 + 渲染层拼接」手法。两个子集都空时（理论上到不了这里，
+/// 因为空清单已经在上一层被整块跳过）返回 `None`。
+fn attention_scope(
+    contributing_ids: &[CheckId],
+    reminder_ids: &[CheckId],
+    v: &crate::copy::VerdictText,
+) -> Option<String> {
+    let contributing_clause = (!contributing_ids.is_empty()).then(|| {
+        format!(
+            "{}{} {}",
+            v.attention_prefix,
+            join_ids(
+                contributing_ids,
+                v.attention_list_separator,
+                v.attention_list_connector
+            ),
+            v.attention_contributing
+        )
+    });
+    let reminder_clause = (!reminder_ids.is_empty()).then(|| {
+        format!(
+            "{} {}",
+            join_ids(
+                reminder_ids,
+                v.attention_list_separator,
+                v.attention_list_connector
+            ),
+            v.attention_reminder_only
+        )
+    });
+
+    match (contributing_clause, reminder_clause) {
+        (Some(c), Some(r)) => Some(format!(
+            "{c}{}{r}{}",
+            v.attention_clause_separator, v.attention_suffix
+        )),
+        (Some(c), None) => Some(format!("{c}{}", v.attention_suffix)),
+        (None, Some(r)) => Some(format!("{r}{}", v.attention_suffix)),
+        (None, None) => None,
+    }
+}
+
+/// 哪些检测项的信号实际被 `verdict::compute()` 消费并命中（贡献综合结论）。
+///
+/// 只读 `Signals` 与 `Verdict` 已经算好的结果，不重算阈值：
+/// - 除 O4 外的贡献信号都是「命中即贡献」的布尔量，直接对照 `Signals` 字段。
+/// - O4（风险分）能否把结论抬到 `Full(High)`，取决于 `anonymous` 选择的
+///   51/76 阈值——但契约 3.2 保证了"高档信号只能来自 O4"，所以只需要看
+///   `verdict` 是否已经是 `Full(High)`，不必在这里重新比较分数与阈值。
+///   O4 也可能通过 `abuse_listed` 贡献到「中」，与分数无关。
+fn contributing_ids(signals: &verdict::Signals, verdict: &Verdict) -> Vec<CheckId> {
+    let mut ids = Vec::new();
+    if signals.tz_mismatch_cli_env == Some(true) {
+        ids.push(CheckId::C4);
+    }
+    if signals.ipv6_leak == Some(true) {
+        ids.push(CheckId::O3);
+    }
+    if signals.dns_egress_leak == Some(true) {
+        ids.push(CheckId::O5);
+    }
+    if signals.udp_egress_mismatch == Some(true) {
+        ids.push(CheckId::O6);
+    }
+    if signals.tun_off == Some(true) {
+        ids.push(CheckId::C3);
+    }
+    if signals.abuse_listed == Some(true) || matches!(verdict, Verdict::Full(Level::High)) {
+        ids.push(CheckId::O4);
+    }
+    ids
+}
+
+/// 用分隔符/连接词把编号列表拼成一句（如「O2 与 O4」「O2、O4 与 O6」）。
+/// 中英文标点不同，两个词都来自 Copy（spec 5.2 的裁定），不写死在这里。
+///
+/// 分隔符与连接词都**自带空格、原样拼接**——与 `C4FixText` 的 `explain_connector`
+/// 同一约定。同一份 Copy 里不并存两套隐含空格规则：一处归一、一处裸拼，改文案的人
+/// 无从判断自己该不该带空格。
+fn join_ids(ids: &[CheckId], separator: &str, connector: &str) -> String {
+    let strs: Vec<&str> = ids.iter().map(|id| id.as_str()).collect();
+    match strs.split_last() {
+        None => String::new(),
+        Some((last, [])) => (*last).to_string(),
+        Some((last, rest)) => format!("{}{connector}{last}", rest.join(separator)),
+    }
+}
+
+/// 检测卡内的取值与说明文字（`values`/`note`/`description`/C4 成因句）用的缩进——
+/// 折行后的续行悬挂对齐到同一列，不顶格。
+const NOTE_INDENT: &str = "       ";
+/// 结论区正文（摘要句、`attention_scope` 句）的缩进。
+const VERDICT_INDENT: &str = "    ";
+/// 页脚提示行的缩进。
+const FOOTER_INDENT: &str = "  ";
+/// 说明文字收进的总列宽（含缩进），spec §5.5。
+const WRAP_WIDTH: usize = 76;
+
+/// 屏幕宽度（字符数），跳过 ANSI 转义序列——`\x1b[2m` 这类控制串不占列。
+/// 页脚是先上色再折行的（提示词 dim、命令字面量不 dim），拿原始字符数去折
+/// 会把彩色输出提前折断。
+fn display_width(text: &str) -> usize {
+    let mut width = 0;
+    let mut chars = text.chars();
+    while let Some(ch) = chars.next() {
+        if ch == '\x1b' {
+            for next in chars.by_ref() {
+                if next == 'm' {
+                    break;
+                }
+            }
+        } else {
+            width += 1;
+        }
+    }
+    width
+}
+
+/// 按空格折行，收进 `WRAP_WIDTH - indent` 列内；不含空格的超宽「词」
+/// （典型是中文长句，中文标点不分隔单词）按字符数强制切分。不处理 CJK
+/// 视觉宽度——文案本身较短，够用即可（brief 要点 4）。
+///
+/// 词间空格**按原样保留**：取值行拿双空格做列内对齐（`Address  1.2.3.4`、
+/// `Asia/Shanghai  ≠  Asia/Tokyo`），归一成单空格等于把对齐拆了。
+fn wrap_lines(text: &str, indent: &str) -> Vec<String> {
+    let avail = WRAP_WIDTH.saturating_sub(indent.chars().count()).max(1);
+
+    // (词, 该词之后的空格串)。`split(' ')` 在连续空格处产出空片段，用它把被吃掉的
+    // 空格逐个补回前一个词的尾部。
+    let mut tokens: Vec<(String, String)> = Vec::new();
+    for (i, part) in text.split(' ').enumerate() {
+        if i > 0
+            && let Some(last) = tokens.last_mut()
+        {
+            last.1.push(' ');
+        }
+        if !part.is_empty() {
+            tokens.push((part.to_string(), String::new()));
+        }
+    }
+
+    let mut lines = Vec::new();
+    let mut current = String::new();
+    for (word, spaces) in tokens {
+        let chars: Vec<char> = word.chars().collect();
+        let chunks: Vec<String> = if chars.len() > avail {
+            chars.chunks(avail).map(|c| c.iter().collect()).collect()
+        } else {
+            vec![word]
+        };
+        for chunk in chunks {
+            // `current` 的尾部空格已计入宽度，正是词与词之间的那一格。
+            if !current.is_empty() && display_width(&current) + display_width(&chunk) > avail {
+                let line = current.trim_end().to_string();
+                lines.push(line);
+                current.clear();
+            }
+            current.push_str(&chunk);
+        }
+        current.push_str(&spaces);
+    }
+    let last = current.trim_end();
+    if !last.is_empty() {
+        lines.push(last.to_string());
+    }
+    lines
+}
+
+/// 折行后逐行输出，续行悬挂对齐到 `indent`。`tone` 为 `None` 时不上色
+/// （C4 成因句：原型里它是决定性说明，不是次级提示，不降 dim）。
+fn render_wrapped(out: &mut String, text: &str, style: &Style, tone: Option<Tone>, indent: &str) {
+    for line in wrap_lines(text, indent) {
+        match tone {
+            Some(t) => {
+                let _ = writeln!(out, "{indent}{}", style.tone(t, &line));
+            }
+            None => {
+                let _ = writeln!(out, "{indent}{line}");
+            }
+        }
+    }
 }
 
 fn render_card(out: &mut String, card: &Card, style: &Style, verbose: bool) {
-    let _ = writeln!(
-        out,
-        "  {} {}  {}",
+    let mut head = format!(
+        "{} {}  {}",
         style.tone(card.tone, marker(card.tone)),
         style.tone(Tone::Dim, card.id.as_str()),
         style.bold(card.title),
     );
+    if let Some(state) = &card.state {
+        let _ = write!(head, "  {}", style.tone(card.state_tone, state));
+    }
+    let _ = writeln!(out, "  {head}");
+
     for value in &card.values {
-        let _ = writeln!(out, "       {value}");
+        // 取值行同样折行：C2／C4／O5／O6 把整句说明放在 `values` 里，其中 O5 的
+        // 泄露句是全报告最长的一行（原型改版点 05 点名的反面教材）。
+        render_wrapped(out, value, style, None, NOTE_INDENT);
     }
     for note in &card.notes {
-        let _ = writeln!(out, "       {}", style.tone(Tone::Dim, note));
+        render_wrapped(out, note, style, Some(Tone::Dim), NOTE_INDENT);
+    }
+    if let Some(fix) = &card.fix {
+        render_wrapped(out, &fix.explain, style, None, NOTE_INDENT);
+        // 修复命令不折行——折断的命令复制粘贴过去就跑不了。
+        let _ = writeln!(out, "{NOTE_INDENT}{}", fix.command);
     }
     if verbose {
-        let _ = writeln!(out, "       {}", style.tone(Tone::Dim, card.description));
+        render_wrapped(out, card.description, style, Some(Tone::Dim), NOTE_INDENT);
     }
 }
 
@@ -216,12 +627,16 @@ fn failed_card(
         id,
         tone: Tone::Dim,
         title,
+        // 失败卡不编造状态词/比对符/修复行——brief 要点 7。
+        state: None,
+        state_tone: Tone::Dim,
         values: vec![failure_text(failure, text).to_string()],
         notes: if failure == Failure::QuotaExhausted {
             vec![text.notes.quota_shared]
         } else {
             Vec::new()
         },
+        fix: None,
         description,
     }
 }
@@ -253,7 +668,8 @@ fn card_o1(outcome: &Outcome<ExitInfo>, text: &Text) -> Card {
         );
     };
 
-    let mut values = vec![info.ip.clone()];
+    let fields = &text.checks.o1_fields;
+    let mut values = vec![format!("{}  {}", fields.address, info.ip)];
     let mut notes = Vec::new();
     if let Some(geo) = &info.geo {
         let place: Vec<&str> = [&geo.city_name, &geo.region_name, &geo.country_name]
@@ -261,28 +677,33 @@ fn card_o1(outcome: &Outcome<ExitInfo>, text: &Text) -> Card {
             .filter_map(|f| f.as_deref())
             .collect();
         if !place.is_empty() {
-            values.push(place.join(", "));
+            values.push(format!("{}  {}", fields.ownership, place.join(", ")));
         }
         let network: Vec<&str> = [&geo.asn, &geo.organisation]
             .into_iter()
             .filter_map(|f| f.as_deref())
             .collect();
         if !network.is_empty() {
-            values.push(network.join("  "));
+            values.push(format!("{}  {}", fields.network, network.join("  ")));
         }
         // 契约 5.4：必须标明归属来自 proxycheck，否则用户拿两边结果对不上时
         // 会以为有一边算错了。
         notes.push(text.notes.geo_source);
     } else {
-        values.push(text.values.unknown.to_string());
+        values.push(format!("{}  {}", fields.ownership, text.values.unknown));
     }
 
     Card {
         id: CheckId::O1,
         tone: Tone::Ok,
         title: meta.title,
+        // O1 没有 ok/warn/bad 分支，「已取得」是唯一状态——它是提示词，不是
+        // 契约 6 的分项评价，固定用 Dim（design：`.cstate.dim`）。
+        state: Some(text.values.obtained.to_string()),
+        state_tone: Tone::Dim,
         values,
         notes,
+        fix: None,
         description: meta.description,
     }
 }
@@ -312,17 +733,42 @@ fn card_timezone(
         None => (Tone::Warn, text.values.timezone_indeterminate),
     };
 
-    let detail = format!(
-        "{}  {}  →  {}",
-        label,
-        check.local.as_deref().unwrap_or(text.values.unknown),
-        check.exit.as_deref().unwrap_or(text.values.unknown),
-    );
+    let local = check.local.as_deref().unwrap_or(text.values.unknown);
+    let exit = check.exit.as_deref().unwrap_or(text.values.unknown);
+    // 比对结果为一致/不一致才用 =/≠；「无从比对」（matches: None）两者都不用，
+    // 借用既有的 Dim marker「·」表示中性分隔（brief 要点 3）——这里的取值不
+    // 上色，与其余 `values` 行的既有约定一致（见文件顶部「说明」的着色决策）。
+    let op = match check.matches {
+        Some(true) => "=",
+        Some(false) => "≠",
+        None => marker(Tone::Dim),
+    };
+    let detail = format!("{local}  {op}  {exit}");
+
+    // 只有 C4（`desktop_note == false`）命中不一致且出口 IP 时区名已知时才给
+    // 修复建议（决策 5：只有 C4 给修复命令；spec §5.4 的「已知」条件显式核对，
+    // 不依赖 `timezone::compare` 「Some 必然双值齐全」这条隐含不变量）。
+    let fix = if !desktop_note && check.matches == Some(false) {
+        check.exit.as_deref().map(|exit_tz| {
+            let cf = &text.checks.c4_fix;
+            CardFix {
+                explain: format!(
+                    "{}{local}{}{exit_tz}{}",
+                    cf.explain_prefix, cf.explain_connector, cf.explain_suffix
+                ),
+                command: format!("{}  {}{exit_tz}", cf.fix_label, cf.fix_command_prefix),
+            }
+        })
+    } else {
+        None
+    };
 
     Card {
         id,
         tone,
         title: meta.title,
+        state: Some(label.to_string()),
+        state_tone: tone,
         values: vec![detail],
         notes: if desktop_note {
             // 契约 5.1：缺了这句话，CLI 用户会误以为自己的 $TZ 已被检查。
@@ -330,6 +776,7 @@ fn card_timezone(
         } else {
             Vec::new()
         },
+        fix,
         description: meta.description,
     }
 }
@@ -346,19 +793,36 @@ fn card_o3(outcome: &Outcome<ipify::Ipv6>, text: &Text) -> Card {
         );
     };
 
-    let (tone, value) = match result {
-        ipify::Ipv6::Leaked(addr) => (Tone::Warn, format!("{}  {addr}", text.values.ipv6_leaked)),
-        ipify::Ipv6::Disabled => (Tone::Ok, text.values.ipv6_disabled.to_string()),
+    let (tone, state, value) = match result {
+        ipify::Ipv6::Leaked(addr) => (
+            Tone::Warn,
+            text.values.ipv6_leaked,
+            format!("{}  {addr}", text.values.ipv6_leaked),
+        ),
+        ipify::Ipv6::Disabled => (
+            Tone::Ok,
+            text.values.ipv6_disabled,
+            text.values.ipv6_disabled.to_string(),
+        ),
         // Indeterminate 在组装时已被折成检测失败，走不到这里。
-        ipify::Ipv6::Indeterminate => (Tone::Dim, text.values.unknown.to_string()),
+        ipify::Ipv6::Indeterminate => (
+            Tone::Dim,
+            text.values.unknown,
+            text.values.unknown.to_string(),
+        ),
     };
 
     Card {
         id: CheckId::O3,
         tone,
         title: meta.title,
+        // 状态词复用现有 values 字段（brief 要点 2）：ipv6_disabled/ipv6_leaked
+        // 已经是「未启用」/「泄露」这类短词，不需要 C2 另开一份同义文案。
+        state: Some(state.to_string()),
+        state_tone: tone,
         values: vec![value],
         notes: Vec::new(),
+        fix: None,
         description: meta.description,
     }
 }
@@ -376,10 +840,11 @@ fn card_o4(outcome: &Outcome<Risk>, text: &Text) -> Card {
     };
 
     let score = result.risk.risk_score;
-    let tone = match verdict::risk_level(score) {
-        Level::Low => Tone::Ok,
-        Level::Medium => Tone::Warn,
-        Level::High => Tone::Bad,
+    let level = verdict::risk_level(score);
+    let (tone, level_word) = match level {
+        Level::Low => (Tone::Ok, text.values.risk_level_low),
+        Level::Medium => (Tone::Warn, text.values.risk_level_medium),
+        Level::High => (Tone::Bad, text.values.risk_level_high),
     };
 
     let mut values = vec![format!("{score}/100")];
@@ -418,8 +883,13 @@ fn card_o4(outcome: &Outcome<Risk>, text: &Text) -> Card {
         id: CheckId::O4,
         tone,
         title: meta.title,
+        // 「{分数}/100 {分级词}」，分级词是不带「风险」后缀的短词，区别于
+        // `verdict.low/medium/high`（design：「33/100 中」）。
+        state: Some(format!("{score}/100 {level_word}")),
+        state_tone: tone,
         values,
         notes: Vec::new(),
+        fix: None,
         description: meta.description,
     }
 }
@@ -437,19 +907,25 @@ fn card_o5(outcome: &Outcome<dns_egress::DnsEgress>, text: &Text) -> Card {
     };
 
     let dt = &text.dns_egress;
-    let (tone, mut values) = match &result.comparison {
+    let (tone, state, mut values) = match &result.comparison {
         dns_egress::Comparison::Comparable {
             leak,
             ecs_country,
             exit_country,
         } => {
+            let tone = if *leak { Tone::Warn } else { Tone::Ok };
+            let op = if *leak { "≠" } else { "=" };
             let comparison_line = format!(
-                "{}  {}  →  {}  {}",
+                "{}  {}  {op}  {}  {}",
                 dt.ecs_label, ecs_country, dt.exit_label, exit_country,
             );
             let leak_message = if *leak { dt.leak } else { dt.no_leak };
-            let tone = if *leak { Tone::Warn } else { Tone::Ok };
-            (tone, vec![comparison_line, leak_message.to_string()])
+            let state = if *leak {
+                dt.state_leaked
+            } else {
+                dt.state_not_leaked
+            };
+            (tone, state, vec![comparison_line, leak_message.to_string()])
         }
         dns_egress::Comparison::NotComparable(reason) => {
             // 三种「无从比对」各自的说明，绝不回退成「泄露」或「未泄露」（契约 2.5 硬约束 3）。
@@ -458,27 +934,40 @@ fn card_o5(outcome: &Outcome<dns_egress::DnsEgress>, text: &Text) -> Card {
                 dns_egress::NotComparable::UnmappedCountry => dt.unmapped_country,
                 dns_egress::NotComparable::UnknownExitCountry => dt.unknown_exit_country,
             };
-            (Tone::Dim, vec![message.to_string()])
+            // 「无从比对」复用 O2/C4 已有的通用「无法比对」短词——它的字段名带
+            // timezone 前缀，但取值本身是通用短语，不是时区专属内容，避免另开
+            // 一份同义文案（brief 要点 2）。
+            (
+                Tone::Dim,
+                text.values.timezone_indeterminate,
+                vec![message.to_string()],
+            )
         }
     };
 
     // resolver 归属始终展示（与 §5.1 里 CLI 同时展示 $TZ 与系统时区同构），
-    // 但 notes 明确标出只有上面的 ECS 判定进综合结论。
+    // 挂一个「仅供参考」pill 在值旁边（原型 refs/cli-report-redesign.html:392-394
+    // 的位置关系）；notes 里的 resolver_note 整句保留不动——两者并存是原型的
+    // 设计，不是待消除的重复：pill 挂在值本身供扫读，note 是解释句供细读。
     values.push(format!(
-        "{}  {}",
+        "{}  {}  {}",
         dt.resolver_label,
         result
             .resolver_geo
             .as_deref()
             .unwrap_or(text.values.unknown),
+        text.values.reference_only,
     ));
 
     Card {
         id: CheckId::O5,
         tone,
         title: meta.title,
+        state: Some(state.to_string()),
+        state_tone: tone,
         values,
         notes: vec![dt.resolver_note],
+        fix: None,
         description: meta.description,
     }
 }
@@ -496,14 +985,16 @@ fn card_o6(outcome: &Outcome<udp_egress::UdpEgress>, text: &Text) -> Card {
     };
 
     let ut = &text.udp_egress;
-    let (tone, values) = match result {
+    let (tone, state, values) = match result {
         udp_egress::UdpEgress::Comparable {
             mismatch,
             reflexive_ip,
             exit_ip,
         } => {
+            let tone = if *mismatch { Tone::Warn } else { Tone::Ok };
+            let op = if *mismatch { "≠" } else { "=" };
             let comparison_line = format!(
-                "{}  {}  →  {}  {}",
+                "{}  {}  {op}  {}  {}",
                 ut.reflexive_label, reflexive_ip, ut.exit_label, exit_ip,
             );
             let mismatch_message = if *mismatch {
@@ -511,8 +1002,16 @@ fn card_o6(outcome: &Outcome<udp_egress::UdpEgress>, text: &Text) -> Card {
             } else {
                 ut.no_mismatch
             };
-            let tone = if *mismatch { Tone::Warn } else { Tone::Ok };
-            (tone, vec![comparison_line, mismatch_message.to_string()])
+            let state = if *mismatch {
+                ut.state_mismatch
+            } else {
+                ut.state_match
+            };
+            (
+                tone,
+                state,
+                vec![comparison_line, mismatch_message.to_string()],
+            )
         }
         udp_egress::UdpEgress::NotComparable(reason) => {
             // 「无从比对」的三种成因与「未命中」文案可分（契约 2.6）。
@@ -521,7 +1020,12 @@ fn card_o6(outcome: &Outcome<udp_egress::UdpEgress>, text: &Text) -> Card {
                 udp_egress::NotComparable::UnknownExitIp => ut.unknown_exit_ip,
                 udp_egress::NotComparable::StunDisagree => ut.stun_disagree,
             };
-            (Tone::Dim, vec![message.to_string()])
+            // 同 O5：复用 O2/C4 已有的通用「无法比对」短词。
+            (
+                Tone::Dim,
+                text.values.timezone_indeterminate,
+                vec![message.to_string()],
+            )
         }
     };
 
@@ -529,8 +1033,11 @@ fn card_o6(outcome: &Outcome<udp_egress::UdpEgress>, text: &Text) -> Card {
         id: CheckId::O6,
         tone,
         title: meta.title,
+        state: Some(state.to_string()),
+        state_tone: tone,
         values,
         notes: Vec::new(),
+        fix: None,
         description: meta.description,
     }
 }
@@ -542,8 +1049,12 @@ fn card_c1(outcome: &Outcome<String>, text: &Text) -> Card {
             id: CheckId::C1,
             tone: Tone::Ok,
             title: meta.title,
+            // 同 O1：没有 ok/warn/bad 分支，「已取得」是提示词而非评价，固定 Dim。
+            state: Some(text.values.obtained.to_string()),
+            state_tone: Tone::Dim,
             values: vec![ip.clone()],
             notes: Vec::new(),
+            fix: None,
             description: meta.description,
         },
         Outcome::Failed(failure) => {
@@ -580,13 +1091,26 @@ fn card_c2(outcome: &Outcome<Vec<dns::Server>>, text: &Text) -> Card {
         })
         .collect();
 
+    // 状态词：数量 + 命中时追加 dns_domestic。C2 未提供「未见国内 DNS」这个否定
+    // 短语（留给本任务判断，见 report）——没有对应词就不编造，非命中时只显示
+    // 数量，不是省略语义，是没有可用的既有文案可以拼出这句否定短语。
+    let count = servers.len();
+    let state = if domestic {
+        format!("{count} · {}", text.values.dns_domestic)
+    } else {
+        count.to_string()
+    };
+
     Card {
         id: CheckId::C2,
         // 国内 DNS 只是提醒，不进综合结论（契约 2.1）。
         tone: if domestic { Tone::Warn } else { Tone::Ok },
         title: meta.title,
+        state: Some(state),
+        state_tone: if domestic { Tone::Warn } else { Tone::Ok },
         values,
         notes: Vec::new(),
+        fix: None,
         description: meta.description,
     }
 }
@@ -631,17 +1155,29 @@ fn card_c3(outcome: &Outcome<proxy::Status>, text: &Text) -> Card {
         state_label(&status.tun)
     ));
 
+    let tone = match status.tun_off() {
+        Some(true) => Tone::Warn,
+        Some(false) => Tone::Ok,
+        // 未知不贡献信号，也不该染成警告色。
+        None => Tone::Dim,
+    };
+
     Card {
         id: CheckId::C3,
-        tone: match status.tun_off() {
-            Some(true) => Tone::Warn,
-            Some(false) => Tone::Ok,
-            // 未知不贡献信号，也不该染成警告色。
-            None => Tone::Dim,
-        },
+        tone,
         title: meta.title,
+        // 状态词取 TUN/VPN 这一路——它是 tone（也是 contributing_ids 的
+        // tun_off 信号）唯一依据的通道，env/system 不影响判定（design：
+        // 「TUN/VPN 已开启」）。
+        state: Some(format!(
+            "{}  {}",
+            text.values.proxy_tun,
+            state_label(&status.tun)
+        )),
+        state_tone: tone,
         values,
         notes: Vec::new(),
+        fix: None,
         description: meta.description,
     }
 }
@@ -669,20 +1205,148 @@ mod tests {
         }
     }
 
+    /// 满配报告：十项全部完成，且把改版新增的着色元素一次凑齐——风险刻度条、
+    /// 「需关注」清单、各卡状态词、O5 的 `reference_only` pill、`=`/`≠` 比对符。
+    /// `blank()`（十项全失败）测不到其中任何一个，颜色断言只跑它等于没跑。
+    fn full() -> Report {
+        Report {
+            o1: Outcome::Done(ExitInfo {
+                ip: "212.50.249.204".into(),
+                geo: Some(crate::probe::proxycheck::Geo {
+                    country_name: Some("Japan".into()),
+                    country_code: Some("JP".into()),
+                    region_name: Some("Osaka".into()),
+                    city_name: Some("Osaka".into()),
+                    timezone: Some("Asia/Tokyo".into()),
+                    asn: Some("AS25820".into()),
+                    organisation: Some("IT7 Networks Inc".into()),
+                    provider: None,
+                }),
+            }),
+            o2: Outcome::Done(TimezoneCheck {
+                local: Some("Asia/Shanghai".into()),
+                exit: Some("Asia/Tokyo".into()),
+                matches: Some(false),
+            }),
+            o3: Outcome::Done(ipify::Ipv6::Leaked("2001:db8::1".parse().unwrap())),
+            o4: Outcome::Done(Risk {
+                risk: crate::probe::proxycheck::Risk {
+                    network_type: Some("Hosting".into()),
+                    proxy: true,
+                    vpn: true,
+                    tor: false,
+                    scraper: false,
+                    risk_score: 85,
+                    anonymous: true,
+                },
+                abuse: Some(crate::probe::stopforumspam::Abuse {
+                    listed: true,
+                    frequency: 3,
+                    last_seen: None,
+                }),
+            }),
+            o5: Outcome::Done(dns_egress::DnsEgress {
+                resolver_geo: Some("Japan - Google LLC".into()),
+                comparison: dns_egress::Comparison::Comparable {
+                    leak: true,
+                    ecs_country: "CN".into(),
+                    exit_country: "JP".into(),
+                },
+            }),
+            o6: Outcome::Done(udp_egress::UdpEgress::Comparable {
+                mismatch: true,
+                reflexive_ip: "198.51.100.20".parse().unwrap(),
+                exit_ip: "212.50.249.204".parse().unwrap(),
+            }),
+            c1: Outcome::Done("203.0.113.7".into()),
+            c2: Outcome::Done(vec![dns::Server {
+                address: "114.114.114.114".into(),
+                label: None,
+                private: false,
+                domestic: true,
+            }]),
+            c3: Outcome::Done(proxy::Status {
+                env_vars: vec!["HTTP_PROXY".into()],
+                system: proxy::State::Enabled,
+                system_kinds: vec!["HTTP".into()],
+                tun: proxy::State::Disabled,
+            }),
+            c4: Outcome::Done(TimezoneCheck {
+                local: Some("Asia/Shanghai".into()),
+                exit: Some("Asia/Tokyo".into()),
+                matches: Some(false),
+            }),
+        }
+    }
+
     fn render(report: &Report, color: bool, verbose: bool) -> String {
         super::report(report, &copy::text(Lang::En), &Style::new(color), verbose)
     }
 
+    /// 说明文字现在按 76 列折行、悬挂缩进（C4），原本整句的 `contains` 断言
+    /// 会被拆到多行而失配。这里把渲染输出按行拼回一整段（去掉每行的缩进——
+    /// 卡片内 7 格、结论区 4 格、页脚 2 格三种都要吃，所以直接 `trim_start`），
+    /// 用于校验被折行打散的说明文字整体是否仍然完整存在——只在英文断言里使用，
+    /// 英文按空格折行，拼回时补单空格能精确复原原文；中文长句会被强制按字符切分
+    /// （无空格可依），拼回会插入原文没有的空格，因此不适用于中文断言。
+    /// 断点落在**双空格**上的文本（页脚的对齐空格）同样复原不了，那里另有断言。
+    fn dewrap(out: &str) -> String {
+        out.lines()
+            .map(|line| line.trim_start())
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
     #[test]
     fn no_color_output_has_no_escape_sequences() {
-        // 重定向到文件不该满屏转义序列。
-        let out = render(&blank(), false, false);
-        assert!(!out.contains('\x1b'), "{out}");
+        // 重定向到文件不该满屏转义序列。跑满配报告——空报告里刻度条、需关注清单、
+        // 状态词、pill、比对符一个都不出现，只跑它等于把改版新增的着色路径全放过。
+        for report in [blank(), full()] {
+            for verbose in [false, true] {
+                let out = render(&report, false, verbose);
+                assert!(!out.contains('\x1b'), "{out}");
+            }
+        }
     }
 
     #[test]
     fn color_output_does_have_escape_sequences() {
-        assert!(render(&blank(), true, false).contains('\x1b'));
+        for report in [blank(), full()] {
+            assert!(render(&report, true, false).contains('\x1b'));
+        }
+    }
+
+    #[test]
+    fn a_full_report_never_exceeds_76_columns() {
+        // spec §5.5 的 76 列约束覆盖整份报告——结论区摘要、attention_scope 句与
+        // 页脚都在内，不只是检测卡里的说明行。宽度按屏幕宽度算（跳过转义序列），
+        // 彩色输出与 --no-color 应当折在同一处。
+        for lang in [Lang::En, Lang::ZhHans] {
+            let text = copy::text(lang);
+            // 结论区的 facts 网格三行不在约束内：spec §5.5 收的是**说明文字**，
+            // facts 是靠标签列对齐的数据行，折行会把网格拆散。出口 IP 那行在
+            // ASN + 机构名都长时确实会越过 76 列，这一条留给人类裁定。
+            let facts = [
+                text.verdict.exit_ip_label,
+                text.verdict.risk_label,
+                text.verdict.coverage_label,
+            ];
+            for color in [false, true] {
+                for verbose in [false, true] {
+                    let out = super::report(&full(), &text, &Style::new(color), verbose);
+                    for line in out
+                        .lines()
+                        .filter(|l| !facts.iter().any(|label| l.trim_start().starts_with(label)))
+                    {
+                        assert!(
+                            display_width(line) <= WRAP_WIDTH,
+                            "超出 76 列（{} 列）：{line:?}",
+                            display_width(line)
+                        );
+                    }
+                }
+            }
+        }
     }
 
     #[test]
@@ -713,8 +1377,8 @@ mod tests {
     #[test]
     fn descriptions_only_appear_with_verbose() {
         let text = copy::text(Lang::En);
-        assert!(!render(&blank(), false, false).contains(text.checks.o1.description));
-        assert!(render(&blank(), false, true).contains(text.checks.o1.description));
+        assert!(!dewrap(&render(&blank(), false, false)).contains(text.checks.o1.description));
+        assert!(dewrap(&render(&blank(), false, true)).contains(text.checks.o1.description));
     }
 
     #[test]
@@ -724,8 +1388,9 @@ mod tests {
         let text = copy::text(Lang::En);
         let out = render(&report, false, false);
         assert!(out.contains(text.failures.quota_exhausted));
-        // 共享配额那句必须在——否则用户以为工具坏了。
-        assert!(out.contains(text.notes.quota_shared));
+        // 共享配额那句必须在——否则用户以为工具坏了。76 列折行会把它拆到多行，
+        // 拼回一整段再断言完整性。
+        assert!(dewrap(&out).contains(text.notes.quota_shared));
     }
 
     #[test]
@@ -738,7 +1403,7 @@ mod tests {
             matches: Some(true),
         });
         let text = copy::text(Lang::En);
-        assert!(render(&report, false, false).contains(text.notes.o2_desktop_only));
+        assert!(dewrap(&render(&report, false, false)).contains(text.notes.o2_desktop_only));
     }
 
     #[test]
@@ -759,7 +1424,7 @@ mod tests {
             }),
         });
         let text = copy::text(Lang::En);
-        assert!(render(&report, false, false).contains(text.notes.geo_source));
+        assert!(dewrap(&render(&report, false, false)).contains(text.notes.geo_source));
     }
 
     #[test]
@@ -779,7 +1444,7 @@ mod tests {
             abuse: None,
         });
         let text = copy::text(Lang::En);
-        assert!(render(&report, false, false).contains(text.values.anonymous_flag));
+        assert!(dewrap(&render(&report, false, false)).contains(text.values.anonymous_flag));
     }
 
     #[test]
@@ -800,7 +1465,40 @@ mod tests {
         assert!(out.contains("JP"), "{out}");
         assert!(out.contains("US"), "{out}");
         assert!(out.contains("Japan - Google LLC"), "{out}");
-        assert!(out.contains(text.dns_egress.resolver_note), "{out}");
+        assert!(
+            dewrap(&out).contains(text.dns_egress.resolver_note),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn the_o5_card_shows_the_reference_only_pill_next_to_resolver_geo_and_keeps_the_note() {
+        // 设计权威 refs/cli-report-redesign.html:392-394：pill 与整句 note 并存，
+        // 不是同一件事的重复——pill 挂在值本身（扫读），note 是解释句（细读）。
+        let mut report = blank();
+        report.o5 = Outcome::Done(dns_egress::DnsEgress {
+            resolver_geo: Some("Japan - Google LLC".into()),
+            comparison: dns_egress::Comparison::Comparable {
+                leak: false,
+                ecs_country: "JP".into(),
+                exit_country: "JP".into(),
+            },
+        });
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+        // pill 绑定在 resolver 归属值这一行，具体文案字符串。
+        assert!(
+            out.contains(&format!(
+                "{}  Japan - Google LLC  {}",
+                text.dns_egress.resolver_label, text.values.reference_only
+            )),
+            "{out}"
+        );
+        // resolver_note 整句仍然在——两者并存，不是二选一。
+        assert!(
+            dewrap(&out).contains(text.dns_egress.resolver_note),
+            "{out}"
+        );
     }
 
     #[test]
@@ -818,8 +1516,14 @@ mod tests {
         let o5_start = out.find(" O5  ").expect("必须有 O5 卡片");
         let o6_start = out.find(" O6  ").expect("必须有 O6 卡片");
         let o5_card = &out[o5_start..o6_start];
-        assert!(o5_card.contains(text.dns_egress.no_ecs), "{o5_card}");
-        assert!(!o5_card.contains(text.failures.upstream), "{o5_card}");
+        assert!(
+            dewrap(o5_card).contains(text.dns_egress.no_ecs),
+            "{o5_card}"
+        );
+        assert!(
+            !dewrap(o5_card).contains(text.failures.upstream),
+            "{o5_card}"
+        );
     }
 
     #[test]
@@ -832,8 +1536,11 @@ mod tests {
             udp_egress::NotComparable::StunDisagree,
         ));
         let out = render(&disagree, false, false);
-        assert!(out.contains(text.udp_egress.stun_disagree), "{out}");
-        assert!(!out.contains(text.udp_egress.no_mismatch), "{out}");
+        assert!(
+            dewrap(&out).contains(text.udp_egress.stun_disagree),
+            "{out}"
+        );
+        assert!(!dewrap(&out).contains(text.udp_egress.no_mismatch), "{out}");
 
         let mut miss = blank();
         miss.o6 = Outcome::Done(udp_egress::UdpEgress::Comparable {
@@ -842,8 +1549,377 @@ mod tests {
             exit_ip: "198.51.100.20".parse().unwrap(),
         });
         let out = render(&miss, false, false);
-        assert!(out.contains(text.udp_egress.no_mismatch), "{out}");
-        assert!(!out.contains(text.udp_egress.stun_disagree), "{out}");
+        assert!(dewrap(&out).contains(text.udp_egress.no_mismatch), "{out}");
+        assert!(
+            !dewrap(&out).contains(text.udp_egress.stun_disagree),
+            "{out}"
+        );
+    }
+
+    fn risk_report(score: u32, anonymous: bool) -> Report {
+        let mut report = blank();
+        report.o4 = Outcome::Done(Risk {
+            risk: crate::probe::proxycheck::Risk {
+                network_type: None,
+                proxy: false,
+                vpn: false,
+                tor: false,
+                scraper: false,
+                risk_score: score,
+                anonymous,
+            },
+            abuse: None,
+        });
+        report
+    }
+
+    // ---- 判别力测试（brief 验证项 5，成对，缺一不可）----
+    // 同一分数（60，O4 分项黄），只翻转 anonymous，综合结论方向相反：
+    // - anonymous: false → 综合结论判高的阈值是 76，60 没过线，O4 仅作提醒。
+    // - anonymous: true  → 综合结论判高的阈值降到 51，60 过线，O4 参与判定。
+    // 判据必须来自 verdict::compute() 的结果，不能是卡片 tone（两次卡片 tone 都是黄）。
+
+    #[test]
+    fn not_anonymous_score_60_does_not_count_o4_toward_the_verdict() {
+        let report = risk_report(60, false);
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+        assert_eq!(report.verdict(), Verdict::Full(Level::Low));
+        assert!(
+            out.contains(&format!("O4 {}", text.verdict.attention_reminder_only)),
+            "{out}"
+        );
+        assert!(
+            !out.contains(&format!("O4 {}", text.verdict.attention_contributing)),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn anonymous_score_60_does_count_o4_toward_the_verdict() {
+        let report = risk_report(60, true);
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+        assert_eq!(report.verdict(), Verdict::Full(Level::High));
+        assert!(
+            out.contains(&format!("O4 {}", text.verdict.attention_contributing)),
+            "{out}"
+        );
+        assert!(
+            !out.contains(&format!("O4 {}", text.verdict.attention_reminder_only)),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn low_score_but_abuse_listed_still_puts_o4_in_the_attention_list_as_contributing() {
+        // O4 卡片的 tone 只读 risk_score（契约 6），完全不读 abuse_listed；
+        // 但 abuse_listed 是独立于分数的贡献信号（StopForumSpam vs proxycheck，
+        // 两个解耦的第三方）。risk_score 10 → risk_level(10) = Low → tone = Ok，
+        // 卡片是绿色的，但 abuse_listed: true 仍然把综合结论拉到 Full(Medium)。
+        // 候选集合如果只看 tone，这张真的贡献了综合结论的卡会被完全漏掉。
+        let mut report = blank();
+        report.o4 = Outcome::Done(Risk {
+            risk: crate::probe::proxycheck::Risk {
+                network_type: None,
+                proxy: false,
+                vpn: false,
+                tor: false,
+                scraper: false,
+                risk_score: 10,
+                anonymous: false,
+            },
+            abuse: Some(crate::probe::stopforumspam::Abuse {
+                listed: true,
+                frequency: 3,
+                last_seen: None,
+            }),
+        });
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+
+        assert_eq!(report.verdict(), Verdict::Full(Level::Medium));
+        assert!(out.contains(text.verdict.attention_label), "{out}");
+        assert!(
+            out.contains(&format!("O4 {}", text.verdict.attention_contributing)),
+            "{out}"
+        );
+        assert!(
+            !out.contains(&format!("O4 {}", text.verdict.attention_reminder_only)),
+            "{out}"
+        );
+        // 清单里 O4 这一行不能显示卡片自己的绿色 ✔——一个标题写着「需关注」的
+        // 清单里出现「这项没问题」的符号是逻辑矛盾。清单 marker 取「需要关注」
+        // 的语义（bad 除外，这里没有 bad 项，统一按 warn 处理），不取卡片 tone。
+        // 卡片自身的渲染（下面的检测卡列表）不受影响，仍按契约 6 显示真实 tone
+        // （分数 10 分，risk_level 判 Low，绿色 ✔）——用 O1 卡片行的位置把两段
+        // 切开，分别断言，而不是对整份输出做一次性 contains（O4 的「✔ ...」
+        // 子串本就会因为卡片本身而存在，一次性断言会把两件事混在一起）。
+        let cards_start = out.find("· O1").expect("O1 卡片必须存在");
+        let attention_block = &out[..cards_start];
+        let cards_block = &out[cards_start..];
+        assert!(
+            attention_block.contains("! O4  IP Type & Risk"),
+            "list line should use the warn marker: {attention_block}"
+        );
+        assert!(
+            !attention_block.contains("✔ O4  IP Type & Risk"),
+            "list line must not reuse the card's own ok marker: {attention_block}"
+        );
+        assert!(
+            cards_block.contains("✔ O4  IP Type & Risk"),
+            "the card itself must still show its real (green) tone: {cards_block}"
+        );
+    }
+
+    /// 低档 + 一个仅提醒项：O2 系统时区不一致（契约 §2.1 明列不进综合结论），
+    /// O4 分数 10 且无滥用收录 ⇒ 综合结论 Full(Low)。
+    fn low_verdict_with_one_reminder_only_item() -> Report {
+        let mut report = blank();
+        report.o2 = tz("Asia/Shanghai", Some("Asia/Tokyo"), Some(false));
+        report.o4 = Outcome::Done(Risk {
+            risk: crate::probe::proxycheck::Risk {
+                network_type: None,
+                proxy: false,
+                vpn: false,
+                tor: false,
+                scraper: false,
+                risk_score: 10,
+                anonymous: false,
+            },
+            abuse: Some(crate::probe::stopforumspam::Abuse {
+                listed: false,
+                frequency: 0,
+                last_seen: None,
+            }),
+        });
+        report
+    }
+
+    #[test]
+    fn a_low_verdict_with_reminder_only_items_does_not_claim_that_nothing_was_found() {
+        // 「各项均未发现异常」与同屏的「需关注」清单自相矛盾——两句话的透镜不同：
+        // 摘要看「有没有贡献信号」，清单看「有没有值得看一眼的项」。纯提醒项
+        // （O2 系统时区、C2 国内 DNS）是常态，不是边角情形。
+        let report = low_verdict_with_one_reminder_only_item();
+        assert_eq!(report.verdict(), Verdict::Full(Level::Low));
+
+        for lang in [Lang::En, Lang::ZhHans] {
+            let text = copy::text(lang);
+            let out = super::report(&report, &text, &Style::new(false), false);
+            let flat = dewrap(&out);
+            assert!(out.contains(text.verdict.attention_label), "{out}");
+            assert!(
+                flat.contains(text.verdict.summary_full_low_reminders),
+                "{out}"
+            );
+            assert!(!flat.contains(text.verdict.summary_full_low), "{out}");
+        }
+    }
+
+    #[test]
+    fn a_low_verdict_without_any_attention_item_keeps_the_plain_summary() {
+        // 判别力对照：把仅提醒项拿掉，摘要必须换回「各项均未发现异常」——
+        // 否则新键会变成低档的无条件文案，等于把原来的句子直接改掉。
+        let mut report = low_verdict_with_one_reminder_only_item();
+        report.o2 = Outcome::Failed(Failure::Upstream);
+        assert_eq!(report.verdict(), Verdict::Full(Level::Low));
+
+        for lang in [Lang::En, Lang::ZhHans] {
+            let text = copy::text(lang);
+            let out = super::report(&report, &text, &Style::new(false), false);
+            let flat = dewrap(&out);
+            assert!(!out.contains(text.verdict.attention_label), "{out}");
+            assert!(flat.contains(text.verdict.summary_full_low), "{out}");
+            assert!(
+                !flat.contains(text.verdict.summary_full_low_reminders),
+                "{out}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_preliminary_low_summary_has_the_same_pair() {
+        // 初步形态同样可达这个组合：O2 不一致（仅提醒）+ O3 未启用（信号已知、未命中）
+        // ⇒ 风险分未知 ⇒ Preliminary(Low)，清单里仍有 O2。
+        let mut with_reminder = blank();
+        with_reminder.o2 = tz("Asia/Shanghai", Some("Asia/Tokyo"), Some(false));
+        with_reminder.o3 = Outcome::Done(ipify::Ipv6::Disabled);
+        assert_eq!(
+            with_reminder.verdict(),
+            Verdict::Preliminary(PreliminaryLevel::Low)
+        );
+
+        let mut without = blank();
+        without.o3 = Outcome::Done(ipify::Ipv6::Disabled);
+        assert_eq!(
+            without.verdict(),
+            Verdict::Preliminary(PreliminaryLevel::Low)
+        );
+
+        for lang in [Lang::En, Lang::ZhHans] {
+            let text = copy::text(lang);
+
+            let out = super::report(&with_reminder, &text, &Style::new(false), false);
+            let flat = dewrap(&out);
+            assert!(
+                flat.contains(text.verdict.summary_preliminary_low_reminders),
+                "{out}"
+            );
+            assert!(
+                !flat.contains(text.verdict.summary_preliminary_low),
+                "{out}"
+            );
+
+            let out = super::report(&without, &text, &Style::new(false), false);
+            let flat = dewrap(&out);
+            assert!(flat.contains(text.verdict.summary_preliminary_low), "{out}");
+            assert!(
+                !flat.contains(text.verdict.summary_preliminary_low_reminders),
+                "{out}"
+            );
+        }
+    }
+
+    #[test]
+    fn attention_block_is_absent_when_no_card_is_warn_or_bad() {
+        // blank() 全部检测失败——失败卡是 Dim，不是 Warn/Bad。
+        let text = copy::text(Lang::En);
+        let out = render(&blank(), false, false);
+        assert!(!out.contains(text.verdict.attention_label), "{out}");
+    }
+
+    #[test]
+    fn attention_scope_splits_contributing_from_reminder_only_items() {
+        // 混合场景：C4（tzMismatchCliEnv 命中，贡献）+ O2（系统时区不一致，契约 2.1
+        // 明列的纯提醒信号）+ O4（分项黄但分数没过线，仅提醒）。
+        let mut report = blank();
+        report.c4 = Outcome::Done(TimezoneCheck {
+            local: Some("Asia/Shanghai".into()),
+            exit: Some("America/New_York".into()),
+            matches: Some(false),
+        });
+        report.o2 = Outcome::Done(TimezoneCheck {
+            local: Some("Asia/Shanghai".into()),
+            exit: Some("America/New_York".into()),
+            matches: Some(false),
+        });
+        report.o4 = Outcome::Done(Risk {
+            risk: crate::probe::proxycheck::Risk {
+                network_type: None,
+                proxy: false,
+                vpn: false,
+                tor: false,
+                scraper: false,
+                risk_score: 40,
+                anonymous: false,
+            },
+            abuse: None,
+        });
+
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+
+        // 需关注清单三项都在，且都在结论区（O1 卡片之后才是下面的卡片流）。
+        // scope 句超过 76 列会被折行，断言前拼回整段。
+        let flat = dewrap(&out);
+        assert!(out.contains(text.verdict.attention_label), "{out}");
+        assert!(
+            flat.contains(&format!("C4 {}", text.verdict.attention_contributing)),
+            "{out}"
+        );
+        // 锁的是渲染结果里的空格，不是拿 Copy 原始取值去拼期望值。
+        assert!(
+            flat.contains(&format!(
+                "O2 and O4 {}",
+                text.verdict.attention_reminder_only
+            )),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn attention_scope_connector_gets_single_spaces_in_both_languages() {
+        // 两个语种的 attention_list_connector 都自带两侧空格（" 与 " / " and "），
+        // 渲染层裸拼接。锁的是渲染结果里的空格数——连接词取值若漏带或多带空格，
+        // 这里当场变红。
+        let mut report = blank();
+        report.o2 = Outcome::Done(TimezoneCheck {
+            local: Some("Asia/Shanghai".into()),
+            exit: Some("America/New_York".into()),
+            matches: Some(false),
+        });
+        report.o4 = Outcome::Done(Risk {
+            risk: crate::probe::proxycheck::Risk {
+                network_type: None,
+                proxy: false,
+                vpn: false,
+                tor: false,
+                scraper: false,
+                risk_score: 40,
+                anonymous: false,
+            },
+            abuse: None,
+        });
+
+        let out_en = render(&report, false, false);
+        assert!(
+            out_en.contains("O2 and O4 flagged for awareness only"),
+            "{out_en}"
+        );
+        assert!(!out_en.contains("O2  and"), "double space leaked: {out_en}");
+
+        let out_zh = super::report(
+            &report,
+            &copy::text(Lang::ZhHans),
+            &Style::new(false),
+            false,
+        );
+        assert!(out_zh.contains("O2 与 O4 仅作提醒"), "{out_zh}");
+    }
+
+    #[test]
+    fn join_ids_uses_the_separator_before_the_last_connector_for_three_or_more_items() {
+        // 三项及以上：分隔符（顿号/逗号）与连接词（与/and）都要正确出现一次，
+        // 且连接词两侧仍是单空格。
+        let mut report = blank();
+        report.o2 = Outcome::Done(TimezoneCheck {
+            local: Some("Asia/Shanghai".into()),
+            exit: Some("America/New_York".into()),
+            matches: Some(false),
+        });
+        report.o4 = Outcome::Done(Risk {
+            risk: crate::probe::proxycheck::Risk {
+                network_type: None,
+                proxy: false,
+                vpn: false,
+                tor: false,
+                scraper: false,
+                risk_score: 40,
+                anonymous: false,
+            },
+            abuse: None,
+        });
+        report.c2 = Outcome::Done(vec![dns::Server {
+            address: "114.114.114.114".into(),
+            label: None,
+            private: false,
+            domestic: true,
+        }]);
+
+        let out_en = render(&report, false, false);
+        assert!(
+            out_en.contains("O2, O4 and C2 flagged for awareness only"),
+            "{out_en}"
+        );
+
+        let out_zh = super::report(
+            &report,
+            &copy::text(Lang::ZhHans),
+            &Style::new(false),
+            false,
+        );
+        assert!(out_zh.contains("O2、O4 与 C2 仅作提醒"), "{out_zh}");
     }
 
     #[test]
@@ -858,5 +1934,310 @@ mod tests {
         let out = render(&report, false, false);
         assert!(!out.contains("127.0.0.1"), "{out}");
         assert!(!out.contains("7890"), "{out}");
+    }
+
+    fn tz(local: &str, exit: Option<&str>, matches: Option<bool>) -> Outcome<TimezoneCheck> {
+        Outcome::Done(TimezoneCheck {
+            local: Some(local.into()),
+            exit: exit.map(String::from),
+            matches,
+        })
+    }
+
+    #[test]
+    fn o2_uses_equals_for_a_match_and_not_equals_for_a_mismatch() {
+        let mut report = blank();
+        report.o2 = tz("Asia/Shanghai", Some("Asia/Shanghai"), Some(true));
+        assert!(
+            render(&report, false, false).contains("Asia/Shanghai  =  Asia/Shanghai"),
+            "{}",
+            render(&report, false, false)
+        );
+
+        let mut report = blank();
+        report.o2 = tz("Asia/Shanghai", Some("Asia/Tokyo"), Some(false));
+        let out = render(&report, false, false);
+        assert!(out.contains("Asia/Shanghai  ≠  Asia/Tokyo"), "{out}");
+        assert!(!out.contains("Asia/Shanghai  =  Asia/Tokyo"), "{out}");
+    }
+
+    #[test]
+    fn timezone_indeterminate_uses_neither_equals_nor_not_equals() {
+        // 「无从比对」（matches: None）两个比对符都不该出现——走 Dim marker「·」。
+        let mut report = blank();
+        report.o2 = tz("Asia/Shanghai", None, None);
+        let out = render(&report, false, false);
+        assert!(!out.contains("  =  "), "{out}");
+        assert!(!out.contains("  ≠  "), "{out}");
+        assert!(out.contains("Asia/Shanghai  ·  unknown"), "{out}");
+    }
+
+    #[test]
+    fn o5_and_o6_use_equals_for_a_match_and_not_equals_for_a_mismatch() {
+        let mut report = blank();
+        report.o5 = Outcome::Done(dns_egress::DnsEgress {
+            resolver_geo: None,
+            comparison: dns_egress::Comparison::Comparable {
+                leak: false,
+                ecs_country: "JP".into(),
+                exit_country: "JP".into(),
+            },
+        });
+        assert!(
+            render(&report, false, false).contains("JP  =  "),
+            "{}",
+            render(&report, false, false)
+        );
+
+        let mut report = blank();
+        report.o5 = Outcome::Done(dns_egress::DnsEgress {
+            resolver_geo: None,
+            comparison: dns_egress::Comparison::Comparable {
+                leak: true,
+                ecs_country: "JP".into(),
+                exit_country: "US".into(),
+            },
+        });
+        assert!(
+            render(&report, false, false).contains("JP  ≠  "),
+            "{}",
+            render(&report, false, false)
+        );
+
+        let mut report = blank();
+        report.o6 = Outcome::Done(udp_egress::UdpEgress::Comparable {
+            mismatch: false,
+            reflexive_ip: "1.2.3.4".parse().unwrap(),
+            exit_ip: "1.2.3.4".parse().unwrap(),
+        });
+        assert!(
+            render(&report, false, false).contains("1.2.3.4  =  Exit IP  1.2.3.4"),
+            "{}",
+            render(&report, false, false)
+        );
+
+        let mut report = blank();
+        report.o6 = Outcome::Done(udp_egress::UdpEgress::Comparable {
+            mismatch: true,
+            reflexive_ip: "1.2.3.4".parse().unwrap(),
+            exit_ip: "5.6.7.8".parse().unwrap(),
+        });
+        assert!(
+            render(&report, false, false).contains("1.2.3.4  ≠  Exit IP  5.6.7.8"),
+            "{}",
+            render(&report, false, false)
+        );
+    }
+
+    #[test]
+    fn not_comparable_o5_and_o6_render_no_comparison_symbol() {
+        let mut report = blank();
+        report.o5 = Outcome::Done(dns_egress::DnsEgress {
+            resolver_geo: None,
+            comparison: dns_egress::Comparison::NotComparable(dns_egress::NotComparable::NoEcs),
+        });
+        report.o6 = Outcome::Done(udp_egress::UdpEgress::NotComparable(
+            udp_egress::NotComparable::StunDisagree,
+        ));
+        let out = render(&report, false, false);
+        assert!(!out.contains("  =  "), "{out}");
+        assert!(!out.contains("  ≠  "), "{out}");
+    }
+
+    #[test]
+    fn the_title_line_carries_a_right_hand_state_word() {
+        // O3：状态词复用现有 values.ipv6_disabled，不是新造的同义词。
+        let mut report = blank();
+        report.o3 = Outcome::Done(ipify::Ipv6::Disabled);
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+        assert!(
+            out.contains(&format!("IPv6 Leak  {}", text.values.ipv6_disabled)),
+            "{out}"
+        );
+
+        // O4：{分数}/100 {分级词}，不带「风险」后缀。33 分落在 26–75，判 medium。
+        let report = risk_report(33, false);
+        let out = render(&report, false, false);
+        assert!(
+            out.contains(&format!(
+                "IP Type & Risk  33/100 {}",
+                text.values.risk_level_medium
+            )),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn failed_cards_have_no_state_word() {
+        // 失败卡不编造状态词——标题行后直接换行。
+        let out = render(&blank(), false, false);
+        let o1_start = out.find(" O1  ").expect("O1 必须存在");
+        let o1_line_end = out[o1_start..].find('\n').unwrap() + o1_start;
+        assert_eq!(
+            out[o1_start..o1_line_end].trim(),
+            "O1  Exit IP and Ownership",
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn c4_gives_a_fix_command_only_when_it_mismatches_with_a_known_exit_timezone() {
+        let text = copy::text(Lang::En);
+
+        // (a) C4 不一致 + 出口 IP 时区名已知 → 有修复行。
+        let mut report = blank();
+        report.c4 = tz("Asia/Shanghai", Some("Asia/Tokyo"), Some(false));
+        let out = render(&report, false, false);
+        assert!(out.contains(text.checks.c4_fix.fix_label), "{out}");
+        assert!(out.contains("export TZ=Asia/Tokyo"), "{out}");
+
+        // (b) C4 无从比对 → 无修复行，即使有本地时区名。
+        let mut report = blank();
+        report.c4 = tz("Asia/Shanghai", None, None);
+        let out = render(&report, false, false);
+        assert!(!out.contains(text.checks.c4_fix.fix_label), "{out}");
+        assert!(!out.contains("export TZ="), "{out}");
+
+        // (c) O2 不一致（非 C4）→ 无修复行——只有 C4 给修复命令（决策 5）。
+        let mut report = blank();
+        report.o2 = tz("Asia/Shanghai", Some("Asia/Tokyo"), Some(false));
+        let out = render(&report, false, false);
+        assert!(!out.contains(text.checks.c4_fix.fix_label), "{out}");
+        assert!(!out.contains("export TZ="), "{out}");
+    }
+
+    #[test]
+    fn long_notes_wrap_within_76_columns_with_a_hanging_indent() {
+        let mut report = blank();
+        report.o1 = Outcome::Done(ExitInfo {
+            ip: "203.0.113.7".into(),
+            geo: Some(crate::probe::proxycheck::Geo {
+                country_name: Some("Australia".into()),
+                country_code: Some("AU".into()),
+                region_name: None,
+                city_name: Some("Sydney".into()),
+                timezone: Some("Australia/Sydney".into()),
+                asn: Some("AS13335".into()),
+                organisation: Some("Cloudflare, Inc.".into()),
+                provider: None,
+            }),
+        });
+        let out = render(&report, false, false);
+        // 只检查检测卡内被本任务折行的说明行（以 NOTE_INDENT 起始）——结论区的
+        // 摘要句不属于 C4 的范围（render_verdict 是 C3 的地盘，本任务不动）。
+        for line in out.lines().filter(|l| l.starts_with(NOTE_INDENT)) {
+            assert!(line.chars().count() <= WRAP_WIDTH, "超出 76 列：{line:?}");
+        }
+        // geo_source（102 字符）必然被折成至少两行；续行悬挂缩进到 NOTE_INDENT，不顶格。
+        assert!(
+            out.contains("\n       database, so the two can disagree."),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn o1_and_o2_pair_up_and_both_keep_their_contract_notes() {
+        // 契约呈现约束抽查：O1 标明 geo_source，O2 标明只覆盖桌面应用（那句提醒
+        // C4 才是命令行认的 $TZ）——O2/C4 双条展示，各自的 note 都要在。
+        let mut report = blank();
+        report.o1 = Outcome::Done(ExitInfo {
+            ip: "212.50.249.204".into(),
+            geo: Some(crate::probe::proxycheck::Geo {
+                country_name: Some("Japan".into()),
+                country_code: Some("JP".into()),
+                region_name: Some("Osaka".into()),
+                city_name: Some("Osaka".into()),
+                timezone: Some("Asia/Tokyo".into()),
+                asn: Some("AS25820".into()),
+                organisation: Some("IT7 Networks Inc".into()),
+                provider: None,
+            }),
+        });
+        report.o2 = tz("Asia/Shanghai", Some("Asia/Tokyo"), Some(false));
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+        assert!(dewrap(&out).contains(text.notes.geo_source), "{out}");
+        assert!(dewrap(&out).contains(text.notes.o2_desktop_only), "{out}");
+    }
+
+    #[test]
+    fn the_footer_hint_uses_the_real_cli_syntax_and_shows_in_every_language() {
+        // 命令字面量以 main.rs 的 Cli/Command/ConfigAction/SettableKey 定义为准：
+        // --verbose/--json 是顶层 flag，config set proxycheck-key 是 SettableKey
+        // 目前唯一枚举的键（`#[value(name = "proxycheck-key")]`）。
+        for lang in [Lang::En, Lang::ZhHans] {
+            let text = copy::text(lang);
+            let out = super::report(&blank(), &text, &Style::new(false), false);
+            // 用完整行匹配而非松散 contains——命令字面量若被改错一个字符，
+            // 单独的子串断言可能仍然因为是另一处的前缀而碰巧通过。
+            // 第一行 en 下有 84 列，会被折到两行（zh 不会），因此期望值先按同一
+            // 折行规则拆开，再逐行连着页脚缩进整行匹配：命令字面量、提示词、
+            // 缩进列三者仍然被锁死，只是不再假设它一定是一行。
+            let hints = format!(
+                "ipcheck --verbose  {}  ·  ipcheck --json  {}",
+                text.footer.verbose_hint, text.footer.json_hint
+            );
+            for line in wrap_lines(&hints, FOOTER_INDENT) {
+                assert!(out.contains(&format!("\n{FOOTER_INDENT}{line}\n")), "{out}");
+            }
+            assert!(
+                out.contains(&format!(
+                    "  ipcheck config set proxycheck-key  {}\n",
+                    text.footer.quota_hint
+                )),
+                "{out}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_footer_hint_never_leaks_into_json_output() {
+        // --json 走 json::report，完全不经过 render::report——这里断言机器可读
+        // 输出里没有页脚的字面命令串，锁住这条天然屏障，不只是靠代码路径隔离。
+        let payload = serde_json::to_string_pretty(&crate::json::report(&blank())).unwrap();
+        assert!(!payload.contains("ipcheck --verbose"), "{payload}");
+        assert!(!payload.contains("ipcheck --json"), "{payload}");
+        assert!(
+            !payload.contains("ipcheck config set proxycheck-key"),
+            "{payload}"
+        );
+    }
+
+    #[test]
+    fn anonymous_51_to_75_shows_a_high_verdict_with_a_yellow_o4_card_and_its_explanation() {
+        // 契约 §6：`anonymous: true` 且分数落在 51–75 时会出现「结论高 · 分项黄」。
+        // 呈现层必须在 O4 卡片内说明这个 IP 正被用作匿名化地址、判高的阈值对它
+        // 降到 51——否则用户看到高风险结论却找不到哪一项显红，会以为结论算错了。
+        // 三件事一起断言：结论区档位是「高」、O4 卡片自身仍是黄（不是红），
+        // 卡片里带着 anonymous_flag 这句解释——不能只看其中一件就当作满足契约。
+        let report = risk_report(60, true);
+        let text = copy::text(Lang::En);
+        let out = render(&report, false, false);
+
+        assert_eq!(report.verdict(), Verdict::Full(Level::High));
+        assert!(out.contains(text.verdict.high), "{out}");
+
+        // 卡片流以「· O1」定位（risk_report 只覆盖 o4，O1 仍是失败卡，Dim marker
+        // 「·」），与既有测试 `low_score_but_abuse_listed_...` 同一手法——避开
+        // 「需关注」清单里同样出现的 " O4  " 子串，只在卡片流本身里核对 O4。
+        let cards_start = out.find("· O1").expect("O1 卡片必须存在（cards 流起点）");
+        let cards_block = &out[cards_start..];
+        let o4_start = cards_block.find(" O4  ").expect("O4 卡片必须存在");
+        let o4_end = cards_block[o4_start..]
+            .find("\n\n")
+            .map(|i| o4_start + i)
+            .unwrap_or(cards_block.len());
+        let o4_card = &cards_block[o4_start..o4_end];
+        let marker_before_o4 = cards_block[..o4_start].chars().last();
+        assert_eq!(
+            marker_before_o4,
+            Some('!'),
+            "O4 卡片自身应仍是黄色 marker（分项分级只看分数，60 分落在 26–75）：{o4_card}"
+        );
+        assert!(
+            dewrap(o4_card).contains(text.values.anonymous_flag),
+            "O4 卡片必须解释判高阈值降到 51 这件事：{o4_card}"
+        );
     }
 }

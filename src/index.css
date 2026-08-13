@@ -1,32 +1,59 @@
-/* 全局变量与基线样式。配色沿用脚手架的浅色 SaaS 基调（规格 4.2），另补三档风险色与灰卡底色。 */
+/* 全局变量与基线样式。规格 §2 决策 7：token 整体换为原型（refs/ipcheck-web-redesign.html）的
+   oklch 双主题体系，accent 由旧紫 #aa3bff 改为仪表蓝——判级红/黄/绿三档色是本产品的语义核心，
+   accent 只是品牌色，不得与其撞色（色相距离论证见 W1 任务报告）。
+   主题不再由 prefers-color-scheme 媒体查询驱动样式，改由 <html data-theme> 属性驱动；
+   媒体查询仍作为「跟随系统」档的输入信号保留，监听逻辑在 src/theme.ts。 */
 
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --muted-bg: #faf9f7;
-  --chip-bg: #f2f1f4;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
+  color-scheme: light;
 
-  /* 三档风险色（规格 3.1 低绿 / 中黄 / 高红） */
-  --tone-ok: #17915b;
-  --tone-warn: #b8860b;
-  --tone-danger: #c0392b;
-  --tone-ok-bg: rgba(23, 145, 91, 0.12);
-  --tone-warn-bg: rgba(184, 134, 11, 0.14);
+  /* ---- 原型 token（值逐字取自 refs/ipcheck-web-redesign.html 的 :root 块） ---- */
+  --bg: oklch(98% 0.005 250);
+  --surface: oklch(100% 0 0);
+  --sunken: oklch(96.5% 0.006 250);
+  --fg: oklch(22% 0.02 240);
+  --muted: oklch(48% 0.018 240);
+  --border: oklch(90% 0.008 240);
+  --hairline: oklch(93.5% 0.006 240);
 
+  --accent: oklch(50% 0.145 250);
+
+  --ok: oklch(43% 0.11 155);
+  --ok-bg: oklch(95.5% 0.035 155);
+  --ok-line: oklch(80% 0.08 155);
+  --warn: oklch(46% 0.11 72);
+  --warn-bg: oklch(96% 0.045 82);
+  --warn-line: oklch(80% 0.09 78);
+  --danger: oklch(46% 0.16 27);
+  --danger-bg: oklch(96% 0.03 27);
+  --danger-line: oklch(80% 0.09 27);
+  --data: oklch(44% 0.02 240);
+
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", "JetBrains Mono", "IBM Plex Mono", Menlo, Consolas,
+    monospace;
+
+  --r: 6px;
+  --nav-h: 56px;
+
+  /* ---- 旧变量名兼容别名 ----
+     App.css / 各组件仍引用这些旧名；把它们改名指向新 token 属于布局重排范畴，
+     交给 W2–W4 随卡片/导航改版一并做。这里只保证「替换后不悬空」（本任务验证条款）。 */
+  --text: var(--muted);
+  --text-h: var(--fg);
+  --chip-bg: var(--sunken);
+  --muted-bg: var(--sunken);
+  --accent-bg: oklch(50% 0.145 250 / 0.1);
+  --accent-border: oklch(50% 0.145 250 / 0.5);
+  --sans: var(--font-ui);
+  --mono: var(--font-mono);
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
-  --sans: system-ui, "Segoe UI", Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
   font: 16px/150% var(--sans);
-  color-scheme: light dark;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -35,26 +62,34 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --muted-bg: #1b1c23;
-    --chip-bg: #24262e;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --tone-ok: #34d399;
-    --tone-warn: #fbbf24;
-    --tone-danger: #f87171;
-    --tone-ok-bg: rgba(52, 211, 153, 0.14);
-    --tone-warn-bg: rgba(251, 191, 36, 0.14);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: oklch(17% 0.012 250);
+  --surface: oklch(21% 0.014 250);
+  --sunken: oklch(19% 0.013 250);
+  --fg: oklch(94% 0.004 250);
+  --muted: oklch(70% 0.018 245);
+  --border: oklch(31% 0.015 245);
+  --hairline: oklch(27% 0.014 245);
+
+  --accent: oklch(72% 0.13 248);
+
+  --ok: oklch(80% 0.14 155);
+  --ok-bg: oklch(30% 0.055 155);
+  --ok-line: oklch(45% 0.08 155);
+  --warn: oklch(84% 0.13 82);
+  --warn-bg: oklch(31% 0.05 78);
+  --warn-line: oklch(47% 0.08 78);
+  --danger: oklch(78% 0.14 27);
+  --danger-bg: oklch(30% 0.06 27);
+  --danger-line: oklch(46% 0.1 27);
+  --data: oklch(72% 0.02 245);
+
+  --accent-bg: oklch(72% 0.13 248 / 0.15);
+  --accent-border: oklch(72% 0.13 248 / 0.5);
+  --shadow:
+    rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
 }
 
 body {
