@@ -122,6 +122,32 @@ describe("落地内容三段", () => {
     }
   });
 
+  // 评审修复轮 1：原型（refs/ipcheck-web-redesign.html:1072-1081）里 .mark.on（绿色）只用于
+  // CLI 列的「支持」，Web 列的「自动/按需」是信息标注、不是二元能力确认，只用裸 .mark。
+  // 断言要有判别力：把 Web 列的类名错改回 "mark on" 必须让这条测试变红。
+  it("对照表 Web 列徽标不套 .mark.on（绿色），CLI 列「支持」全部套 .mark.on", () => {
+    const html = renderLanding("zh-hans");
+    const { columnWeb, columnCli } = COPY_ZH_HANS.landing.compare;
+
+    const webCells =
+      html.match(
+        new RegExp(`<td[^>]*data-label="${columnWeb}"[^>]*>.*?</td>`, "g"),
+      ) ?? [];
+    const cliCells =
+      html.match(
+        new RegExp(`<td[^>]*data-label="${columnCli}"[^>]*>.*?</td>`, "g"),
+      ) ?? [];
+
+    expect(webCells).toHaveLength(10);
+    expect(cliCells).toHaveLength(10);
+    for (const cell of webCells) {
+      expect(cell).not.toContain('class="mark on"');
+    }
+    for (const cell of cliCells) {
+      expect(cell).toContain('class="mark on"');
+    }
+  });
+
   // brief 验证项 3：表格要有正确的表头语义，堆叠形态下也不能丢失「这个值属于哪一列」。
   it('对照表表头是 <th scope="col">，Web/CLI 值格带 data-label 标出所属列', () => {
     const html = renderLanding("zh-hans");

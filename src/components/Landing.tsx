@@ -90,8 +90,11 @@ export function Landing() {
                   <tr key={row.id}>
                     <td className="c-id">{row.id}</td>
                     <td className="c-item">{COPY.checks[row.id].title}</td>
+                    {/* Web 列的「自动/按需」是信息标注，不是二元能力确认，不套绿色 .mark.on
+                        （原型 refs/ipcheck-web-redesign.html:1072-1081：.mark.on 只用在 CLI
+                        列的「支持」上；Web 列只有裸 .mark 与「—」的 .mark.dash 两种）。 */}
                     <td className="c-mark" data-label={compare.columnWeb}>
-                      <span className={webOn ? "mark on" : "mark dash"}>
+                      <span className={webOn ? "mark" : "mark dash"}>
                         {webValue}
                       </span>
                     </td>
