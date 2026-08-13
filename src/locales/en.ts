@@ -6,7 +6,7 @@
 export const EN = {
   site: {
     title: "ipcheck · Network Environment Checkup",
-    tagline: "Know your network before you launch your AI CLI",
+    tagline: "Know your network before you use IP-sensitive tools",
   },
 
   nav: {
@@ -55,7 +55,7 @@ export const EN = {
       fullMedium:
         "Suspicious signals found — review the items marked yellow below.",
       fullHigh:
-        "Your exit IP is high risk. AI tools are quite likely to trigger anti-abuse controls right now.",
+        "Your exit IP is high risk. IP-sensitive services are quite likely to flag you right now.",
     },
     exitIpLabel: "Exit IP",
     exitIpUnknown: "Unavailable",
@@ -292,7 +292,7 @@ export const EN = {
     why: {
       title: "Why you need a checkup",
       /** 四栏枚举前的引导句（原型 .why-lede，新增结构性文案）。 */
-      lede: "AI tools are sensitive to your network environment. The most common pitfalls fall into four categories.",
+      lede: "Tools and services that judge you by your IP are sensitive to your network environment. The most common pitfalls fall into four categories.",
       /** 四栏枚举，顺序与 O4/O2/O3/C2 对应（原型 .why-grid）。措辞取自对应检测项的 meaning 文案，不新造事实。 */
       items: [
         {

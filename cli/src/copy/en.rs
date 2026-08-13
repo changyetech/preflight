@@ -43,7 +43,7 @@ pub const EN: Text = Text {
         summary_full_low: "No anomalies found in any check.",
         summary_full_low_reminders: "Nothing that counts toward the verdict was found. Some items below are flagged for awareness only.",
         summary_full_medium: "Suspicious signals found — review the flagged items below.",
-        summary_full_high: "Your exit IP is high risk. AI tools are quite likely to trigger anti-abuse controls right now.",
+        summary_full_high: "Your exit IP is high risk. IP-sensitive services are quite likely to flag you right now.",
         exit_ip_label: "Exit IP",
         risk_label: "Risk score",
         coverage_label: "Coverage",

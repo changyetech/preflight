@@ -8,7 +8,7 @@ import type { Copy } from "./en";
 export const ZH_HANS: Copy = {
   site: {
     title: "ipcheck · 网络环境体检",
-    tagline: "开跑 AI 命令行工具之前，先看清自己的网络长什么样",
+    tagline: "使用对 IP 环境敏感的工具之前，先看清自己的网络长什么样",
   },
 
   nav: {
@@ -46,7 +46,7 @@ export const ZH_HANS: Copy = {
       preliminaryMedium: "自动检测项发现可疑信号，建议先处理下方标黄的项。",
       fullLow: "各项检测均未发现异常。",
       fullMedium: "存在可疑信号，建议逐项核对下方标黄的项。",
-      fullHigh: "出口 IP 风险很高，此时使用 AI 工具有较大概率触发风控。",
+      fullHigh: "出口 IP 风险很高，此时使用对 IP 敏感的服务有较大概率触发风控。",
     },
     exitIpLabel: "出口 IP",
     exitIpUnknown: "未能取得",
@@ -248,7 +248,7 @@ export const ZH_HANS: Copy = {
   landing: {
     why: {
       title: "为什么需要体检",
-      lede: "AI 工具对访问环境很敏感，最容易踩雷的集中在四类。",
+      lede: "按 IP 判断访客的工具与服务对网络环境很敏感，最容易踩雷的集中在四类。",
       items: [
         {
           title: "出口 IP 类型与滥用记录",
