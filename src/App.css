@@ -578,7 +578,9 @@ article[id] {
 }
 
 .cov-cell.is-done {
-  background: var(--data);
+  /* 完成 ≠ 通过：不能用判级绿；--data 灰在两主题下都像置灰态，改用 accent
+     表示「此格已跑完」，与失败红/需 CLI 灰/按需斜纹保持可区分。 */
+  background: var(--accent);
 }
 
 .cov-cell.is-failed {
@@ -630,7 +632,8 @@ article[id] {
 }
 
 .sw-done {
-  background: var(--data);
+  /* 与 .cov-cell.is-done 同色：图例色块必须和格子一致 */
+  background: var(--accent);
 }
 .sw-cli {
   background: var(--border);
@@ -1037,7 +1040,8 @@ button {
   width: 0.375rem;
   height: 0.375rem;
   border-radius: 2px;
-  background: var(--data);
+  /* 与覆盖度 .sw-done 同色：「Web 端已覆盖」与「已完成」语义相近，保持一致 */
+  background: var(--accent);
 }
 
 #why .why-tag[data-cli="true"] i {
