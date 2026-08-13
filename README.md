@@ -29,7 +29,7 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/<owner>/ipcheck/release
 ipcheck                 # 体检
 ipcheck --verbose       # 附带每一项的说明
 ipcheck --json          # 机器可读输出
-ipcheck --lang en       # en / zh-hans / zh-hant / ru
+ipcheck --lang en       # en / zh-hans
 ```
 
 可选：注册一个免费的 proxycheck key，把日配额从 100 次提到 1000 次。
