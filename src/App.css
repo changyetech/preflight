@@ -1223,12 +1223,13 @@ button {
     border: 0;
   }
 
+  /* 只改 display，不写 width:100%：本站没有全局 border-box，
+     100% 宽再叠上 tr 的内边距与边框会把行撑出容器（右侧溢出）；块级元素本就填满容器。 */
   .compare-table,
   .compare-table tbody,
   .compare-table tr,
   .compare-table td {
     display: block;
-    width: 100%;
   }
 
   .compare-table tbody tr {
@@ -1242,7 +1243,9 @@ button {
     margin-bottom: 0;
   }
 
-  .compare-table td {
+  /* 选择器要带 tbody：否则特异性低于上面的 `.compare-table tbody td`，重置不生效，
+     堆叠卡片里会残留桌面态的单元格内边距与下边框（表现为项目名下的一道短横线）。 */
+  .compare-table tbody td {
     padding: 0;
     border-bottom: 0;
   }
