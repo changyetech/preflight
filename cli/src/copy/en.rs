@@ -42,11 +42,16 @@ pub const EN: Text = Text {
         summary_full_medium: "Suspicious signals found — review the flagged items below.",
         summary_full_high: "Your exit IP is high risk. AI tools are quite likely to trigger anti-abuse controls right now.",
         exit_ip_label: "Exit IP",
+        risk_label: "Risk score",
+        coverage_label: "Coverage",
         attention_label: "Needs attention",
         attention_contributing: "counts toward the verdict",
         attention_reminder_only: "flagged for awareness only",
         attention_list_separator: ", ",
         attention_list_connector: " and ",
+        attention_prefix: "Only ",
+        attention_clause_separator: "; ",
+        attention_suffix: ".",
     },
 
     coverage: CoverageText {

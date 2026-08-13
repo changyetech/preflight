@@ -89,6 +89,11 @@ copy_leaf! {
         summary_full_medium,
         summary_full_high,
         exit_ip_label,
+        /// facts 网格「风险评分」行的标签列（spec §5.2，原型 `.facts` 的 `<span class="k">`）。
+        risk_label,
+        /// facts 网格「覆盖度」行的标签列，同上——四行共用同一个标签列，缺了就不再是
+        /// 对齐网格，是散行。
+        coverage_label,
         /// 结论区「需关注」清单的标签（spec §5.1）。
         attention_label,
         /// 「需关注」清单里，贡献综合结论的项的标注词（vs 仅提醒项）。
@@ -100,6 +105,14 @@ copy_leaf! {
         attention_list_separator,
         /// 「需关注」清单里最后一项前的连接词（中文"与"、英文" and "）。
         attention_list_connector,
+        /// `attention_scope` 句的起始固定短语（中文"其中只有 "、英文"Only "），
+        /// 只在有贡献项时使用。
+        attention_prefix,
+        /// `attention_scope` 句里，贡献分句与仅提醒分句之间的连接标点
+        /// （中文"，"、英文"; "），只在两个分句都非空时使用。
+        attention_clause_separator,
+        /// `attention_scope` 句的收尾标点（中文"。"、英文"."）。
+        attention_suffix,
     }
 }
 

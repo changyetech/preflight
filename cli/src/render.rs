@@ -199,7 +199,8 @@ fn render_verdict(
         };
         let _ = writeln!(
             out,
-            "    {score}/100  {}  {}",
+            "    {}  {score}/100  {}  {}",
+            text.verdict.risk_label,
             risk_bar(score, bar_tone, style),
             style.tone(Tone::Dim, text.values.risk_scale_note)
         );
@@ -208,7 +209,8 @@ fn render_verdict(
     // 综合结论永远不得脱离覆盖度单独呈现（ADR-0004）。
     let _ = writeln!(
         out,
-        "    {}",
+        "    {}  {}",
+        text.verdict.coverage_label,
         style.tone(
             Tone::Dim,
             &format!(
@@ -285,42 +287,52 @@ fn render_attention(
         .filter(|id| !contributing.contains(id))
         .collect();
 
-    let v = &text.verdict;
-    if !contributing_ids.is_empty() {
-        let _ = writeln!(
-            out,
-            "    {}",
-            style.tone(
-                Tone::Dim,
-                &format!(
-                    "{} {}",
-                    join_ids(
-                        &contributing_ids,
-                        v.attention_list_separator,
-                        v.attention_list_connector
-                    ),
-                    v.attention_contributing
-                )
-            )
-        );
+    if let Some(scope) = attention_scope(&contributing_ids, &reminder_ids, &text.verdict) {
+        let _ = writeln!(out, "    {}", style.tone(Tone::Dim, &scope));
     }
-    if !reminder_ids.is_empty() {
-        let _ = writeln!(
-            out,
-            "    {}",
-            style.tone(
-                Tone::Dim,
-                &format!(
-                    "{} {}",
-                    join_ids(
-                        &reminder_ids,
-                        v.attention_list_separator,
-                        v.attention_list_connector
-                    ),
-                    v.attention_reminder_only
-                )
-            )
-        );
+}
+
+/// `attention_scope` 句：固定短语（前缀/分句标点/收尾标点）+ 已有的 ID 列表拼接
+/// 与贡献词/仅提醒词，不引入任何占位符替换或模板语法——与拼 ID 列表用的是
+/// 同一套「固定片段 + 渲染层拼接」手法。两个子集都空时（理论上到不了这里，
+/// 因为空清单已经在上一层被整块跳过）返回 `None`。
+fn attention_scope(
+    contributing_ids: &[CheckId],
+    reminder_ids: &[CheckId],
+    v: &crate::copy::VerdictText,
+) -> Option<String> {
+    let contributing_clause = (!contributing_ids.is_empty()).then(|| {
+        format!(
+            "{}{} {}",
+            v.attention_prefix,
+            join_ids(
+                contributing_ids,
+                v.attention_list_separator,
+                v.attention_list_connector
+            ),
+            v.attention_contributing
+        )
+    });
+    let reminder_clause = (!reminder_ids.is_empty()).then(|| {
+        format!(
+            "{} {}",
+            join_ids(
+                reminder_ids,
+                v.attention_list_separator,
+                v.attention_list_connector
+            ),
+            v.attention_reminder_only
+        )
+    });
+
+    match (contributing_clause, reminder_clause) {
+        (Some(c), Some(r)) => Some(format!(
+            "{c}{}{r}{}",
+            v.attention_clause_separator, v.attention_suffix
+        )),
+        (Some(c), None) => Some(format!("{c}{}", v.attention_suffix)),
+        (None, Some(r)) => Some(format!("{r}{}", v.attention_suffix)),
+        (None, None) => None,
     }
 }
 

@@ -38,11 +38,16 @@ pub const ZH_HANS: Text = Text {
         summary_full_medium: "发现可疑信号，先看下面标出的项。",
         summary_full_high: "你的出口 IP 风险很高，现在用 AI 工具相当可能触发风控。",
         exit_ip_label: "出口 IP",
+        risk_label: "风险评分",
+        coverage_label: "覆盖度",
         attention_label: "需关注",
         attention_contributing: "参与综合结论判定",
         attention_reminder_only: "仅作提醒",
         attention_list_separator: "、",
         attention_list_connector: "与",
+        attention_prefix: "其中只有 ",
+        attention_clause_separator: "，",
+        attention_suffix: "。",
     },
 
     coverage: CoverageText {
