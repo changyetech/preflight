@@ -52,34 +52,41 @@ describe("两语种各自是独立静态资源，不是彼此的软 404 兜底",
     expect(html).not.toContain(COPY.site.title);
   });
 
-  it("每个语种页恰好声明 3 条 hreflang：en、zh-Hans、x-default（规格 §3）", async () => {
-    const html = await (await SELF.fetch("https://example.com/zh-hans")).text();
+  // 规格 §3 要求两个入口各自声明同一份 hreflang 集合——用 it.each 对 `/` 与
+  // `/zh-hans` 各跑一遍，而不是只测其中一个入口（曾经的缺口：只测过 /zh-hans）。
+  it.each(["/", "/zh-hans"])(
+    "%s 恰好声明 3 条 hreflang：en、zh-Hans、x-default（规格 §3）",
+    async (path) => {
+      const html = await (
+        await SELF.fetch(`https://example.com${path}`)
+      ).text();
 
-    // 解析出所有 <link rel="alternate"> 标签本身，再从标签内取 hreflang/href——
-    // 不依赖标签在源码里被 prettier 排成一行还是拆成多行（对格式化不敏感）。
-    const linkTags = html.match(/<link\s+rel="alternate"[^>]*\/?>/g) ?? [];
-    const hreflangToHref = new Map(
-      linkTags.map((tag) => [
-        tag.match(/hreflang="([^"]*)"/)?.[1],
-        tag.match(/href="([^"]*)"/)?.[1],
-      ]),
-    );
+      // 解析出所有 <link rel="alternate"> 标签本身，再从标签内取 hreflang/href——
+      // 不依赖标签在源码里被 prettier 排成一行还是拆成多行（对格式化不敏感）。
+      const linkTags = html.match(/<link\s+rel="alternate"[^>]*\/?>/g) ?? [];
+      const hreflangToHref = new Map(
+        linkTags.map((tag) => [
+          tag.match(/hreflang="([^"]*)"/)?.[1],
+          tag.match(/href="([^"]*)"/)?.[1],
+        ]),
+      );
 
-    expect(
-      linkTags,
-      `实际 alternate 标签：\n${linkTags.join("\n")}`,
-    ).toHaveLength(3);
-    expect(
-      hreflangToHref,
-      `实际 hreflang→href 映射：${JSON.stringify([...hreflangToHref])}`,
-    ).toEqual(
-      new Map([
-        ["en", "https://ipcheck.omnikit.run/"],
-        ["zh-Hans", "https://ipcheck.omnikit.run/zh-hans"],
-        ["x-default", "https://ipcheck.omnikit.run/"],
-      ]),
-    );
-  });
+      expect(
+        linkTags,
+        `实际 alternate 标签：\n${linkTags.join("\n")}`,
+      ).toHaveLength(3);
+      expect(
+        hreflangToHref,
+        `实际 hreflang→href 映射：${JSON.stringify([...hreflangToHref])}`,
+      ).toEqual(
+        new Map([
+          ["en", "https://ipcheck.omnikit.run/"],
+          ["zh-Hans", "https://ipcheck.omnikit.run/zh-hans"],
+          ["x-default", "https://ipcheck.omnikit.run/"],
+        ]),
+      );
+    },
+  );
 
   it("不存在的路径返回真实 404，而不是软 404（I1：曾经的 SPA 回退会让任意路径都 200）", async () => {
     const response = await SELF.fetch(
