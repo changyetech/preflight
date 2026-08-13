@@ -369,8 +369,14 @@ fn contributing_ids(signals: &verdict::Signals, verdict: &Verdict) -> Vec<CheckI
 
 /// 用分隔符/连接词把编号列表拼成一句（如「O2 与 O4」「O2、O4 与 O6」）。
 /// 中英文标点不同，两个词都来自 Copy（spec 5.2 的裁定），不写死在这里。
+///
+/// 连接词两侧的空格由渲染层统一补上（`connector.trim()` 后包一层单空格），
+/// 不进 Copy——Copy 里的连接词保持裸词（`与`/`and`），带空格的文案值是脆弱写法，
+/// 复制粘贴、trim、对齐时都会出问题。分隔符（顿号/逗号）不受影响，中英文本就
+/// 各自吸收了自己的空格习惯，C2 给的取值原样使用。
 fn join_ids(ids: &[CheckId], separator: &str, connector: &str) -> String {
     let strs: Vec<&str> = ids.iter().map(|id| id.as_str()).collect();
+    let connector = format!(" {} ", connector.trim());
     match strs.split_last() {
         None => String::new(),
         Some((last, [])) => (*last).to_string(),
@@ -1147,13 +1153,99 @@ mod tests {
             out.contains(&format!("C4 {}", text.verdict.attention_contributing)),
             "{out}"
         );
+        // 连接词两侧的空格由渲染层统一补上，不是 Copy 里 en/zh 各自凑巧带对——
+        // 这里锁的是渲染结果，不是拿 Copy 原始取值去拼期望值。
         assert!(
             out.contains(&format!(
-                "O2{}O4 {}",
-                text.verdict.attention_list_connector, text.verdict.attention_reminder_only
+                "O2 and O4 {}",
+                text.verdict.attention_reminder_only
             )),
             "{out}"
         );
+    }
+
+    #[test]
+    fn attention_scope_connector_gets_single_spaces_in_both_languages() {
+        // zh_hans 的 attention_list_connector 是裸词"与"（不带空格），en 是" and "
+        // （C2 给的取值本就带空格）——渲染层对两者一视同仁地 trim 再包一层单空格，
+        // 结果都应该是单空格，不依赖 Copy 里连接词本身带不带空格。
+        let mut report = blank();
+        report.o2 = Outcome::Done(TimezoneCheck {
+            local: Some("Asia/Shanghai".into()),
+            exit: Some("America/New_York".into()),
+            matches: Some(false),
+        });
+        report.o4 = Outcome::Done(Risk {
+            risk: crate::probe::proxycheck::Risk {
+                network_type: None,
+                proxy: false,
+                vpn: false,
+                tor: false,
+                scraper: false,
+                risk_score: 40,
+                anonymous: false,
+            },
+            abuse: None,
+        });
+
+        let out_en = render(&report, false, false);
+        assert!(
+            out_en.contains("O2 and O4 flagged for awareness only"),
+            "{out_en}"
+        );
+        assert!(!out_en.contains("O2  and"), "double space leaked: {out_en}");
+
+        let out_zh = super::report(
+            &report,
+            &copy::text(Lang::ZhHans),
+            &Style::new(false),
+            false,
+        );
+        assert!(out_zh.contains("O2 与 O4 仅作提醒"), "{out_zh}");
+    }
+
+    #[test]
+    fn join_ids_uses_the_separator_before_the_last_connector_for_three_or_more_items() {
+        // 三项及以上：分隔符（顿号/逗号）与连接词（与/and）都要正确出现一次，
+        // 且连接词两侧仍是单空格。
+        let mut report = blank();
+        report.o2 = Outcome::Done(TimezoneCheck {
+            local: Some("Asia/Shanghai".into()),
+            exit: Some("America/New_York".into()),
+            matches: Some(false),
+        });
+        report.o4 = Outcome::Done(Risk {
+            risk: crate::probe::proxycheck::Risk {
+                network_type: None,
+                proxy: false,
+                vpn: false,
+                tor: false,
+                scraper: false,
+                risk_score: 40,
+                anonymous: false,
+            },
+            abuse: None,
+        });
+        report.c2 = Outcome::Done(vec![dns::Server {
+            address: "114.114.114.114".into(),
+            label: None,
+            private: false,
+            domestic: true,
+        }]);
+
+        let out_en = render(&report, false, false);
+        assert!(
+            out_en.contains("O2, O4 and C2 flagged for awareness only"),
+            "{out_en}"
+        );
+
+        let out_zh = super::report(
+            &report,
+            &copy::text(Lang::ZhHans),
+            &Style::new(false),
+            false,
+        );
+        assert!(out_zh.contains("O2、O4 与 C2 仅作提醒"), "{out_zh}");
     }
 
     #[test]
