@@ -9,7 +9,7 @@ export type ThemePref = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
 
 /** ADR-0016：主题偏好是 ADR-0008「不持久化」立场的显式例外，纯外观、无隐私载荷。 */
-export const THEME_STORAGE_KEY = "ipcheck-theme";
+export const THEME_STORAGE_KEY = "preflight-theme";
 
 /** 把任意值收窄为合法的三态偏好；不认识的值一律落到 system（规格 §4.3）。 */
 export function normalizeThemePref(value: unknown): ThemePref {

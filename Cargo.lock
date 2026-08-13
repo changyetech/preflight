@@ -465,22 +465,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ipcheck"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "clap",
- "jiff",
- "rpassword",
- "serde",
- "serde_json",
- "sys-locale",
- "terminal_size",
- "toml",
- "ureq",
-]
-
-[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -699,6 +683,22 @@ name = "powerfmt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
+
+[[package]]
+name = "preflight"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "jiff",
+ "rpassword",
+ "serde",
+ "serde_json",
+ "sys-locale",
+ "terminal_size",
+ "toml",
+ "ureq",
+]
 
 [[package]]
 name = "proc-macro2"

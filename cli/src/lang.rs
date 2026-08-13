@@ -2,7 +2,7 @@
 //!
 //! 解析顺序：`--lang` > 配置文件 `language` > 系统 locale > `en`。
 //!
-//! 与 ipcheck Web 的一处**刻意分歧**：Web 不做 Accept-Language 自动跳转（规格第 7 节），
+//! 与 Preflight Web 的一处**刻意分歧**：Web 不做 Accept-Language 自动跳转（规格第 7 节），
 //! 因为 URL 必须是语言的唯一真相，且浏览器给的 Accept-Language 常与用户真实偏好脱节。
 //! CLI 没有 URL，这条理由整个不适用；而 shell 里的 `LC_ALL`/`LANG` 是用户自己环境的一部分，
 //! 可信度远高于浏览器默认值。理由见 docs/verdict.md 第 5 节。

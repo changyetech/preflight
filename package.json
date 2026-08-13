@@ -1,5 +1,5 @@
 {
-  "name": "ipcheck-web",
+  "name": "preflight-web",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "deploy": "pnpm build && wrangler deploy -c dist/ipcheck/wrangler.json"
+    "deploy": "pnpm build && wrangler deploy -c dist/preflight/wrangler.json"
   },
   "dependencies": {
     "react": "^19.2.8",

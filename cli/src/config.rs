@@ -39,33 +39,33 @@ pub struct ConfigFile {
 
 /// 解析出配置文件路径。纯函数——调用方负责读环境变量，测试才不必改进程环境。
 ///
-/// `IPCHECK_CONFIG` > 平台约定目录。返回 `None` 表示连家目录都找不到，
+/// `PREFLIGHT_CONFIG` > 平台约定目录。返回 `None` 表示连家目录都找不到，
 /// 此时按"没有配置文件"处理，而不是报错。
 pub fn resolve_path(
-    ipcheck_config: Option<&str>,
+    preflight_config: Option<&str>,
     xdg_config_home: Option<&str>,
     home: Option<&str>,
     appdata: Option<&str>,
 ) -> Option<PathBuf> {
-    if let Some(explicit) = ipcheck_config.filter(|v| !v.is_empty()) {
+    if let Some(explicit) = preflight_config.filter(|v| !v.is_empty()) {
         return Some(PathBuf::from(explicit));
     }
 
     if cfg!(windows) {
         return appdata
             .filter(|v| !v.is_empty())
-            .map(|base| Path::new(base).join("ipcheck").join("config.toml"));
+            .map(|base| Path::new(base).join("preflight").join("config.toml"));
     }
 
-    // XDG 风格：`~/.config/ipcheck/config.toml`。刻意不用各平台"正统"路径——
+    // XDG 风格：`~/.config/preflight/config.toml`。刻意不用各平台"正统"路径——
     // macOS 的 `~/Library/Application Support/` 对 CLI 用户既不好找也不好手写。
     if let Some(base) = xdg_config_home.filter(|v| !v.is_empty()) {
-        return Some(Path::new(base).join("ipcheck").join("config.toml"));
+        return Some(Path::new(base).join("preflight").join("config.toml"));
     }
     home.filter(|v| !v.is_empty()).map(|base| {
         Path::new(base)
             .join(".config")
-            .join("ipcheck")
+            .join("preflight")
             .join("config.toml")
     })
 }
@@ -73,7 +73,7 @@ pub fn resolve_path(
 /// 从进程环境解析路径。
 pub fn path_from_env() -> Option<PathBuf> {
     resolve_path(
-        std::env::var("IPCHECK_CONFIG").ok().as_deref(),
+        std::env::var("PREFLIGHT_CONFIG").ok().as_deref(),
         std::env::var("XDG_CONFIG_HOME").ok().as_deref(),
         std::env::var("HOME").ok().as_deref(),
         std::env::var("APPDATA").ok().as_deref(),
@@ -244,7 +244,7 @@ mod tests {
     #[test]
     fn missing_file_is_not_an_error() {
         assert!(load(None).is_ok());
-        assert!(load(Some(Path::new("/nonexistent/ipcheck/config.toml"))).is_ok());
+        assert!(load(Some(Path::new("/nonexistent/preflight/config.toml"))).is_ok());
     }
 
     #[test]
@@ -258,11 +258,11 @@ mod tests {
     fn unix_uses_xdg_style_paths() {
         assert_eq!(
             resolve_path(None, Some("/x/cfg"), Some("/home/u"), None),
-            Some(PathBuf::from("/x/cfg/ipcheck/config.toml"))
+            Some(PathBuf::from("/x/cfg/preflight/config.toml"))
         );
         assert_eq!(
             resolve_path(None, None, Some("/home/u"), None),
-            Some(PathBuf::from("/home/u/.config/ipcheck/config.toml"))
+            Some(PathBuf::from("/home/u/.config/preflight/config.toml"))
         );
     }
 
@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn saved_config_is_owner_only_and_roundtrips() {
-        let dir = std::env::temp_dir().join(format!("ipcheck-cfg-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("preflight-cfg-{}", std::process::id()));
         let path = dir.join("config.toml");
         let config = ConfigFile {
             proxycheck_key: Some("secret".into()),

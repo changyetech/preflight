@@ -1,19 +1,19 @@
-# ipcheck
+# Preflight
 
 面向「对 IP 网络环境敏感的工具」用户的网络环境体检产品——在使用这类工具前先检测自己的 IP 环境。一个仓库产出两个实现——在线体检站与本机命令行工具——它们共享同一份判级契约。
 
 ## Language
 
-**ipcheck CLI**:
+**Preflight CLI**:
 本仓库产出的命令行工具，运行在用户本机、能读取本地网络环境，覆盖全部检测项。
-_Avoid_: ipcheck（单说"ipcheck"时永远有歧义，必须带 CLI 或 Web 后缀）
+_Avoid_: Preflight（单说"Preflight"时永远有歧义，必须带 CLI 或 Web 后缀）
 
-**ipcheck Web**:
+**Preflight Web**:
 本仓库产出的网站，运行在 Cloudflare 边缘，只能观察到用户浏览器与网络出口暴露给服务端的信息。
-_Avoid_: 官网、门户、ipcheck online
+_Avoid_: 官网、门户、Preflight online
 
 **ai-ipcheck**:
-ipcheck CLI 的前身，曾发布到 PyPI（命令名同为 `ipcheck`），已归档、不再维护。提到它只为指代历史行为。
+Preflight CLI 的前身，曾发布到 PyPI（命令名为 `ipcheck`），已归档、不再维护。提到它只为指代历史行为。
 _Avoid_: 旧 CLI、老 CLI（这两个词不体现它是另一份独立实现，而非同一实现的旧版本）
 
 **检测项**:
@@ -25,11 +25,11 @@ _Avoid_: 检查、测试项、check
 _Avoid_: Web 项、线上项
 
 **仅 CLI 项**:
-必须读取本机环境（本地 DNS 服务器、系统代理/TUN 状态、`$TZ`）才能完成的检测项，ipcheck Web 结构性地做不到。
+必须读取本机环境（本地 DNS 服务器、系统代理/TUN 状态、`$TZ`）才能完成的检测项，Preflight Web 结构性地做不到。
 _Avoid_: 不支持项、本地项
 
 **按需检测项**:
-在 ipcheck Web 中需用户显式触发才执行的可在线检测项，因其消耗本站共享的第三方配额。ipcheck CLI 用用户自己的配额，同一检测项在 CLI 侧自动执行、不构成按需项。
+在 Preflight Web 中需用户显式触发才执行的可在线检测项，因其消耗本站共享的第三方配额。Preflight CLI 用用户自己的配额，同一检测项在 CLI 侧自动执行、不构成按需项。
 _Avoid_: 付费项、手动项
 
 **信号**:
@@ -37,7 +37,7 @@ _Avoid_: 付费项、手动项
 _Avoid_: 指标、因子、风险项
 
 **出口 IP**:
-用户流量经代理后离开的公网 IP，即 Cloudflare 边缘观察到的来源地址。ipcheck Web 只能看到这一个 IP。
+用户流量经代理后离开的公网 IP，即 Cloudflare 边缘观察到的来源地址。Preflight Web 只能看到这一个 IP。
 _Avoid_: 公网 IP、真实 IP（"真实 IP"在 CLI 指国内直连回显得到的本机公网 IP，Web 拿不到，一律不用此词）
 
 **分流泄露**:

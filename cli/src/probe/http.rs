@@ -10,7 +10,7 @@ pub fn agent(timeout: Duration) -> ureq::Agent {
     ureq::Agent::config_builder()
         .timeout_global(Some(timeout))
         // 明确一个 UA：匿名 UA 更容易被第三方的风控挡掉，且出问题时对方能认出是谁。
-        .user_agent(concat!("ipcheck/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("preflight/", env!("CARGO_PKG_VERSION")))
         .build()
         .into()
 }

@@ -212,5 +212,5 @@
 | # | 未决事实 | 风险 | 状态 |
 |---|---|---|---|
 | 1 | `api6.ipify.org` 在**具备 IPv6** 的环境下的 CORS 响应头 | 若 CORS 不通，会把有 IPv6 的用户误判为无 IPv6，即把有风险的人判成安全 | 未验证 |
-| 2 | `wrangler dev` 本地模式下 `request.cf` 地理字段是真值还是占位值 | 影响开发体验，不影响设计（见 5.2） | **已确认：占位值**（`wrangler dev` 启动时明确警告 `Unable to fetch the Request.cf object! Falling back to a default placeholder...`）。详见 [scaffold 计划验证记录](../plans/2026-08-10-ipcheck-web--scaffold.md#验证记录) |
-| 3 | Cloudflare Workers Observability 默认是否记录客户端 IP，以及关闭方式 | 直接关系 ADR-0008 的承诺能否兑现，**阻塞上线** | **未确认**（官方文档未逐字段列出）。已保守将 `wrangler.jsonc` 的 `observability.enabled` 设为 `false`；待人工在 Dashboard 实测确认。详见 [scaffold 计划验证记录](../plans/2026-08-10-ipcheck-web--scaffold.md#验证记录) |
+| 2 | `wrangler dev` 本地模式下 `request.cf` 地理字段是真值还是占位值 | 影响开发体验，不影响设计（见 5.2） | **已确认：占位值**（`wrangler dev` 启动时明确警告 `Unable to fetch the Request.cf object! Falling back to a default placeholder...`）。详见 [scaffold 计划验证记录](../plans/2026-08-10-preflight-web--scaffold.md#验证记录) |
+| 3 | Cloudflare Workers Observability 默认是否记录客户端 IP，以及关闭方式 | 直接关系 ADR-0008 的承诺能否兑现，**阻塞上线** | **未确认**（官方文档未逐字段列出）。已保守将 `wrangler.jsonc` 的 `observability.enabled` 设为 `false`；待人工在 Dashboard 实测确认。详见 [scaffold 计划验证记录](../plans/2026-08-10-preflight-web--scaffold.md#验证记录) |

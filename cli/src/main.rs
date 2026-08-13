@@ -1,4 +1,4 @@
-//! ipcheck CLI —— 网络环境体检。
+//! Preflight CLI —— 网络环境体检。
 //!
 //! 判级契约见 docs/verdict.md（Web 与 CLI 共同的判据），实现计划见
 //! docs/plans/2026-08-12-cli-rust-rewrite.md。
@@ -22,7 +22,7 @@ use lang::{Lang, LangError};
 
 #[derive(Parser)]
 #[command(
-    name = "ipcheck",
+    name = "preflight",
     version,
     // GNU 惯例：版权信息进 `--version`（`-V` 仍是短版本号），日常报告输出保持干净。
     long_version = long_version(),
@@ -49,7 +49,7 @@ struct Cli {
 /// `--version` 的完整输出：版本号 + 版权行。年份取运行时当前年，不写死。
 fn long_version() -> String {
     format!(
-        "{}\n© {} ipcheck",
+        "{}\n© {} Preflight",
         env!("CARGO_PKG_VERSION"),
         jiff::Zoned::now().year()
     )
@@ -97,7 +97,7 @@ fn main() {
     match run() {
         Ok(code) => std::process::exit(code),
         Err(err) => {
-            eprintln!("ipcheck: {err:#}");
+            eprintln!("preflight: {err:#}");
             std::process::exit(EXIT_TOOL_FAILURE);
         }
     }
@@ -135,7 +135,7 @@ fn run() -> Result<i32> {
 
 fn run_checkup(cli: &Cli, text: &Text, settings: &Settings) -> Result<i32> {
     // 进度提示只往 **stderr** 打，且只在交互终端里打：stdout 恒为一份干净的报告，
-    // `ipcheck | cat` 与 `--json` 的语义因此完全一致。
+    // `preflight | cat` 与 `--json` 的语义因此完全一致。
     let interactive = std::io::stderr().is_terminal();
     if interactive && !cli.json {
         eprint!("{}\r", text.values.checking);
@@ -157,7 +157,7 @@ fn run_checkup(cli: &Cli, text: &Text, settings: &Settings) -> Result<i32> {
         // 非 TTY 自动关色：重定向到文件不该满屏转义序列。
         let color = !settings.no_color && std::io::stdout().is_terminal();
         // 宽度跟随窗口，量的是 **stdout** 那一端：重定向到文件/管道时拿不到宽度，
-        // 落回固定宽度——`ipcheck > report.txt` 的产物不该随当时的窗口大小变化。
+        // 落回固定宽度——`preflight > report.txt` 的产物不该随当时的窗口大小变化。
         // 只在渲染前量一次，不监听 SIGWINCH：报告是一次性输出，不重排。
         let style = match terminal_size::terminal_size_of(std::io::stdout()) {
             Some((terminal_size::Width(columns), _)) => {
@@ -294,39 +294,40 @@ mod tests {
 
     #[test]
     fn bare_invocation_is_the_checkup_not_a_subcommand() {
-        // `ipcheck` 裸敲必须直接体检，不能要求用户记一个子命令。
-        let cli = Cli::try_parse_from(["ipcheck"]).unwrap();
+        // `preflight` 裸敲必须直接体检，不能要求用户记一个子命令。
+        let cli = Cli::try_parse_from(["preflight"]).unwrap();
         assert!(cli.command.is_none());
     }
 
     #[test]
     fn there_is_no_plaintext_key_flag() {
         // 明文 flag 会进 shell history 与 `ps`。这条测试锁住那个"顺手加一个"的冲动。
-        assert!(Cli::try_parse_from(["ipcheck", "--proxycheck-key", "secret"]).is_err());
+        assert!(Cli::try_parse_from(["preflight", "--proxycheck-key", "secret"]).is_err());
         assert!(
-            Cli::try_parse_from(["ipcheck", "config", "set", "proxycheck-key", "secret"]).is_err()
+            Cli::try_parse_from(["preflight", "config", "set", "proxycheck-key", "secret"])
+                .is_err()
         );
     }
 
     #[test]
     fn config_set_only_accepts_whitelisted_keys() {
-        assert!(Cli::try_parse_from(["ipcheck", "config", "set", "proxycheck-key"]).is_ok());
-        assert!(Cli::try_parse_from(["ipcheck", "config", "set", "risk-threshold"]).is_err());
+        assert!(Cli::try_parse_from(["preflight", "config", "set", "proxycheck-key"]).is_ok());
+        assert!(Cli::try_parse_from(["preflight", "config", "set", "risk-threshold"]).is_err());
     }
 
     #[test]
     fn config_list_is_a_valid_subcommand() {
-        assert!(Cli::try_parse_from(["ipcheck", "config", "list"]).is_ok());
+        assert!(Cli::try_parse_from(["preflight", "config", "list"]).is_ok());
     }
 
     #[test]
     fn long_version_carries_the_copyright_line() {
         // `--version` 走 long_version，除版本号外还要带版权行（`-V` 仍是短版本号）。
         // 不用 unwrap_err：那需要 `Cli: Debug`，为一条测试给整个 CLI 派生 Debug 不值。
-        let Err(err) = Cli::try_parse_from(["ipcheck", "--version"]) else {
+        let Err(err) = Cli::try_parse_from(["preflight", "--version"]) else {
             panic!("--version 应走 DisplayVersion 的错误路径");
         };
-        let copyright = format!("© {} ipcheck", jiff::Zoned::now().year());
+        let copyright = format!("© {} Preflight", jiff::Zoned::now().year());
         assert!(
             err.to_string().contains(&copyright),
             "--version 输出应包含版权行「{copyright}」：{err}"
@@ -335,8 +336,8 @@ mod tests {
 
     #[test]
     fn lang_flag_is_accepted_before_and_after_subcommands() {
-        assert!(Cli::try_parse_from(["ipcheck", "--lang", "zh-hans"]).is_ok());
-        assert!(Cli::try_parse_from(["ipcheck", "config", "path", "--lang", "zh-hans"]).is_ok());
+        assert!(Cli::try_parse_from(["preflight", "--lang", "zh-hans"]).is_ok());
+        assert!(Cli::try_parse_from(["preflight", "config", "path", "--lang", "zh-hans"]).is_ok());
     }
 
     #[test]

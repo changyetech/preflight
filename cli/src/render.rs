@@ -1,6 +1,6 @@
 //! 呈现层：把一次体检渲染成人读的报告。
 //!
-//! 参考 ipcheck Web 的视觉结构，**不用表格边框**：
+//! 参考 Preflight Web 的视觉结构，**不用表格边框**：
 //! 结论区置顶（用户敲完命令第一眼看到结论，不用滚），其下是 10 张检测卡。
 //! 网页的顶部导航与落地内容不移植——终端没有锚点，营销文案对已装用户没有意义。
 //!
@@ -307,7 +307,7 @@ fn render_footer(out: &mut String, text: &Text, style: &Style) {
     render_wrapped(
         out,
         &format!(
-            "ipcheck --verbose  {}",
+            "preflight --verbose  {}",
             style.tone(Tone::Dim, f.verbose_hint)
         ),
         style,
@@ -317,7 +317,7 @@ fn render_footer(out: &mut String, text: &Text, style: &Style) {
     );
     render_wrapped(
         out,
-        &format!("ipcheck --json  {}", style.tone(Tone::Dim, f.json_hint)),
+        &format!("preflight --json  {}", style.tone(Tone::Dim, f.json_hint)),
         style,
         None,
         FOOTER_INDENT,
@@ -326,7 +326,7 @@ fn render_footer(out: &mut String, text: &Text, style: &Style) {
     render_wrapped(
         out,
         &format!(
-            "ipcheck config set proxycheck-key  {}",
+            "preflight config set proxycheck-key  {}",
             style.tone(Tone::Dim, f.quota_hint)
         ),
         style,
@@ -2925,8 +2925,8 @@ mod tests {
             // --verbose 与 --json 各占一行；期望值仍按同一折行规则拆开后逐行
             // 连着页脚缩进整行匹配：命令字面量、提示词、缩进列三者都被锁死。
             let hints = [
-                format!("ipcheck --verbose  {}", text.footer.verbose_hint),
-                format!("ipcheck --json  {}", text.footer.json_hint),
+                format!("preflight --verbose  {}", text.footer.verbose_hint),
+                format!("preflight --json  {}", text.footer.json_hint),
             ];
             for hint in &hints {
                 for line in wrap_lines(hint, FOOTER_INDENT, PROSE_WIDTH) {
@@ -2935,7 +2935,7 @@ mod tests {
             }
             assert!(
                 out.contains(&format!(
-                    "  ipcheck config set proxycheck-key  {}\n",
+                    "  preflight config set proxycheck-key  {}\n",
                     text.footer.quota_hint
                 )),
                 "{out}"
@@ -2948,10 +2948,10 @@ mod tests {
         // --json 走 json::report，完全不经过 render::report——这里断言机器可读
         // 输出里没有页脚的字面命令串，锁住这条天然屏障，不只是靠代码路径隔离。
         let payload = serde_json::to_string_pretty(&crate::json::report(&blank())).unwrap();
-        assert!(!payload.contains("ipcheck --verbose"), "{payload}");
-        assert!(!payload.contains("ipcheck --json"), "{payload}");
+        assert!(!payload.contains("preflight --verbose"), "{payload}");
+        assert!(!payload.contains("preflight --json"), "{payload}");
         assert!(
-            !payload.contains("ipcheck config set proxycheck-key"),
+            !payload.contains("preflight config set proxycheck-key"),
             "{payload}"
         );
     }

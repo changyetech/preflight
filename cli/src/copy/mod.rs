@@ -1,4 +1,4 @@
-//! 文案层。与 ipcheck Web 的 `src/copy.ts` 同构：英文是**源语言**，两语种（en / zh-hans）
+//! 文案层。与 Preflight Web 的 `src/copy.ts` 同构：英文是**源语言**，两语种（en / zh-hans）
 //! 都由结构体**完整**填写——漏一个字段是编译错误，不存在"部分翻译回落英文"这回事
 //! （ADR-0016：语种收缩为 en + zh-hans 后，删除了字段级回落机制）。
 //!
@@ -46,7 +46,7 @@ mod zh_hans;
 use crate::lang::Lang;
 
 copy_leaf! {
-    /// `ipcheck config` 子命令的文案。
+    /// `preflight config` 子命令的文案。
     ConfigText {
         path_label,
         key_state_set,
@@ -170,7 +170,7 @@ copy_leaf! {
 }
 
 copy_node! {
-    /// 10 个检测项。O1–O6 的标题必须与 ipcheck Web 逐字一致（契约 1.1）。
+    /// 10 个检测项。O1–O6 的标题必须与 Preflight Web 逐字一致（契约 1.1）。
     ChecksText {
         o1: CheckText,
         // O1 值行标签，只服务 o1，见 `O1FieldsText`。
@@ -261,15 +261,15 @@ copy_leaf! {
 }
 
 copy_leaf! {
-    /// 页脚提示行（design：`.footer-hint`）。命令本身（`ipcheck --verbose` 等）
+    /// 页脚提示行（design：`.footer-hint`）。命令本身（`preflight --verbose` 等）
     /// 是字面 CLI 语法，不随语种变化，写死在 `render.rs`；这里只放随语种变化的
     /// 说明词。
     FooterText {
-        /// `ipcheck --verbose` 之后的说明词。
+        /// `preflight --verbose` 之后的说明词。
         verbose_hint,
-        /// `ipcheck --json` 之后的说明词。
+        /// `preflight --json` 之后的说明词。
         json_hint,
-        /// `ipcheck config set proxycheck-key` 之后的配额提示。
+        /// `preflight config set proxycheck-key` 之后的配额提示。
         quota_hint,
     }
 }

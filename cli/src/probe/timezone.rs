@@ -18,7 +18,7 @@ pub type Match = Option<bool>;
 /// `US/Pacific` 与 `America/Los_Angeles` 是同一个时区的两个 IANA 名，
 /// 只比名字会把它判成「不一致」，给设置完全正确的用户报一个中风险。
 ///
-/// 注意 ipcheck Web 目前**只比名字**（`src/domain/timezone.ts`），这是一处两端分歧。
+/// 注意 Preflight Web 目前**只比名字**（`src/domain/timezone.ts`），这是一处两端分歧。
 pub fn compare(local: Option<&str>, exit: Option<&str>) -> Match {
     let (local, exit) = (local?.trim(), exit?.trim());
     if local.is_empty() || exit.is_empty() {

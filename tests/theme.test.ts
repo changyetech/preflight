@@ -86,7 +86,7 @@ describe("writeStoredThemePref", () => {
     const setItem = vi.fn();
     vi.stubGlobal("localStorage", { setItem });
     writeStoredThemePref("dark");
-    expect(setItem).toHaveBeenCalledWith("ipcheck-theme", "dark");
+    expect(setItem).toHaveBeenCalledWith("preflight-theme", "dark");
   });
 
   it("写入抛异常时静默忽略，不影响调用方", () => {

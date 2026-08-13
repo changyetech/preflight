@@ -2,7 +2,7 @@
 //!
 //! 本文件必须完整：少写一个字段是编译错误，而不是运行时才发现某处掉回英文。
 //!
-//! O1–O6 的标题必须与 ipcheck Web 的 `src/locales/en.ts` **逐字一致**（契约 1.1）。
+//! O1–O6 的标题必须与 Preflight Web 的 `src/locales/en.ts` **逐字一致**（契约 1.1）。
 
 use super::{
     C4FixText, CheckText, ChecksText, ConfigText, CoverageText, DnsEgressText, ErrorText,
@@ -171,7 +171,7 @@ pub const EN: Text = Text {
     notes: NoteText {
         geo_source: "Ownership data comes from proxycheck. The website uses Cloudflare's database, so the two can disagree.",
         o2_desktop_only: "This one covers GUI apps, which follow the system timezone. Command-line tools read $TZ instead — that is C4 below.",
-        quota_shared: "Without an API key proxycheck allows 100 queries per day, counted per exit IP — you share it with anyone else on the same proxy node. Run `ipcheck config set proxycheck-key` to raise it to 1,000.",
+        quota_shared: "Without an API key proxycheck allows 100 queries per day, counted per exit IP — you share it with anyone else on the same proxy node. Run `preflight config set proxycheck-key` to raise it to 1,000.",
     },
 
     footer: FooterText {

@@ -1,7 +1,7 @@
-# ipcheck 判级契约
+# Preflight 判级契约
 
 - 状态：**契约（normative）**——代码与本文不一致时，以本文为准（见 CLAUDE.md「Authoritative Source」）
-- 适用范围：**两个实现**——ipcheck Web（TypeScript，`src/domain/`）与 ipcheck CLI（Rust，`cli/`）
+- 适用范围：**两个实现**——Preflight Web（TypeScript，`src/domain/`）与 Preflight CLI（Rust，`cli/`）
 - 相关：[ADR-0010](./adr/0010-verdict-contract-normative-cli-full-implementation.md)（本文的权威性来源）、[ADR-0011](./adr/0011-capability-boundary-divergence.md)（两端差异如何表达）、[ADR-0012](./adr/0012-cli-direct-third-party-not-worker-api.md)（CLI 不走本站 API）、[ADR-0013](./adr/0013-drop-vendor-endpoint-check.md)（移除厂商端点检测）、[ADR-0014](./adr/0014-split-tunnel-leak-checks.md)（新增分流泄露两项）、[ADR-0015](./adr/0015-tun-off-requires-proxy-evidence.md)（`tunOff` 以代理迹象为前提）
 
 本文定义「一次网络环境体检得出什么结论」。它是**两个实现共同的判据**：CLI 是全集实现（10 项全测），Web 是它在浏览器 + 边缘能力边界内的**投影**（C1–C4 恒为「需 CLI」）。
@@ -14,7 +14,7 @@
 
 共 **10 项**，覆盖度的分母恒为 10。ID 是跨端稳定标识，**不得复用、不得改号**。
 
-> **C5 是已废弃的编号**：它曾是「AI 厂商端点检测」，读本机的厂商专属配置。已按 [ADR-0013](./adr/0013-drop-vendor-endpoint-check.md) 移除——ipcheck 只检测网络环境，不检测任何具体工具的配置。**C5 这个编号不得再被任何检测项使用**（ID 不复用的规则对已删除的 ID 同样成立）。
+> **C5 是已废弃的编号**：它曾是「AI 厂商端点检测」，读本机的厂商专属配置。已按 [ADR-0013](./adr/0013-drop-vendor-endpoint-check.md) 移除——Preflight 只检测网络环境，不检测任何具体工具的配置。**C5 这个编号不得再被任何检测项使用**（ID 不复用的规则对已删除的 ID 同样成立）。
 
 > **C2 的语义收缩过**：它原先写作「本地 DNS 服务器**与 DNS 泄露**」，但泄露判定从未实现——实现自始至终只读本机 DNS **配置**。按 [ADR-0014](./adr/0014-split-tunnel-leak-checks.md) 已把措辞收缩到实际能力（「本地 DNS 服务器配置」），泄露判定拆到新的 O5。**跨版本比对两份 `--json` 输出时需知道这一点**：同一个 `C2` 在旧版本的措辞里承诺过更多，但那份承诺没有对应的实现，不存在行为回退。
 
@@ -378,7 +378,7 @@ Web 经**浏览器的 WebRTC 栈**取反射地址，CLI 直接发 **RFC 5389 bin
 
 ## 8. CLI 配置红线
 
-CLI 有配置文件（`~/.config/ipcheck/config.toml`），**允许的键是白名单**：
+CLI 有配置文件（`~/.config/preflight/config.toml`），**允许的键是白名单**：
 
 | 键 | 说明 |
 |---|---|

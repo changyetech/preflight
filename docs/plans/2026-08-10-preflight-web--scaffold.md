@@ -1,7 +1,7 @@
 # ipcheck Web — 工程骨架
 
-- 父计划：[2026-08-10-ipcheck-web.md](./2026-08-10-ipcheck-web.md)
-- 实现规格：[docs/specs/2026-08-10-ipcheck-web.md](../specs/2026-08-10-ipcheck-web.md) 第 5 节
+- 父计划：[2026-08-10-preflight-web.md](./2026-08-10-preflight-web.md)
+- 实现规格：[docs/specs/2026-08-10-preflight-web.md](../specs/2026-08-10-preflight-web.md) 第 5 节
 - Depends on: —
 
 ## 目标
@@ -90,4 +90,4 @@
 1. 登录 Cloudflare Dashboard → Workers & Pages → 对应 Worker → Observability，实际开启一次，发起几次真实请求，检查 Logs 面板里单条记录是否包含来源 IP（字段名可能是 `clientIp` / `cf-connecting-ip` header / 或 `Event.Request.headers` 里的某个字段）。
 2. 若确认包含 IP：查是否有 Log Field / Redaction 设置可关闭该字段（Dashboard 里搜索 "Redact" 或联系 Cloudflare 支持确认）；若无法关闭，需回到 ADR-0008 重新措辞隐私承诺（例如改为"不做二次留存/不外发"而非"不记录"）。
 3. 若确认不含 IP：可安全开启 `observability.enabled: true`，更新本文件与 `wrangler.jsonc` 注释。
-4. 把最终结论回填本节，并同步更新 `docs/specs/2026-08-10-ipcheck-web.md` 第 9 节。
+4. 把最终结论回填本节，并同步更新 `docs/specs/2026-08-10-preflight-web.md` 第 9 节。

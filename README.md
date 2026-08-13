@@ -1,41 +1,41 @@
-# ipcheck
+# Preflight
 
 面向「对 IP 网络环境敏感的工具」用户的网络环境体检——用之前先确认自己的 IP 环境。一个仓库产出两个实现，共享同一份[判级契约](docs/verdict.md)：
 
-- **ipcheck Web** —— 在线体检站，零门槛，能测 6 项
-- **ipcheck CLI** —— 本机命令行工具，覆盖全部 10 项
+- **Preflight Web** —— 在线体检站，零门槛，能测 6 项
+- **Preflight CLI** —— 本机命令行工具，覆盖全部 10 项
 
 按 IP 判断访客的工具与服务对访问环境很敏感，网络环境配置至关重要：IPv6 悄悄泄露真实地址、DNS 走国内服务商暴露位置、出口 IP 风险过高触发风控、系统时区与出口 IP 对不上……开跑之前先扫一眼。
 
 ## 安装 CLI
 
 ```bash
-brew install <owner>/tap/ipcheck
+brew install <owner>/tap/preflight
 ```
 
 或者：
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/<owner>/ipcheck/releases/latest/download/ipcheck-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/<owner>/preflight/releases/latest/download/preflight-installer.sh | sh
 ```
 
-有 Rust 工具链的话也可以 `cargo install --git https://github.com/<owner>/ipcheck`。**不发布到 crates.io。**
+有 Rust 工具链的话也可以 `cargo install --git https://github.com/<owner>/preflight`。**不发布到 crates.io。**
 
 > 仓库地址与应用名在第一个 `cli/v*` tag 之前是占位状态，见 [docs/plans/2026-08-12-cli-rust-rewrite.md](docs/plans/2026-08-12-cli-rust-rewrite.md) 的「未决事项」。
 
 ## 使用
 
 ```bash
-ipcheck                 # 体检
-ipcheck --verbose       # 附带每一项的说明
-ipcheck --json          # 机器可读输出
-ipcheck --lang en       # en / zh-hans
+preflight                 # 体检
+preflight --verbose       # 附带每一项的说明
+preflight --json          # 机器可读输出
+preflight --lang en       # en / zh-hans
 ```
 
 可选：注册一个免费的 proxycheck key，把日配额从 100 次提到 1000 次。
 
 ```bash
-ipcheck config set proxycheck-key    # 交互式输入，不回显、不进 shell history
+preflight config set proxycheck-key    # 交互式输入，不回显、不进 shell history
 ```
 
 ## 8 个检测项

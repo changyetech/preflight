@@ -1,6 +1,6 @@
 # 判级规则提升为 normative 契约，CLI 是全集实现、Web 是投影
 
-判级规则此前散落在两处：`docs/specs/2026-08-10-ipcheck-web.md` §3（design spec，按 CLAUDE.md 的定义是 descriptive、会漂）与 `src/domain/verdict.ts`（真实行为）。用 Rust 在本仓库重写 CLI 后，同一套领域知识要被两个语言各实现一遍，散文 + 各写各的测试必然漂移。我们决定新建 [docs/verdict.md](../verdict.md) 作为**唯一 normative 的判级契约**，CLI 为全集实现（9 项）、Web 为其在浏览器 + 边缘能力边界内的投影，`docs/specs/` 里的判级章节掏空改为引用。
+判级规则此前散落在两处：`docs/specs/2026-08-10-preflight-web.md` §3（design spec，按 CLAUDE.md 的定义是 descriptive、会漂）与 `src/domain/verdict.ts`（真实行为）。用 Rust 在本仓库重写 CLI 后，同一套领域知识要被两个语言各实现一遍，散文 + 各写各的测试必然漂移。我们决定新建 [docs/verdict.md](../verdict.md) 作为**唯一 normative 的判级契约**，CLI 为全集实现（9 项）、Web 为其在浏览器 + 边缘能力边界内的投影，`docs/specs/` 里的判级章节掏空改为引用。
 
 ## Considered Options
 

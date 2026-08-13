@@ -1,7 +1,7 @@
-# ipcheck Web API 契约
+# Preflight Web API 契约
 
 - 状态：**契约（normative）**——代码与本文不一致时，以本文为准（见 CLAUDE.md「Authoritative Source」）
-- 实现规格：[docs/specs/2026-08-10-ipcheck-web.md](./specs/2026-08-10-ipcheck-web.md) 第 5 节
+- 实现规格：[docs/specs/2026-08-10-preflight-web.md](./specs/2026-08-10-preflight-web.md) 第 5 节
 - 通用规约：字段名 camelCase、`Content-Type: application/json; charset=utf-8`、响应信封 `{code, message, data}` / `{code, message, details}`（见 `code-conventions` skill 的 http-constitution 与 error-codes）
 
 本站只有两个接口，均无鉴权、无分页、无版本前缀（单体前端专用，不对外承诺兼容性以外的东西）。

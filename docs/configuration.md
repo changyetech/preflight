@@ -1,7 +1,7 @@
 # 配置清单
 
 - 状态：**约定文档**——本仓库跑起来、部署出去所需的全部配置。新增任何配置项必须登记在此
-- 适用：ipcheck Web（Cloudflare Worker + 静态资源）与 ipcheck CLI（Rust）
+- 适用：Preflight Web（Cloudflare Worker + 静态资源）与 Preflight CLI（Rust）
 
 > **红线：本文出现的所有 secret 都不入库。** 仓库里只有占位（`.env.example`）与引用（`${{ secrets.* }}`），真值走 `wrangler secret put`、GitHub Secrets 或用户本机的配置文件（[ADR-0008](./adr/0008-privacy-informed-consent-upfront.md)）。
 
@@ -92,10 +92,10 @@ wrangler secret put TURNSTILE_SECRET_KEY
 ### 2.3 部署
 
 ```bash
-pnpm deploy    # = build + wrangler deploy -c dist/ipcheck/wrangler.json
+pnpm deploy    # = build + wrangler deploy -c dist/preflight/wrangler.json
 ```
 
-**不要**直接对根 `wrangler.jsonc` 执行 `wrangler deploy`——那会绕过 Vite 产物、改用 wrangler 自己的打包。根配置是**输入**，真正部署用的是 `@cloudflare/vite-plugin` 生成的 `dist/ipcheck/wrangler.json`。
+**不要**直接对根 `wrangler.jsonc` 执行 `wrangler deploy`——那会绕过 Vite 产物、改用 wrangler 自己的打包。根配置是**输入**，真正部署用的是 `@cloudflare/vite-plugin` 生成的 `dist/preflight/wrangler.json`。
 
 ### 2.4 待人工完成的两项
 
@@ -111,7 +111,7 @@ pnpm deploy    # = build + wrangler deploy -c dist/ipcheck/wrangler.json
 
 | 仓库 | 用途 | 可见性 |
 |---|---|---|
-| `<owner>/ipcheck` | 主仓库 | **必须 public**——`cargo install --git` 与 Homebrew tap 对私有仓库都要凭证，一行安装命令就不成立了 |
+| `<owner>/preflight` | 主仓库 | **必须 public**——`cargo install --git` 与 Homebrew tap 对私有仓库都要凭证，一行安装命令就不成立了 |
 | `<owner>/homebrew-tap` | Homebrew formula | public。Homebrew 硬性要求 tap 是**独立仓库** |
 
 ### 3.2 Secrets
@@ -157,7 +157,7 @@ git tag cli/v0.2.0 && git push --tags
 
 CLI 零配置可用。以下都是可选项。
 
-**配置文件**：`~/.config/ipcheck/config.toml`（Unix）／`%APPDATA%\ipcheck\config.toml`（Windows）。`IPCHECK_CONFIG` 可覆盖路径，`ipcheck config path` 打印实际读的是哪个。`ipcheck config list` 打印全部键**合并后的生效值**（flag > 环境变量 > 配置文件 > 默认；secret 只报是否已设置，绝不回显）。
+**配置文件**：`~/.config/preflight/config.toml`（Unix）／`%APPDATA%\preflight\config.toml`（Windows）。`PREFLIGHT_CONFIG` 可覆盖路径，`preflight config path` 打印实际读的是哪个。`preflight config list` 打印全部键**合并后的生效值**（flag > 环境变量 > 配置文件 > 默认；secret 只报是否已设置，绝不回显）。
 
 **允许的键是白名单**（[verdict.md §8](./verdict.md)），**未知键报错退出**——静默忽略会让拼错的键表现成「配了但没生效」，那是最难查的一类问题：
 
@@ -173,7 +173,7 @@ CLI 零配置可用。以下都是可选项。
 **设置 key**：
 
 ```bash
-ipcheck config set proxycheck-key    # 交互式、不回显，写入后权限置 600
+preflight config set proxycheck-key    # 交互式、不回显，写入后权限置 600
 ```
 
 刻意**不提供** `--proxycheck-key <KEY>` 明文 flag——那会把 secret 写进 shell history，也会出现在 `ps` 的进程列表里。脚本／CI 场景用环境变量 `PROXYCHECK_API_KEY`。
@@ -207,12 +207,12 @@ ipcheck config set proxycheck-key    # 交互式、不回显，写入后权限�
 - [ ] 应用最终名已定（这是最后的免费改名窗口）
 - [ ] `Cargo.toml` 里的 `tap` 占位已替换
 - [ ] `dist plan --tag=cli/v0.2.0` 解析通过
-- [ ] 发版后 `brew install <owner>/tap/ipcheck` 与 installer 一行命令实测可用
+- [ ] 发版后 `brew install <owner>/tap/preflight` 与 installer 一行命令实测可用
 
 ---
 
 ## 7. 绝不入库的东西
 
-`PROXYCHECK_API_KEY` · `TURNSTILE_SECRET_KEY` · `CLOUDFLARE_API_TOKEN` · `HOMEBREW_TAP_TOKEN` · 用户的 `~/.config/ipcheck/config.toml`
+`PROXYCHECK_API_KEY` · `TURNSTILE_SECRET_KEY` · `CLOUDFLARE_API_TOKEN` · `HOMEBREW_TAP_TOKEN` · 用户的 `~/.config/preflight/config.toml`
 
 `.env` 已在 `.gitignore` 里。CLI 侧还有一层：`Settings` 手写了 `Debug` 实现，key 在调试输出里显示为 `<set>` 而不是原值——派生的 `Debug` 会在 panic backtrace 里把它原样打出来。

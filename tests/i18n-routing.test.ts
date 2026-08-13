@@ -80,9 +80,9 @@ describe("两语种各自是独立静态资源，不是彼此的软 404 兜底",
         `实际 hreflang→href 映射：${JSON.stringify([...hreflangToHref])}`,
       ).toEqual(
         new Map([
-          ["en", "https://ipcheck.omnikit.run/"],
-          ["zh-Hans", "https://ipcheck.omnikit.run/zh-hans"],
-          ["x-default", "https://ipcheck.omnikit.run/"],
+          ["en", "https://preflight.omnikit.run/"],
+          ["zh-Hans", "https://preflight.omnikit.run/zh-hans"],
+          ["x-default", "https://preflight.omnikit.run/"],
         ]),
       );
     },

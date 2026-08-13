@@ -1,7 +1,7 @@
 # ipcheck Web — Worker API
 
-- 父计划：[2026-08-10-ipcheck-web.md](./2026-08-10-ipcheck-web.md)
-- 实现规格：[docs/specs/2026-08-10-ipcheck-web.md](../specs/2026-08-10-ipcheck-web.md) 第 2.1 / 2.4 / 5 节
+- 父计划：[2026-08-10-preflight-web.md](./2026-08-10-preflight-web.md)
+- 实现规格：[docs/specs/2026-08-10-preflight-web.md](../specs/2026-08-10-preflight-web.md) 第 2.1 / 2.4 / 5 节
 - Depends on: `--scaffold`
 
 ## 目标

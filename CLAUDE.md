@@ -1,4 +1,4 @@
-# ipcheck
+# Preflight
 
 ## Architecture
 
@@ -38,7 +38,7 @@ Web application
 | `make lint` / `make fmt` | oxlint / Prettier |
 | `make check` | fmt + lint + build + test（**只管 Web**——改一行 CSS 不该等 Rust 编译） |
 | `make cli-build` / `cli-test` / `cli-lint` / `cli-fmt` | CLI 的 cargo 对应命令 |
-| `make cli-release` | CLI release 构建（产物在 `target/release/ipcheck`） |
+| `make cli-release` | CLI release 构建（产物在 `target/release/preflight`） |
 | `make check-cli` | CLI 的 fmt + clippy + build + test |
 | `make check-all` | Web 与 CLI 都跑 |
 | `make clean` | 删除 `dist`、`.wrangler` 等产物 |
@@ -46,9 +46,9 @@ Web application
 **构建产物布局**（由 `@cloudflare/vite-plugin` 决定）：
 
 - `dist/client/` — 静态资源（`index.html`、`en/index.html`、`assets/`）
-- `dist/ipcheck/` — Worker bundle 与**生成的** `wrangler.json`（其中的 `assets.directory` 由插件填写）
+- `dist/preflight/` — Worker bundle 与**生成的** `wrangler.json`（其中的 `assets.directory` 由插件填写）
 
-**部署**：`pnpm deploy`（= build + `wrangler deploy -c dist/ipcheck/wrangler.json`）。**不要**直接对根 `wrangler.jsonc` 执行 `wrangler deploy`——那会绕过 Vite 产物、改用 wrangler 自己的打包。
+**部署**：`pnpm deploy`（= build + `wrangler deploy -c dist/preflight/wrangler.json`）。**不要**直接对根 `wrangler.jsonc` 执行 `wrangler deploy`——那会绕过 Vite 产物、改用 wrangler 自己的打包。
 
 **关于 `wrangler.jsonc`**：它是**输入配置**。其中的 `assets.directory`（`./dist/client`）只服务于 vitest-pool-workers——测试直接读这份配置，需要它指向构建产物；真实构建与部署用的是生成的输出配置。因此 `make test` 前需要先 `make build`（`tests/i18n-routing.test.ts` 依赖 `env.ASSETS` 读取真实产物）。
 
@@ -159,7 +159,7 @@ Universal cross-cutting conventions (HTTP/API design, observability, testing, co
 A static map of the repo. Contract and convention documents live directly under `docs/`; `docs/specs/` and `docs/plans/` accumulate dated documents over time.
 
 ```
-ipcheck/
+preflight/
 ├── CLAUDE.md          # This file - project rules, conventions, and module guide
 ├── AGENTS.md          # → @CLAUDE.md
 ├── CONTEXT.md         # Ubiquitous language glossary (domain terms only, no implementation)
@@ -176,7 +176,7 @@ ipcheck/
 │   ├── domain/        # 纯逻辑：结论判级、覆盖度、时区比对、IPv6、对照表
 │   └── probes/        # 浏览器直连的第三方探测（ipify）
 ├── Cargo.toml         # 纯 workspace（members = ["cli"]）+ dist 发布配置
-├── cli/               # ipcheck CLI（Rust）——判级契约的**全集实现**，10 项全测
+├── cli/               # Preflight CLI（Rust）——判级契约的**全集实现**，10 项全测
 │   └── src/
 │       ├── domain/    # 纯逻辑：检测项、覆盖度、判级（golden 向量在此消费）
 │       ├── probe/     # 10 项探测 + 第三方调用；不碰终端

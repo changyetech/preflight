@@ -1,4 +1,4 @@
-# ipcheck CLI 的质量门。
+# Preflight CLI 的质量门。
 #
 # 与 web.yml 的 paths 互不重叠，例外是 docs/ 下两份两端共吃的数据文件：
 # - docs/verdict-cases.json——判级契约的可执行形式，改它必须两侧同时验证（docs/verdict.md 第 7 节）

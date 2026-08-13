@@ -61,7 +61,7 @@ GitHub 仓库 owner 与主仓库名 · `<owner>/homebrew-tap` 仓库 · `HOMEBRE
 
 9. **仓库文档收尾**
    - `CLAUDE.md`：结构树加 `cli/`；Tech Stack 加 Rust 与 CLI；Build & Test 加 `cli-*` / `check-cli` / `check-all`；**修掉已漂移的「`index.html` / `en/index.html` 两个入口」**（实际已是 5 语种、英文在根路径）
-   - `docs/specs/2026-08-10-ipcheck-web.md` §3：**掏空改为引用** [docs/verdict.md](../verdict.md)——同一套判级规则不能同时住在一份 normative 和一份 descriptive 文档里
+   - `docs/specs/2026-08-10-preflight-web.md` §3：**掏空改为引用** [docs/verdict.md](../verdict.md)——同一套判级规则不能同时住在一份 normative 和一份 descriptive 文档里
    - → verify：`grep -rn "两个入口" CLAUDE.md` 无命中；spec §3 不再自述判级规则
 
 10. **删除 `refs/ipcheck/`**

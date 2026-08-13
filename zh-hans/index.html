@@ -4,22 +4,22 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ipcheck · 网络环境体检</title>
+    <title>Preflight · 网络环境体检</title>
     <meta
       name="description"
       content="查看你的出口 IP 归属、系统时区一致性与 IPv6 泄露，使用对 IP 环境敏感的工具前先看清自己的网络环境。"
     />
-    <link rel="canonical" href="https://ipcheck.omnikit.run/zh-hans" />
-    <link rel="alternate" hreflang="en" href="https://ipcheck.omnikit.run/" />
+    <link rel="canonical" href="https://preflight.omnikit.run/zh-hans" />
+    <link rel="alternate" hreflang="en" href="https://preflight.omnikit.run/" />
     <link
       rel="alternate"
       hreflang="zh-Hans"
-      href="https://ipcheck.omnikit.run/zh-hans"
+      href="https://preflight.omnikit.run/zh-hans"
     />
     <link
       rel="alternate"
       hreflang="x-default"
-      href="https://ipcheck.omnikit.run/"
+      href="https://preflight.omnikit.run/"
     />
     <!-- 防闪白：必须内联、必须在任何样式表加载/渲染前执行。读取 localStorage 里的主题偏好，
          立刻在 <html> 上打好 data-theme-pref（三态偏好）/ data-theme（二态生效值），
@@ -29,7 +29,7 @@
       (function () {
         var pref = null;
         try {
-          pref = localStorage.getItem("ipcheck-theme");
+          pref = localStorage.getItem("preflight-theme");
         } catch (e) {}
         if (pref !== "light" && pref !== "dark") pref = "system";
         var dark =

@@ -132,7 +132,7 @@ function reflexiveFrom(
     });
 
     // 没有 m 行就不会开始候选收集，数据通道是拿它的最省事的办法。
-    pc.createDataChannel("ipcheck");
+    pc.createDataChannel("preflight");
     pc.createOffer()
       .then((offer) => pc.setLocalDescription(offer))
       .catch(() => finish(null));

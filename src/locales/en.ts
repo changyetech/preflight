@@ -5,7 +5,7 @@
 
 export const EN = {
   site: {
-    title: "ipcheck · Network Environment Checkup",
+    title: "Preflight · Network Environment Checkup",
     tagline: "Know your network before you use IP-sensitive tools",
   },
 
@@ -16,7 +16,7 @@ export const EN = {
     /** 跳过导航链接（规格 §4 要点 6）：键盘用户可跳过顶栏 5 个锚点直达正文。 */
     skipToContent: "Skip to main content",
     /** 顶栏品牌名与锚点标签：短于 landing 各段标题，顶栏放不下长标题。 */
-    brand: "ipcheck",
+    brand: "Preflight",
     checks: "Web checks",
     cliChecks: "CLI-only",
     why: "Why",
@@ -95,7 +95,7 @@ export const EN = {
     copy: "Copy",
     copied: "Copied",
     /** 与 README「安装 CLI」的首选方式一致。`<owner>` 在第一个 `cli/v*` tag 前是占位。 */
-    installCommand: "brew install <owner>/tap/ipcheck",
+    installCommand: "brew install <owner>/tap/preflight",
     meaningLabel: "What this means",
   },
 

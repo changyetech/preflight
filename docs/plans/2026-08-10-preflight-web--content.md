@@ -1,7 +1,7 @@
 # ipcheck Web — 落地内容与国际化
 
-- 父计划：[2026-08-10-ipcheck-web.md](./2026-08-10-ipcheck-web.md)
-- 实现规格：[docs/specs/2026-08-10-ipcheck-web.md](../specs/2026-08-10-ipcheck-web.md) 第 4 / 6 / 7 节
+- 父计划：[2026-08-10-preflight-web.md](./2026-08-10-preflight-web.md)
+- 实现规格：[docs/specs/2026-08-10-preflight-web.md](../specs/2026-08-10-preflight-web.md) 第 4 / 6 / 7 节
 - Depends on: `--ui-panel`
 
 ## 目标

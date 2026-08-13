@@ -1,4 +1,4 @@
-# ipcheck Web 的部署。
+# Preflight Web 的部署。
 #
 # 与 cli.yml 的 paths 互不重叠，例外是两份两端共吃的数据文件——改它们必须两侧同时验证：
 # docs/verdict-cases.json（判级契约的可执行形式，docs/verdict.md 第 7 节）与
@@ -52,9 +52,9 @@ jobs:
       # 所以必须排在 build 之后。
       - run: pnpm vitest run
 
-      # 部署用的是**插件生成的** dist/ipcheck/wrangler.json，不是根目录那份输入配置——
+      # 部署用的是**插件生成的** dist/preflight/wrangler.json，不是根目录那份输入配置——
       # 对根 wrangler.jsonc 直接 deploy 会绕过 Vite 产物、改用 wrangler 自己的打包。
       - name: Deploy
-        run: pnpm exec wrangler deploy -c dist/ipcheck/wrangler.json
+        run: pnpm exec wrangler deploy -c dist/preflight/wrangler.json
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

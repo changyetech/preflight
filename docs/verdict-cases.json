@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "docs/verdict.md 第 2-3 节的可执行形式。ipcheck Web（vitest）与 ipcheck CLI（cargo test）必须各写一个参数化测试消费本文件。改判级规则的顺序恒为：verdict.md -> 本文件 -> 两端实现。",
+  "about": "docs/verdict.md 第 2-3 节的可执行形式。Preflight Web（vitest）与 Preflight CLI（cargo test）必须各写一个参数化测试消费本文件。改判级规则的顺序恒为：verdict.md -> 本文件 -> 两端实现。",
   "conventions": {
     "signals": "输入是原始观测值而非派生布尔量（如给 riskScore 数值而不是 riskScoreHigh），以便阈值本身也被测到。",
     "unknown": "null 表示未知——该检测项未执行、进行中或已失败。未知一律不贡献信号（verdict.md 2.3）。字段整体缺省等同于 null。",
@@ -10,7 +10,7 @@
     "tunOff": "例外：tunOff 保持派生布尔量，不展开原始观测。它是仅 CLI 的信号，本文件的向量钉的是两端平价，对单端信号展开换不回任何东西；「存在代理迹象」这个前提（verdict.md 2.7）在信号产出层判定，由 CLI 单测锁住（cli/src/probe/proxy.rs）。tunOff 为 true 时已蕴含迹象存在。",
     "udpEgress": "stunReflexiveIps 是**成功取回反射地址**的 STUN 列表（即 verdict.md 2.6 的 N_ok），exitIp 是出口 IP，二者派生出 udpEgressMismatch。null 与 **空数组 [] 同义**：一个 STUN 都没答上来，N_ok = 0 < 2 ⇒ O6 检测失败。单元素数组同理（N_ok = 1 < 2 ⇒ 检测失败）——列表里只放答上来的，没答上来的不占位。数组内地址互不一致、或与 exitIp 协议族不同因而同族数不足 2，均为无从比对而非未命中。",
     "expect": "stage 为 insufficient 时没有 level 字段——这与类型层面的设计一致，不是省略。",
-    "aiIpcheckDiverges": "标记该输入下 ipcheck CLI 与已归档的 ai-ipcheck 结论不同。平价比对（见实现计划 --output）遇到这些用例应按新契约判定，不得当作回归。",
+    "aiIpcheckDiverges": "标记该输入下 Preflight CLI 与已归档的 ai-ipcheck 结论不同。平价比对（见实现计划 --output）遇到这些用例应按新契约判定，不得当作回归。",
     "pairing": "riskScore 与 anonymous 必须成对：两者同为数值/布尔，或同为 null。只给其中一个是契约禁止的状态（verdict.md 2.3）。"
   },
   "cases": [
@@ -477,7 +477,7 @@
         "level": "medium"
       },
       "aiIpcheckDiverges": true,
-      "note": "ai-ipcheck 在此输入下判低（IPv6 泄露只进检测建议）。ipcheck CLI 判中——ADR-0006 升格后成为契约的一部分，对两端同时生效。这是相对 ai-ipcheck 的两处刻意行为变更之一，平价比对时不得当作回归。"
+      "note": "ai-ipcheck 在此输入下判低（IPv6 泄露只进检测建议）。Preflight CLI 判中——ADR-0006 升格后成为契约的一部分，对两端同时生效。这是相对 ai-ipcheck 的两处刻意行为变更之一，平价比对时不得当作回归。"
     },
     {
       "id": "cli-full-medium-tun-off",
