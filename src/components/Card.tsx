@@ -20,6 +20,9 @@ export function CopyButton({ text }: { text: string }) {
       type="button"
       className="copy"
       onClick={() => {
+        // 非安全上下文（http）或旧浏览器没有 navigator.clipboard——降级为「什么都不做」，
+        // 不抛错、不留下点了没反应却报错的按钮（brief 要点 2）。
+        if (!navigator.clipboard) return;
         void navigator.clipboard.writeText(text).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);

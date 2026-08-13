@@ -283,11 +283,37 @@ export const EN = {
   landing: {
     why: {
       title: "Why you need a checkup",
-      body: "AI tools are sensitive to your network environment. The most common pitfalls fall into four categories: exit IP type or abuse history that triggers anti-abuse controls; a mismatch between system and exit IP timezone; IPv6 quietly bypassing the proxy and exposing your real location; and local DNS exposing the domains you visit to your local ISP. This site can check the first three online; your local DNS server's configuration requires reading your local environment, which a webpage structurally cannot access — that's a CLI-only item.",
+      /** 四栏枚举前的引导句（原型 .why-lede，新增结构性文案）。 */
+      lede: "AI tools are sensitive to your network environment. The most common pitfalls fall into four categories.",
+      /** 四栏枚举，顺序与 O4/O2/O3/C2 对应（原型 .why-grid）。措辞取自对应检测项的 meaning 文案，不新造事实。 */
+      items: [
+        {
+          title: "Exit IP type & abuse history",
+          body: "Datacenter IPs, public proxies, and heavily abused IPs are the most direct trigger for anti-abuse controls.",
+        },
+        {
+          title: "System vs. exit IP timezone",
+          body: "A timezone mismatch is one of the most common proxy tells: the IP says United States, but the system clock says Beijing time — anti-abuse controls catch that instantly.",
+        },
+        {
+          title: "IPv6 leak",
+          body: "Most proxies only handle IPv4. If your machine has IPv6, some traffic slips past the proxy and goes out directly, exposing an address from a different location.",
+        },
+        {
+          title: "Local DNS exposure",
+          body: "Your local ISP can see which domains you resolve, even once your other traffic is proxied.",
+        },
+      ],
+      /** 前三项标签后缀（原型「网页可测」）；第四项（CLI-only）复用 coverage.needCli，不新造近义词。 */
+      checkedOnlineTag: "Checked online",
+      /** 段尾收束句，逐字取自原 why.body 的后半句。 */
+      foot: "This site can check the first three online; your local DNS server's configuration requires reading your local environment, which a webpage structurally cannot access — that's a CLI-only item.",
     },
     install: {
       title: "Install the CLI for all 10 checks",
       body: "The web version is a quick first look — it covers 6 items. The CLI covers all 10, including your real public IP, local DNS configuration, proxy/TUN detection, and the $TZ timezone check.",
+      /** 安装命令的适用平台（原型 .install-meta .plat）。brew 安装仅覆盖 macOS/Linux，与 Cargo.toml 的 dist targets 一致。 */
+      platforms: "macOS · Linux",
     },
     compare: {
       title: "Web vs. CLI: Full Feature Comparison",
