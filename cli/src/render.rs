@@ -76,7 +76,16 @@ fn verdict_tone(verdict: &Verdict) -> Tone {
     }
 }
 
-fn verdict_headline<'a>(verdict: &Verdict, text: &'a Text) -> (&'a str, Option<&'a str>, &'a str) {
+/// 结论区的档位词、形态徽章与摘要句。
+///
+/// `has_reminder_only` = 「需关注」清单里存在仅提醒项。低档的默认摘要说「未发现异常」，
+/// 与同屏的仅提醒清单自相矛盾（O2 系统时区、C2 国内 DNS 都是常态），因此低档两个形态
+/// 各有一条专用摘要。判级逻辑一行不动——矛盾出在文案，不在判据。
+fn verdict_headline<'a>(
+    verdict: &Verdict,
+    has_reminder_only: bool,
+    text: &'a Text,
+) -> (&'a str, Option<&'a str>, &'a str) {
     match verdict {
         Verdict::Insufficient => (
             text.verdict.insufficient,
@@ -86,7 +95,11 @@ fn verdict_headline<'a>(verdict: &Verdict, text: &'a Text) -> (&'a str, Option<&
         Verdict::Preliminary(PreliminaryLevel::Low) => (
             text.verdict.low,
             Some(text.verdict.preliminary_badge),
-            text.verdict.summary_preliminary_low,
+            if has_reminder_only {
+                text.verdict.summary_preliminary_low_reminders
+            } else {
+                text.verdict.summary_preliminary_low
+            },
         ),
         Verdict::Preliminary(PreliminaryLevel::Medium) => (
             text.verdict.medium,
@@ -96,7 +109,11 @@ fn verdict_headline<'a>(verdict: &Verdict, text: &'a Text) -> (&'a str, Option<&
         Verdict::Full(Level::Low) => (
             text.verdict.low,
             Some(text.verdict.full_badge),
-            text.verdict.summary_full_low,
+            if has_reminder_only {
+                text.verdict.summary_full_low_reminders
+            } else {
+                text.verdict.summary_full_low
+            },
         ),
         Verdict::Full(Level::Medium) => (
             text.verdict.medium,
@@ -169,16 +186,28 @@ pub fn report(report: &Report, text: &Text, style: &Style, verbose: bool) -> Str
 /// 提示行天然不会混进机器可读输出。
 fn render_footer(out: &mut String, text: &Text, style: &Style) {
     let f = &text.footer;
-    let _ = writeln!(
+    // 先上色再折行：`render_wrapped` 的宽度计算跳过转义序列（`display_width`），
+    // 提示词的 dim 与命令字面量的常色都得以保留。
+    render_wrapped(
         out,
-        "  ipcheck --verbose  {}  ·  ipcheck --json  {}",
-        style.tone(Tone::Dim, f.verbose_hint),
-        style.tone(Tone::Dim, f.json_hint)
+        &format!(
+            "ipcheck --verbose  {}  ·  ipcheck --json  {}",
+            style.tone(Tone::Dim, f.verbose_hint),
+            style.tone(Tone::Dim, f.json_hint)
+        ),
+        style,
+        None,
+        FOOTER_INDENT,
     );
-    let _ = writeln!(
+    render_wrapped(
         out,
-        "  ipcheck config set proxycheck-key  {}",
-        style.tone(Tone::Dim, f.quota_hint)
+        &format!(
+            "ipcheck config set proxycheck-key  {}",
+            style.tone(Tone::Dim, f.quota_hint)
+        ),
+        style,
+        None,
+        FOOTER_INDENT,
     );
 }
 
@@ -192,14 +221,18 @@ fn render_verdict(
     style: &Style,
 ) {
     let tone = verdict_tone(verdict);
-    let (level, badge, summary) = verdict_headline(verdict, text);
+    // 摘要句要知道清单里有没有仅提醒项，因此候选集合先算——`render_attention`
+    // 复用同一份结果，不重算第二遍（两遍算法迟早分叉）。
+    let (items, contributing) = attention_items(all_cards, report, verdict);
+    let has_reminder_only = items.iter().any(|c| !contributing.contains(&c.id));
+    let (level, badge, summary) = verdict_headline(verdict, has_reminder_only, text);
 
     let headline = match badge {
         Some(badge) => format!("{}  {}", style.bold(level), style.tone(Tone::Dim, badge)),
         None => style.bold(level),
     };
     let _ = writeln!(out, "  {} {headline}", style.tone(tone, marker(tone)));
-    let _ = writeln!(out, "    {summary}");
+    render_wrapped(out, summary, style, None, VERDICT_INDENT);
 
     if let Outcome::Done(info) = &report.o1 {
         let mut parts = vec![info.ip.clone()];
@@ -257,7 +290,7 @@ fn render_verdict(
         )
     );
 
-    render_attention(out, all_cards, report, verdict, text, style);
+    render_attention(out, &items, &contributing, text, style);
 }
 
 /// 风险分刻度条：20 格块字符，填充比例 = `score / 100`。
@@ -275,20 +308,17 @@ fn risk_bar(score: u32, tone: Tone, style: &Style) -> String {
     )
 }
 
-/// 「需关注」清单从卡片 tone 派生（spec 5.2），不写死检测项列表。
-/// 无 warn/bad 项时整块（含 attention_scope 句）不出。
-fn render_attention(
-    out: &mut String,
-    all_cards: &[Card],
+/// 「需关注」清单的候选集合，以及其中实际贡献综合结论的检测项。
+///
+/// 判据是「信号是否实际被 compute() 消费并命中」，不是卡片 tone——一张
+/// Warn/Bad 卡可能来自契约 2.1 明列的纯提醒信号。不在这里重算 51/76 阈值：
+/// O4 是否贡献综合结论，直接读 compute() 的结果（只有 O4 的风险分能把结论
+/// 判到 Full(High)，这是判级契约 3.2 的不变量，不是这里现算的）。
+fn attention_items<'a>(
+    all_cards: &'a [Card],
     report: &Report,
     verdict: &Verdict,
-    text: &Text,
-    style: &Style,
-) {
-    // 判据是「信号是否实际被 compute() 消费并命中」，不是卡片 tone——一张
-    // Warn/Bad 卡可能来自契约 2.1 明列的纯提醒信号。不在这里重算 51/76 阈值：
-    // O4 是否贡献综合结论，直接读 compute() 的结果（只有 O4 的风险分能把结论
-    // 判到 Full(High)，这是判级契约 3.2 的不变量，不是这里现算的）。
+) -> (Vec<&'a Card>, Vec<CheckId>) {
     let contributing = contributing_ids(&report.signals(), verdict);
 
     // 候选集合不能只看 tone：O4 卡片的 tone 只读 risk_score（契约 6），完全不读
@@ -305,12 +335,24 @@ fn render_attention(
     // 同级元素的相对顺序保持不变。
     items.sort_by_key(|c| if c.tone == Tone::Bad { 0 } else { 1 });
 
+    (items, contributing)
+}
+
+/// 「需关注」清单从卡片 tone 派生（spec 5.2），不写死检测项列表。
+/// 无 warn/bad 项时整块（含 attention_scope 句）不出。
+fn render_attention(
+    out: &mut String,
+    items: &[&Card],
+    contributing: &[CheckId],
+    text: &Text,
+    style: &Style,
+) {
     if items.is_empty() {
         return;
     }
 
     let _ = writeln!(out, "    {}", style.bold(text.verdict.attention_label));
-    for card in &items {
+    for card in items {
         // 清单的 marker 取「清单自身的语义」，不取卡片 tone：卡片 tone 只读分项
         // 分级（契约 6，只看分数），清单要说的是「这项影响了结论/值得看一眼」。
         // 一张卡片能进这份清单，只有两种原因——tone 本身是 Warn/Bad，或者
@@ -346,7 +388,7 @@ fn render_attention(
         .collect();
 
     if let Some(scope) = attention_scope(&contributing_ids, &reminder_ids, &text.verdict) {
-        let _ = writeln!(out, "    {}", style.tone(Tone::Dim, &scope));
+        render_wrapped(out, &scope, style, Some(Tone::Dim), VERDICT_INDENT);
     }
 }
 
@@ -428,13 +470,11 @@ fn contributing_ids(signals: &verdict::Signals, verdict: &Verdict) -> Vec<CheckI
 /// 用分隔符/连接词把编号列表拼成一句（如「O2 与 O4」「O2、O4 与 O6」）。
 /// 中英文标点不同，两个词都来自 Copy（spec 5.2 的裁定），不写死在这里。
 ///
-/// 连接词两侧的空格由渲染层统一补上（`connector.trim()` 后包一层单空格），
-/// 不进 Copy——Copy 里的连接词保持裸词（`与`/`and`），带空格的文案值是脆弱写法，
-/// 复制粘贴、trim、对齐时都会出问题。分隔符（顿号/逗号）不受影响，中英文本就
-/// 各自吸收了自己的空格习惯，C2 给的取值原样使用。
+/// 分隔符与连接词都**自带空格、原样拼接**——与 `C4FixText` 的 `explain_connector`
+/// 同一约定。同一份 Copy 里不并存两套隐含空格规则：一处归一、一处裸拼，改文案的人
+/// 无从判断自己该不该带空格。
 fn join_ids(ids: &[CheckId], separator: &str, connector: &str) -> String {
     let strs: Vec<&str> = ids.iter().map(|id| id.as_str()).collect();
-    let connector = format!(" {} ", connector.trim());
     match strs.split_last() {
         None => String::new(),
         Some((last, [])) => (*last).to_string(),
@@ -442,62 +482,96 @@ fn join_ids(ids: &[CheckId], separator: &str, connector: &str) -> String {
     }
 }
 
-/// 说明文字（`note`/`description`/C4 成因句）用的缩进——与 `values` 现有的
-/// 7 格缩进一致，折行后的续行悬挂对齐到同一列，不顶格。
+/// 检测卡内的取值与说明文字（`values`/`note`/`description`/C4 成因句）用的缩进——
+/// 折行后的续行悬挂对齐到同一列，不顶格。
 const NOTE_INDENT: &str = "       ";
+/// 结论区正文（摘要句、`attention_scope` 句）的缩进。
+const VERDICT_INDENT: &str = "    ";
+/// 页脚提示行的缩进。
+const FOOTER_INDENT: &str = "  ";
 /// 说明文字收进的总列宽（含缩进），spec §5.5。
 const WRAP_WIDTH: usize = 76;
 
-/// 按空格折行，收进 `WRAP_WIDTH - NOTE_INDENT` 列内；不含空格的超宽「词」
+/// 屏幕宽度（字符数），跳过 ANSI 转义序列——`\x1b[2m` 这类控制串不占列。
+/// 页脚是先上色再折行的（提示词 dim、命令字面量不 dim），拿原始字符数去折
+/// 会把彩色输出提前折断。
+fn display_width(text: &str) -> usize {
+    let mut width = 0;
+    let mut chars = text.chars();
+    while let Some(ch) = chars.next() {
+        if ch == '\x1b' {
+            for next in chars.by_ref() {
+                if next == 'm' {
+                    break;
+                }
+            }
+        } else {
+            width += 1;
+        }
+    }
+    width
+}
+
+/// 按空格折行，收进 `WRAP_WIDTH - indent` 列内；不含空格的超宽「词」
 /// （典型是中文长句，中文标点不分隔单词）按字符数强制切分。不处理 CJK
 /// 视觉宽度——文案本身较短，够用即可（brief 要点 4）。
-fn wrap_lines(text: &str) -> Vec<String> {
-    let avail = WRAP_WIDTH.saturating_sub(NOTE_INDENT.len());
+///
+/// 词间空格**按原样保留**：取值行拿双空格做列内对齐（`Address  1.2.3.4`、
+/// `Asia/Shanghai  ≠  Asia/Tokyo`），归一成单空格等于把对齐拆了。
+fn wrap_lines(text: &str, indent: &str) -> Vec<String> {
+    let avail = WRAP_WIDTH.saturating_sub(indent.chars().count()).max(1);
 
-    let mut tokens: Vec<String> = Vec::new();
-    for word in text.split(' ') {
-        if word.is_empty() {
-            continue;
+    // (词, 该词之后的空格串)。`split(' ')` 在连续空格处产出空片段，用它把被吃掉的
+    // 空格逐个补回前一个词的尾部。
+    let mut tokens: Vec<(String, String)> = Vec::new();
+    for (i, part) in text.split(' ').enumerate() {
+        if i > 0
+            && let Some(last) = tokens.last_mut()
+        {
+            last.1.push(' ');
         }
-        let chars: Vec<char> = word.chars().collect();
-        if chars.len() <= avail {
-            tokens.push(word.to_string());
-        } else {
-            for chunk in chars.chunks(avail) {
-                tokens.push(chunk.iter().collect());
-            }
+        if !part.is_empty() {
+            tokens.push((part.to_string(), String::new()));
         }
     }
 
     let mut lines = Vec::new();
     let mut current = String::new();
-    for token in tokens {
-        let extra = if current.is_empty() { 0 } else { 1 };
-        if current.chars().count() + extra + token.chars().count() > avail {
-            if !current.is_empty() {
-                lines.push(std::mem::take(&mut current));
+    for (word, spaces) in tokens {
+        let chars: Vec<char> = word.chars().collect();
+        let chunks: Vec<String> = if chars.len() > avail {
+            chars.chunks(avail).map(|c| c.iter().collect()).collect()
+        } else {
+            vec![word]
+        };
+        for chunk in chunks {
+            // `current` 的尾部空格已计入宽度，正是词与词之间的那一格。
+            if !current.is_empty() && display_width(&current) + display_width(&chunk) > avail {
+                let line = current.trim_end().to_string();
+                lines.push(line);
+                current.clear();
             }
-        } else if extra == 1 {
-            current.push(' ');
+            current.push_str(&chunk);
         }
-        current.push_str(&token);
+        current.push_str(&spaces);
     }
-    if !current.is_empty() {
-        lines.push(current);
+    let last = current.trim_end();
+    if !last.is_empty() {
+        lines.push(last.to_string());
     }
     lines
 }
 
-/// 折行后逐行输出，续行悬挂对齐到 `NOTE_INDENT`。`tone` 为 `None` 时不上色
+/// 折行后逐行输出，续行悬挂对齐到 `indent`。`tone` 为 `None` 时不上色
 /// （C4 成因句：原型里它是决定性说明，不是次级提示，不降 dim）。
-fn render_wrapped(out: &mut String, text: &str, style: &Style, tone: Option<Tone>) {
-    for line in wrap_lines(text) {
+fn render_wrapped(out: &mut String, text: &str, style: &Style, tone: Option<Tone>, indent: &str) {
+    for line in wrap_lines(text, indent) {
         match tone {
             Some(t) => {
-                let _ = writeln!(out, "{NOTE_INDENT}{}", style.tone(t, &line));
+                let _ = writeln!(out, "{indent}{}", style.tone(t, &line));
             }
             None => {
-                let _ = writeln!(out, "{NOTE_INDENT}{line}");
+                let _ = writeln!(out, "{indent}{line}");
             }
         }
     }
@@ -516,17 +590,20 @@ fn render_card(out: &mut String, card: &Card, style: &Style, verbose: bool) {
     let _ = writeln!(out, "  {head}");
 
     for value in &card.values {
-        let _ = writeln!(out, "{NOTE_INDENT}{value}");
+        // 取值行同样折行：C2／C4／O5／O6 把整句说明放在 `values` 里，其中 O5 的
+        // 泄露句是全报告最长的一行（原型改版点 05 点名的反面教材）。
+        render_wrapped(out, value, style, None, NOTE_INDENT);
     }
     for note in &card.notes {
-        render_wrapped(out, note, style, Some(Tone::Dim));
+        render_wrapped(out, note, style, Some(Tone::Dim), NOTE_INDENT);
     }
     if let Some(fix) = &card.fix {
-        render_wrapped(out, &fix.explain, style, None);
+        render_wrapped(out, &fix.explain, style, None, NOTE_INDENT);
+        // 修复命令不折行——折断的命令复制粘贴过去就跑不了。
         let _ = writeln!(out, "{NOTE_INDENT}{}", fix.command);
     }
     if verbose {
-        render_wrapped(out, card.description, style, Some(Tone::Dim));
+        render_wrapped(out, card.description, style, Some(Tone::Dim), NOTE_INDENT);
     }
 }
 
@@ -1128,32 +1205,148 @@ mod tests {
         }
     }
 
+    /// 满配报告：十项全部完成，且把改版新增的着色元素一次凑齐——风险刻度条、
+    /// 「需关注」清单、各卡状态词、O5 的 `reference_only` pill、`=`/`≠` 比对符。
+    /// `blank()`（十项全失败）测不到其中任何一个，颜色断言只跑它等于没跑。
+    fn full() -> Report {
+        Report {
+            o1: Outcome::Done(ExitInfo {
+                ip: "212.50.249.204".into(),
+                geo: Some(crate::probe::proxycheck::Geo {
+                    country_name: Some("Japan".into()),
+                    country_code: Some("JP".into()),
+                    region_name: Some("Osaka".into()),
+                    city_name: Some("Osaka".into()),
+                    timezone: Some("Asia/Tokyo".into()),
+                    asn: Some("AS25820".into()),
+                    organisation: Some("IT7 Networks Inc".into()),
+                    provider: None,
+                }),
+            }),
+            o2: Outcome::Done(TimezoneCheck {
+                local: Some("Asia/Shanghai".into()),
+                exit: Some("Asia/Tokyo".into()),
+                matches: Some(false),
+            }),
+            o3: Outcome::Done(ipify::Ipv6::Leaked("2001:db8::1".parse().unwrap())),
+            o4: Outcome::Done(Risk {
+                risk: crate::probe::proxycheck::Risk {
+                    network_type: Some("Hosting".into()),
+                    proxy: true,
+                    vpn: true,
+                    tor: false,
+                    scraper: false,
+                    risk_score: 85,
+                    anonymous: true,
+                },
+                abuse: Some(crate::probe::stopforumspam::Abuse {
+                    listed: true,
+                    frequency: 3,
+                    last_seen: None,
+                }),
+            }),
+            o5: Outcome::Done(dns_egress::DnsEgress {
+                resolver_geo: Some("Japan - Google LLC".into()),
+                comparison: dns_egress::Comparison::Comparable {
+                    leak: true,
+                    ecs_country: "CN".into(),
+                    exit_country: "JP".into(),
+                },
+            }),
+            o6: Outcome::Done(udp_egress::UdpEgress::Comparable {
+                mismatch: true,
+                reflexive_ip: "198.51.100.20".parse().unwrap(),
+                exit_ip: "212.50.249.204".parse().unwrap(),
+            }),
+            c1: Outcome::Done("203.0.113.7".into()),
+            c2: Outcome::Done(vec![dns::Server {
+                address: "114.114.114.114".into(),
+                label: None,
+                private: false,
+                domestic: true,
+            }]),
+            c3: Outcome::Done(proxy::Status {
+                env_vars: vec!["HTTP_PROXY".into()],
+                system: proxy::State::Enabled,
+                system_kinds: vec!["HTTP".into()],
+                tun: proxy::State::Disabled,
+            }),
+            c4: Outcome::Done(TimezoneCheck {
+                local: Some("Asia/Shanghai".into()),
+                exit: Some("Asia/Tokyo".into()),
+                matches: Some(false),
+            }),
+        }
+    }
+
     fn render(report: &Report, color: bool, verbose: bool) -> String {
         super::report(report, &copy::text(Lang::En), &Style::new(color), verbose)
     }
 
     /// 说明文字现在按 76 列折行、悬挂缩进（C4），原本整句的 `contains` 断言
-    /// 会被拆到多行而失配。这里把渲染输出按行拼回一整段（去掉每行的悬挂缩进），
+    /// 会被拆到多行而失配。这里把渲染输出按行拼回一整段（去掉每行的缩进——
+    /// 卡片内 7 格、结论区 4 格、页脚 2 格三种都要吃，所以直接 `trim_start`），
     /// 用于校验被折行打散的说明文字整体是否仍然完整存在——只在英文断言里使用，
     /// 英文按空格折行，拼回时补单空格能精确复原原文；中文长句会被强制按字符切分
     /// （无空格可依），拼回会插入原文没有的空格，因此不适用于中文断言。
+    /// 断点落在**双空格**上的文本（页脚的对齐空格）同样复原不了，那里另有断言。
     fn dewrap(out: &str) -> String {
         out.lines()
-            .map(|line| line.strip_prefix(NOTE_INDENT).unwrap_or(line))
+            .map(|line| line.trim_start())
             .collect::<Vec<_>>()
             .join(" ")
     }
 
     #[test]
     fn no_color_output_has_no_escape_sequences() {
-        // 重定向到文件不该满屏转义序列。
-        let out = render(&blank(), false, false);
-        assert!(!out.contains('\x1b'), "{out}");
+        // 重定向到文件不该满屏转义序列。跑满配报告——空报告里刻度条、需关注清单、
+        // 状态词、pill、比对符一个都不出现，只跑它等于把改版新增的着色路径全放过。
+        for report in [blank(), full()] {
+            for verbose in [false, true] {
+                let out = render(&report, false, verbose);
+                assert!(!out.contains('\x1b'), "{out}");
+            }
+        }
     }
 
     #[test]
     fn color_output_does_have_escape_sequences() {
-        assert!(render(&blank(), true, false).contains('\x1b'));
+        for report in [blank(), full()] {
+            assert!(render(&report, true, false).contains('\x1b'));
+        }
+    }
+
+    #[test]
+    fn a_full_report_never_exceeds_76_columns() {
+        // spec §5.5 的 76 列约束覆盖整份报告——结论区摘要、attention_scope 句与
+        // 页脚都在内，不只是检测卡里的说明行。宽度按屏幕宽度算（跳过转义序列），
+        // 彩色输出与 --no-color 应当折在同一处。
+        for lang in [Lang::En, Lang::ZhHans] {
+            let text = copy::text(lang);
+            // 结论区的 facts 网格三行不在约束内：spec §5.5 收的是**说明文字**，
+            // facts 是靠标签列对齐的数据行，折行会把网格拆散。出口 IP 那行在
+            // ASN + 机构名都长时确实会越过 76 列，这一条留给人类裁定。
+            let facts = [
+                text.verdict.exit_ip_label,
+                text.verdict.risk_label,
+                text.verdict.coverage_label,
+            ];
+            for color in [false, true] {
+                for verbose in [false, true] {
+                    let out = super::report(&full(), &text, &Style::new(color), verbose);
+                    for line in out
+                        .lines()
+                        .filter(|l| !facts.iter().any(|label| l.trim_start().starts_with(label)))
+                    {
+                        assert!(
+                            display_width(line) <= WRAP_WIDTH,
+                            "超出 76 列（{} 列）：{line:?}",
+                            display_width(line)
+                        );
+                    }
+                }
+            }
+        }
     }
 
     #[test]
@@ -1251,7 +1444,7 @@ mod tests {
             abuse: None,
         });
         let text = copy::text(Lang::En);
-        assert!(render(&report, false, false).contains(text.values.anonymous_flag));
+        assert!(dewrap(&render(&report, false, false)).contains(text.values.anonymous_flag));
     }
 
     #[test]
@@ -1323,8 +1516,14 @@ mod tests {
         let o5_start = out.find(" O5  ").expect("必须有 O5 卡片");
         let o6_start = out.find(" O6  ").expect("必须有 O6 卡片");
         let o5_card = &out[o5_start..o6_start];
-        assert!(o5_card.contains(text.dns_egress.no_ecs), "{o5_card}");
-        assert!(!o5_card.contains(text.failures.upstream), "{o5_card}");
+        assert!(
+            dewrap(o5_card).contains(text.dns_egress.no_ecs),
+            "{o5_card}"
+        );
+        assert!(
+            !dewrap(o5_card).contains(text.failures.upstream),
+            "{o5_card}"
+        );
     }
 
     #[test]
@@ -1337,8 +1536,11 @@ mod tests {
             udp_egress::NotComparable::StunDisagree,
         ));
         let out = render(&disagree, false, false);
-        assert!(out.contains(text.udp_egress.stun_disagree), "{out}");
-        assert!(!out.contains(text.udp_egress.no_mismatch), "{out}");
+        assert!(
+            dewrap(&out).contains(text.udp_egress.stun_disagree),
+            "{out}"
+        );
+        assert!(!dewrap(&out).contains(text.udp_egress.no_mismatch), "{out}");
 
         let mut miss = blank();
         miss.o6 = Outcome::Done(udp_egress::UdpEgress::Comparable {
@@ -1347,8 +1549,11 @@ mod tests {
             exit_ip: "198.51.100.20".parse().unwrap(),
         });
         let out = render(&miss, false, false);
-        assert!(out.contains(text.udp_egress.no_mismatch), "{out}");
-        assert!(!out.contains(text.udp_egress.stun_disagree), "{out}");
+        assert!(dewrap(&out).contains(text.udp_egress.no_mismatch), "{out}");
+        assert!(
+            !dewrap(&out).contains(text.udp_egress.stun_disagree),
+            "{out}"
+        );
     }
 
     fn risk_report(score: u32, anonymous: bool) -> Report {
@@ -1467,6 +1672,115 @@ mod tests {
         );
     }
 
+    /// 低档 + 一个仅提醒项：O2 系统时区不一致（契约 §2.1 明列不进综合结论），
+    /// O4 分数 10 且无滥用收录 ⇒ 综合结论 Full(Low)。
+    fn low_verdict_with_one_reminder_only_item() -> Report {
+        let mut report = blank();
+        report.o2 = tz("Asia/Shanghai", Some("Asia/Tokyo"), Some(false));
+        report.o4 = Outcome::Done(Risk {
+            risk: crate::probe::proxycheck::Risk {
+                network_type: None,
+                proxy: false,
+                vpn: false,
+                tor: false,
+                scraper: false,
+                risk_score: 10,
+                anonymous: false,
+            },
+            abuse: Some(crate::probe::stopforumspam::Abuse {
+                listed: false,
+                frequency: 0,
+                last_seen: None,
+            }),
+        });
+        report
+    }
+
+    #[test]
+    fn a_low_verdict_with_reminder_only_items_does_not_claim_that_nothing_was_found() {
+        // 「各项均未发现异常」与同屏的「需关注」清单自相矛盾——两句话的透镜不同：
+        // 摘要看「有没有贡献信号」，清单看「有没有值得看一眼的项」。纯提醒项
+        // （O2 系统时区、C2 国内 DNS）是常态，不是边角情形。
+        let report = low_verdict_with_one_reminder_only_item();
+        assert_eq!(report.verdict(), Verdict::Full(Level::Low));
+
+        for lang in [Lang::En, Lang::ZhHans] {
+            let text = copy::text(lang);
+            let out = super::report(&report, &text, &Style::new(false), false);
+            let flat = dewrap(&out);
+            assert!(out.contains(text.verdict.attention_label), "{out}");
+            assert!(
+                flat.contains(text.verdict.summary_full_low_reminders),
+                "{out}"
+            );
+            assert!(!flat.contains(text.verdict.summary_full_low), "{out}");
+        }
+    }
+
+    #[test]
+    fn a_low_verdict_without_any_attention_item_keeps_the_plain_summary() {
+        // 判别力对照：把仅提醒项拿掉，摘要必须换回「各项均未发现异常」——
+        // 否则新键会变成低档的无条件文案，等于把原来的句子直接改掉。
+        let mut report = low_verdict_with_one_reminder_only_item();
+        report.o2 = Outcome::Failed(Failure::Upstream);
+        assert_eq!(report.verdict(), Verdict::Full(Level::Low));
+
+        for lang in [Lang::En, Lang::ZhHans] {
+            let text = copy::text(lang);
+            let out = super::report(&report, &text, &Style::new(false), false);
+            let flat = dewrap(&out);
+            assert!(!out.contains(text.verdict.attention_label), "{out}");
+            assert!(flat.contains(text.verdict.summary_full_low), "{out}");
+            assert!(
+                !flat.contains(text.verdict.summary_full_low_reminders),
+                "{out}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_preliminary_low_summary_has_the_same_pair() {
+        // 初步形态同样可达这个组合：O2 不一致（仅提醒）+ O3 未启用（信号已知、未命中）
+        // ⇒ 风险分未知 ⇒ Preliminary(Low)，清单里仍有 O2。
+        let mut with_reminder = blank();
+        with_reminder.o2 = tz("Asia/Shanghai", Some("Asia/Tokyo"), Some(false));
+        with_reminder.o3 = Outcome::Done(ipify::Ipv6::Disabled);
+        assert_eq!(
+            with_reminder.verdict(),
+            Verdict::Preliminary(PreliminaryLevel::Low)
+        );
+
+        let mut without = blank();
+        without.o3 = Outcome::Done(ipify::Ipv6::Disabled);
+        assert_eq!(
+            without.verdict(),
+            Verdict::Preliminary(PreliminaryLevel::Low)
+        );
+
+        for lang in [Lang::En, Lang::ZhHans] {
+            let text = copy::text(lang);
+
+            let out = super::report(&with_reminder, &text, &Style::new(false), false);
+            let flat = dewrap(&out);
+            assert!(
+                flat.contains(text.verdict.summary_preliminary_low_reminders),
+                "{out}"
+            );
+            assert!(
+                !flat.contains(text.verdict.summary_preliminary_low),
+                "{out}"
+            );
+
+            let out = super::report(&without, &text, &Style::new(false), false);
+            let flat = dewrap(&out);
+            assert!(flat.contains(text.verdict.summary_preliminary_low), "{out}");
+            assert!(
+                !flat.contains(text.verdict.summary_preliminary_low_reminders),
+                "{out}"
+            );
+        }
+    }
+
     #[test]
     fn attention_block_is_absent_when_no_card_is_warn_or_bad() {
         // blank() 全部检测失败——失败卡是 Dim，不是 Warn/Bad。
@@ -1507,15 +1821,16 @@ mod tests {
         let out = render(&report, false, false);
 
         // 需关注清单三项都在，且都在结论区（O1 卡片之后才是下面的卡片流）。
+        // scope 句超过 76 列会被折行，断言前拼回整段。
+        let flat = dewrap(&out);
         assert!(out.contains(text.verdict.attention_label), "{out}");
         assert!(
-            out.contains(&format!("C4 {}", text.verdict.attention_contributing)),
+            flat.contains(&format!("C4 {}", text.verdict.attention_contributing)),
             "{out}"
         );
-        // 连接词两侧的空格由渲染层统一补上，不是 Copy 里 en/zh 各自凑巧带对——
-        // 这里锁的是渲染结果，不是拿 Copy 原始取值去拼期望值。
+        // 锁的是渲染结果里的空格，不是拿 Copy 原始取值去拼期望值。
         assert!(
-            out.contains(&format!(
+            flat.contains(&format!(
                 "O2 and O4 {}",
                 text.verdict.attention_reminder_only
             )),
@@ -1525,9 +1840,9 @@ mod tests {
 
     #[test]
     fn attention_scope_connector_gets_single_spaces_in_both_languages() {
-        // zh_hans 的 attention_list_connector 是裸词"与"（不带空格），en 是" and "
-        // （C2 给的取值本就带空格）——渲染层对两者一视同仁地 trim 再包一层单空格，
-        // 结果都应该是单空格，不依赖 Copy 里连接词本身带不带空格。
+        // 两个语种的 attention_list_connector 都自带两侧空格（" 与 " / " and "），
+        // 渲染层裸拼接。锁的是渲染结果里的空格数——连接词取值若漏带或多带空格，
+        // 这里当场变红。
         let mut report = blank();
         report.o2 = Outcome::Done(TimezoneCheck {
             local: Some("Asia/Shanghai".into()),
@@ -1856,13 +2171,16 @@ mod tests {
             let out = super::report(&blank(), &text, &Style::new(false), false);
             // 用完整行匹配而非松散 contains——命令字面量若被改错一个字符，
             // 单独的子串断言可能仍然因为是另一处的前缀而碰巧通过。
-            assert!(
-                out.contains(&format!(
-                    "  ipcheck --verbose  {}  ·  ipcheck --json  {}\n",
-                    text.footer.verbose_hint, text.footer.json_hint
-                )),
-                "{out}"
+            // 第一行 en 下有 84 列，会被折到两行（zh 不会），因此期望值先按同一
+            // 折行规则拆开，再逐行连着页脚缩进整行匹配：命令字面量、提示词、
+            // 缩进列三者仍然被锁死，只是不再假设它一定是一行。
+            let hints = format!(
+                "ipcheck --verbose  {}  ·  ipcheck --json  {}",
+                text.footer.verbose_hint, text.footer.json_hint
             );
+            for line in wrap_lines(&hints, FOOTER_INDENT) {
+                assert!(out.contains(&format!("\n{FOOTER_INDENT}{line}\n")), "{out}");
+            }
             assert!(
                 out.contains(&format!(
                     "  ipcheck config set proxycheck-key  {}\n",
@@ -1918,7 +2236,7 @@ mod tests {
             "O4 卡片自身应仍是黄色 marker（分项分级只看分数，60 分落在 26–75）：{o4_card}"
         );
         assert!(
-            o4_card.contains(text.values.anonymous_flag),
+            dewrap(o4_card).contains(text.values.anonymous_flag),
             "O4 卡片必须解释判高阈值降到 51 这件事：{o4_card}"
         );
     }
