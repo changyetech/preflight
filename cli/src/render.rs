@@ -12,7 +12,7 @@ use crate::copy::Text;
 use crate::domain::checks::{CheckId, Coverage, Failure, Outcome};
 use crate::domain::verdict::{self, Level, PreliminaryLevel, Verdict};
 use crate::domain::{dns_egress, udp_egress};
-use crate::probe::{ExitInfo, Report, Risk, TimezoneCheck, dns, ipify, proxy};
+use crate::probe::{ExitInfo, RealIp, Report, Risk, TimezoneCheck, dns, ipify, proxy, proxycheck};
 
 /// 分项的颜色语义。与综合结论无关（契约 6）。
 #[derive(Clone, Copy, PartialEq)]
@@ -1148,22 +1148,18 @@ fn cards(report: &Report, text: &Text, style: &Style) -> Vec<Card> {
     ]
 }
 
-fn card_o1(outcome: &Outcome<ExitInfo>, text: &Text) -> Card {
-    let meta = &text.checks.o1;
-    let Outcome::Done(info) = outcome else {
-        return failed_card(
-            CheckId::O1,
-            meta.title,
-            meta.description,
-            outcome.failure().unwrap(),
-            text,
-        );
-    };
-
+/// 「地址 + 归属 + 网络」三行，O1 与 C1 共用——两处的归属同源（契约 1），
+/// 展示形状也必须一致，否则用户没法逐行对照「真实 vs 出口」。
+fn ip_with_geo_rows(
+    ip: &str,
+    geo: Option<&proxycheck::Geo>,
+    source_note: &'static str,
+    text: &Text,
+) -> (Vec<Row>, Vec<&'static str>) {
     let fields = &text.checks.o1_fields;
-    let mut values = vec![Row::Kv(fields.address, info.ip.clone())];
+    let mut values = vec![Row::Kv(fields.address, ip.to_string())];
     let mut notes = Vec::new();
-    if let Some(geo) = &info.geo {
+    if let Some(geo) = geo {
         let place: Vec<&str> = [&geo.city_name, &geo.region_name, &geo.country_name]
             .into_iter()
             .filter_map(|f| f.as_deref())
@@ -1180,10 +1176,27 @@ fn card_o1(outcome: &Outcome<ExitInfo>, text: &Text) -> Card {
         }
         // 契约 5.4：必须标明归属来自 proxycheck，否则用户拿两边结果对不上时
         // 会以为有一边算错了。
-        notes.push(text.notes.geo_source);
+        notes.push(source_note);
     } else {
         values.push(Row::Kv(fields.ownership, text.values.unknown.to_string()));
     }
+    (values, notes)
+}
+
+fn card_o1(outcome: &Outcome<ExitInfo>, text: &Text) -> Card {
+    let meta = &text.checks.o1;
+    let Outcome::Done(info) = outcome else {
+        return failed_card(
+            CheckId::O1,
+            meta.title,
+            meta.description,
+            outcome.failure().unwrap(),
+            text,
+        );
+    };
+
+    let (values, notes) =
+        ip_with_geo_rows(&info.ip, info.geo.as_ref(), text.notes.geo_source, text);
 
     Card {
         id: CheckId::O1,
@@ -1570,21 +1583,29 @@ fn card_o6(outcome: &Outcome<udp_egress::UdpEgress>, text: &Text) -> Card {
     }
 }
 
-fn card_c1(outcome: &Outcome<String>, text: &Text) -> Card {
+fn card_c1(outcome: &Outcome<RealIp>, text: &Text) -> Card {
     let meta = &text.checks.c1;
     match outcome {
-        Outcome::Done(ip) => Card {
-            id: CheckId::C1,
-            tone: Tone::Ok,
-            title: meta.title,
-            // 同 O1：没有 ok/warn/bad 分支，「已取得」是提示词而非评价，固定 Dim。
-            state: Some(text.values.obtained.to_string()),
-            state_tone: Tone::Dim,
-            values: vec![Row::Kv(text.checks.o1_fields.address, ip.clone())],
-            notes: Vec::new(),
-            fix: None,
-            description: meta.description,
-        },
+        Outcome::Done(real) => {
+            let (values, notes) = ip_with_geo_rows(
+                &real.ip,
+                real.geo.as_ref(),
+                text.notes.geo_source_local,
+                text,
+            );
+            Card {
+                id: CheckId::C1,
+                tone: Tone::Ok,
+                title: meta.title,
+                // 同 O1：没有 ok/warn/bad 分支，「已取得」是提示词而非评价，固定 Dim。
+                state: Some(text.values.obtained.to_string()),
+                state_tone: Tone::Dim,
+                values,
+                notes,
+                fix: None,
+                description: meta.description,
+            }
+        }
         Outcome::Failed(failure) => {
             failed_card(CheckId::C1, meta.title, meta.description, *failure, text)
         }
@@ -1783,7 +1804,20 @@ mod tests {
                 reflexive_ip: "198.51.100.20".parse().unwrap(),
                 exit_ip: "212.50.249.204".parse().unwrap(),
             }),
-            c1: Outcome::Done("203.0.113.7".into()),
+            c1: Outcome::Done(RealIp {
+                ip: "203.0.113.7".into(),
+                // 与 O1 的出口归属刻意不同：这正是 C1 加归属要让用户看见的对照。
+                geo: Some(crate::probe::proxycheck::Geo {
+                    country_name: Some("China".into()),
+                    country_code: Some("CN".into()),
+                    region_name: Some("Guangdong".into()),
+                    city_name: Some("Shenzhen".into()),
+                    timezone: Some("Asia/Shanghai".into()),
+                    asn: Some("AS4134".into()),
+                    organisation: Some("Chinanet".into()),
+                    provider: None,
+                }),
+            }),
             c2: Outcome::Done(vec![dns::Server {
                 address: "114.114.114.114".into(),
                 label: None,

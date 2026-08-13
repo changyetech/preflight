@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 
 use crate::domain::checks::{ALL_CHECKS, CheckId, Failure, Outcome, TOTAL_CHECKS};
 use crate::domain::{dns_egress, udp_egress};
-use crate::probe::{Report, TimezoneCheck, ipify, proxy};
+use crate::probe::{Report, TimezoneCheck, ipify, proxy, proxycheck};
 
 fn failure_name(failure: Failure) -> &'static str {
     match failure {
@@ -94,16 +94,7 @@ fn check_json(id: CheckId, report: &Report) -> Value {
                 "ip": info.ip,
                 // 归属来自 proxycheck，不是 Cloudflare（契约 5.4）。
                 "geoSource": "proxycheck",
-                "geo": info.geo.as_ref().map(|geo| json!({
-                    "countryName": geo.country_name,
-                    "countryCode": geo.country_code,
-                    "regionName": geo.region_name,
-                    "cityName": geo.city_name,
-                    "timezone": geo.timezone,
-                    "asn": geo.asn,
-                    "organisation": geo.organisation,
-                    "provider": geo.provider,
-                })),
+                "geo": info.geo.as_ref().map(geo_json),
             })
         }),
         CheckId::O2 => check(&report.o2, timezone),
@@ -171,7 +162,14 @@ fn check_json(id: CheckId, report: &Report) -> Value {
                 "notComparableReason": udp_not_comparable_reason(result),
             })
         }),
-        CheckId::C1 => check(&report.c1, |ip| json!({ "ip": ip })),
+        CheckId::C1 => check(&report.c1, |real| {
+            json!({
+                "ip": real.ip,
+                // 与 O1 同源（契约 1）：同一个 proxycheck 地理库。
+                "geoSource": "proxycheck",
+                "geo": real.geo.as_ref().map(geo_json),
+            })
+        }),
         CheckId::C2 => check(&report.c2, |servers| {
             json!({
                 "servers": servers.iter().map(|server| json!({
@@ -195,6 +193,20 @@ fn check_json(id: CheckId, report: &Report) -> Value {
         }),
         CheckId::C4 => check(&report.c4, timezone),
     }
+}
+
+/// O1 与 C1 共用同一份归属形状——两处都来自 proxycheck 的同一段字段（契约 1）。
+fn geo_json(geo: &proxycheck::Geo) -> Value {
+    json!({
+        "countryName": geo.country_name,
+        "countryCode": geo.country_code,
+        "regionName": geo.region_name,
+        "cityName": geo.city_name,
+        "timezone": geo.timezone,
+        "asn": geo.asn,
+        "organisation": geo.organisation,
+        "provider": geo.provider,
+    })
 }
 
 fn state_name(state: &proxy::State) -> &'static str {
@@ -574,7 +586,10 @@ mod tests {
                 reflexive_ip: "203.0.113.10".parse().unwrap(),
                 exit_ip: "203.0.113.10".parse().unwrap(),
             }),
-            c1: Outcome::Done("198.51.100.5".into()),
+            c1: Outcome::Done(crate::probe::RealIp {
+                ip: "198.51.100.5".into(),
+                geo: Some(clean_geo()),
+            }),
             c2: Outcome::Done(vec![
                 dns::Server {
                     address: "192.168.1.1".into(),
@@ -674,7 +689,12 @@ mod tests {
                     "exitIp": "203.0.113.10",
                     "notComparableReason": null,
                 },
-                "C1": { "status": "done", "ip": "198.51.100.5" },
+                "C1": {
+                    "status": "done",
+                    "ip": "198.51.100.5",
+                    "geoSource": "proxycheck",
+                    "geo": clean_geo_json(),
+                },
                 "C2": {
                     "status": "done",
                     "servers": [

@@ -279,6 +279,9 @@ copy_leaf! {
     NoteText {
         /// 契约 5.4：归属来自 proxycheck，不是 Cloudflare，两端可能对不上。
         geo_source,
+        /// 同上，但用于 C1——它在网页版根本不存在，「与网页版对不上」那半句无从谈起，
+        /// 只保留「必须标明数据源」这条约束。
+        geo_source_local,
         /// 契约 5.1：O2 测的是系统时区，命令行进程认 `$TZ`（那是 C4）。
         o2_desktop_only,
         /// ADR-0012：无 key 配额按出口 IP 计，与同节点用户共享。

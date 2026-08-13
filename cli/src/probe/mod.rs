@@ -54,6 +54,15 @@ pub struct ExitInfo {
     pub geo: Option<proxycheck::Geo>,
 }
 
+/// C1 本机真实 IP 与归属。
+#[derive(Debug, Clone, PartialEq)]
+pub struct RealIp {
+    pub ip: String,
+    /// 与 O1 **同源**（同一个 proxycheck 地理库，契约 1）。`None` = 归属未取得，
+    /// 但这不降级 C1 的状态——IP 拿到了检测项就完成了。
+    pub geo: Option<proxycheck::Geo>,
+}
+
 /// 时区一致性的一条比对。
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimezoneCheck {
@@ -71,7 +80,7 @@ pub struct Report {
     pub o4: Outcome<Risk>,
     pub o5: Outcome<DnsEgress>,
     pub o6: Outcome<UdpEgress>,
-    pub c1: Outcome<String>,
+    pub c1: Outcome<RealIp>,
     pub c2: Outcome<Vec<dns::Server>>,
     pub c3: Outcome<proxy::Status>,
     pub c4: Outcome<TimezoneCheck>,
@@ -163,18 +172,37 @@ pub fn run(timeout: Duration, proxycheck_key: Option<&str>) -> Report {
 
     let exit_ip = exposure.as_ref().and_then(|e| e.ipv4.clone());
 
-    // 第二拨：依赖出口 IP。proxycheck 与 StopForumSpam 可以并发。
-    let (lookup, abuse) = match exit_ip.as_deref() {
-        Some(ip) => thread::scope(|scope| {
-            let lookup = scope.spawn(|| proxycheck::lookup(&agent, ip, proxycheck_key));
-            let abuse = scope.spawn(|| stopforumspam::probe(&agent, ip));
-            (
-                lookup.join().unwrap_or(proxycheck::Outcome::Unavailable),
-                abuse.join().ok().flatten(),
-            )
-        }),
-        None => (proxycheck::Outcome::Unavailable, None),
-    };
+    // C1 的归属与 O1 同源（契约 1）。**短路**：真实 IP 与出口 IP 相同（代理未生效或
+    // 未分流）时复用 O1 的结果，不再发一次查询——这是「每次运行最多多吃 1 次配额」的来源。
+    let real_ip_to_look_up = real_ip
+        .clone()
+        .filter(|ip| exit_ip.as_deref() != Some(ip.as_str()));
+
+    // 第二拨：依赖第一拨拿到的 IP。三个查询互不依赖，并发跑——C1 的归属因此不增加墙钟时间。
+    let (lookup, abuse, real_geo) = thread::scope(|scope| {
+        let lookup = scope.spawn(|| match exit_ip.as_deref() {
+            Some(ip) => proxycheck::lookup(&agent, ip, proxycheck_key),
+            None => proxycheck::Outcome::Unavailable,
+        });
+        let abuse = scope.spawn(|| {
+            exit_ip
+                .as_deref()
+                .and_then(|ip| stopforumspam::probe(&agent, ip))
+        });
+        let real_geo = scope.spawn(|| {
+            let ip = real_ip_to_look_up.as_deref()?;
+            match proxycheck::lookup(&agent, ip, proxycheck_key) {
+                proxycheck::Outcome::Ok(l) => Some(l.geo),
+                // 归属取不到不降级 C1（契约 1 第 2 条）。
+                _ => None,
+            }
+        });
+        (
+            lookup.join().unwrap_or(proxycheck::Outcome::Unavailable),
+            abuse.join().ok().flatten(),
+            real_geo.join().ok().flatten(),
+        )
+    });
 
     assemble(Observations {
         exposure,
@@ -182,6 +210,7 @@ pub fn run(timeout: Duration, proxycheck_key: Option<&str>) -> Report {
         lookup,
         abuse,
         real_ip,
+        real_geo,
         dns_servers,
         proxy_status,
         dns_egress,
@@ -197,6 +226,8 @@ struct Observations {
     lookup: proxycheck::Outcome,
     abuse: Option<stopforumspam::Abuse>,
     real_ip: Option<String>,
+    /// C1 单独查得的归属。真实 IP 与出口 IP 相同时为 `None`——那种情形复用 O1 的归属。
+    real_geo: Option<proxycheck::Geo>,
     dns_servers: Option<Vec<dns::Server>>,
     proxy_status: Option<proxy::Status>,
     dns_egress: Option<crate::domain::dns_egress::Observation>,
@@ -210,6 +241,7 @@ fn assemble(observations: Observations) -> Report {
         lookup,
         abuse,
         real_ip,
+        real_geo,
         dns_servers,
         proxy_status,
         dns_egress,
@@ -227,6 +259,19 @@ fn assemble(observations: Observations) -> Report {
     let exit_country = geo.as_ref().and_then(|g| g.country_code.clone());
     // 认不出协议族的出口地址等同于未知：反射地址无从筛选，落判定表第 3 行。
     let exit_address: Option<IpAddr> = exit_ip.as_ref().and_then(|ip| ip.parse().ok());
+
+    // C1 的归属与 O1 同源：两个 IP 相同就复用 O1 的归属，不同才用单独查得的那份（契约 1）。
+    let c1 = match real_ip {
+        Some(ip) => {
+            let real_geo = if exit_ip.as_deref() == Some(ip.as_str()) {
+                geo.clone()
+            } else {
+                real_geo
+            };
+            Outcome::Done(RealIp { ip, geo: real_geo })
+        }
+        None => Outcome::Failed(Failure::Upstream),
+    };
 
     let o1 = match exit_ip {
         Some(ip) => Outcome::Done(ExitInfo { ip, geo }),
@@ -257,10 +302,7 @@ fn assemble(observations: Observations) -> Report {
         o4,
         o5: crate::domain::dns_egress::judge(dns_egress.as_ref(), exit_country.as_deref()),
         o6: crate::domain::udp_egress::judge(&reflexive_ips, exit_address),
-        c1: match real_ip {
-            Some(ip) => Outcome::Done(ip),
-            None => Outcome::Failed(Failure::Upstream),
-        },
+        c1,
         c2: match dns_servers {
             Some(servers) if !servers.is_empty() => Outcome::Done(servers),
             _ => Outcome::Failed(Failure::Local),
@@ -310,6 +352,95 @@ mod tests {
             exit: Some("America/Los_Angeles".into()),
             matches,
         })
+    }
+
+    fn geo(country: &str) -> proxycheck::Geo {
+        proxycheck::Geo {
+            country_name: Some(country.into()),
+            country_code: None,
+            region_name: None,
+            city_name: None,
+            timezone: None,
+            asn: None,
+            organisation: None,
+            provider: None,
+        }
+    }
+
+    fn observations(
+        exit_ip: Option<&str>,
+        exit_geo: Option<proxycheck::Geo>,
+        real_ip: Option<&str>,
+        real_geo: Option<proxycheck::Geo>,
+    ) -> Observations {
+        Observations {
+            exposure: None,
+            exit_ip: exit_ip.map(str::to_string),
+            lookup: match exit_geo {
+                Some(geo) => proxycheck::Outcome::Ok(Box::new(proxycheck::Lookup {
+                    geo,
+                    risk: proxycheck::Risk {
+                        network_type: None,
+                        proxy: false,
+                        vpn: false,
+                        tor: false,
+                        scraper: false,
+                        risk_score: 10,
+                        anonymous: false,
+                    },
+                })),
+                None => proxycheck::Outcome::Unavailable,
+            },
+            abuse: None,
+            real_ip: real_ip.map(str::to_string),
+            real_geo,
+            dns_servers: None,
+            proxy_status: None,
+            dns_egress: None,
+            reflexive_ips: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn c1_reuses_the_exit_geo_when_both_ips_are_the_same() {
+        // 契约 1 第 1 条的短路：同一个 IP 不该再吃一次配额，归属也必须与 O1 同源。
+        let report = assemble(observations(
+            Some("203.0.113.10"),
+            Some(geo("Japan")),
+            Some("203.0.113.10"),
+            None,
+        ));
+        assert_eq!(
+            report.c1.value().and_then(|r| r.geo.clone()),
+            Some(geo("Japan"))
+        );
+    }
+
+    #[test]
+    fn c1_uses_its_own_geo_when_the_real_ip_differs_from_the_exit_ip() {
+        let report = assemble(observations(
+            Some("203.0.113.10"),
+            Some(geo("Japan")),
+            Some("198.51.100.5"),
+            Some(geo("China")),
+        ));
+        assert_eq!(
+            report.c1.value().and_then(|r| r.geo.clone()),
+            Some(geo("China"))
+        );
+    }
+
+    #[test]
+    fn a_missing_c1_geo_does_not_fail_the_check() {
+        // 契约 1 第 2 条：IP 拿到了检测项就完成了，归属缺失只是少展示几行。
+        let report = assemble(observations(
+            Some("203.0.113.10"),
+            None,
+            Some("198.51.100.5"),
+            None,
+        ));
+        assert!(report.c1.is_done());
+        assert_eq!(report.c1.value().and_then(|r| r.geo.clone()), None);
     }
 
     #[test]

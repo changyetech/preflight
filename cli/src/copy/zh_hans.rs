@@ -98,7 +98,7 @@ pub const ZH_HANS: Text = Text {
             description: "UDP 流量的出口地址是否与 TCP 观测到的出口 IP 一致，用两个独立的 STUN 探测互相印证。",
         },
         c1: CheckText {
-            title: "本机真实 IP",
+            title: "本机真实 IP 与归属",
             description: "经中国大陆的直连回显服务取得。规则代理默认对大陆 IP 走直连，因此即使开着 VPN 也能露出真实 ISP 出口；分流规则不含大陆直连时，本项只会再次显示出口 IP。",
         },
         c2: CheckText {
@@ -164,6 +164,7 @@ pub const ZH_HANS: Text = Text {
 
     notes: NoteText {
         geo_source: "归属数据来自 proxycheck；网页版用的是 Cloudflare 的地理库，两者可能对不上。",
+        geo_source_local: "归属数据来自 proxycheck，与上面 O1 同源——两处可以直接对照。",
         o2_desktop_only: "本项对应图形界面应用（跟随系统时区）。命令行工具认的是 $TZ，那是下面的 C4。",
         quota_shared: "无 key 时 proxycheck 每天 100 次，按出口 IP 计——与同一代理节点上的其他人共享。执行 `preflight config set proxycheck-key` 可提升到 1000 次。",
     },

@@ -104,7 +104,7 @@ pub const EN: Text = Text {
             description: "Whether UDP traffic exits through the same address as the exit IP observed over TCP, using two independent STUN probes.",
         },
         c1: CheckText {
-            title: "Real public IP",
+            title: "Real Public IP and Ownership",
             description: "Obtained from an echo service in mainland China, which rule-based proxies route directly — so it reveals your real ISP exit even with a VPN running. If your proxy rules don't route mainland China directly, this simply shows your exit IP again.",
         },
         c2: CheckText {
@@ -170,6 +170,7 @@ pub const EN: Text = Text {
 
     notes: NoteText {
         geo_source: "Ownership data comes from proxycheck. The website uses Cloudflare's database, so the two can disagree.",
+        geo_source_local: "Ownership data comes from proxycheck, the same source as O1 above — so the two are directly comparable.",
         o2_desktop_only: "This one covers GUI apps, which follow the system timezone. Command-line tools read $TZ instead — that is C4 below.",
         quota_shared: "Without an API key proxycheck allows 100 queries per day, counted per exit IP — you share it with anyone else on the same proxy node. Run `preflight config set proxycheck-key` to raise it to 1,000.",
     },
