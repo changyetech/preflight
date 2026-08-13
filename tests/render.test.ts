@@ -165,6 +165,47 @@ describe("结论区渲染", () => {
       expect(html).toContain('class="cov"');
     }
   });
+
+  it("控制台在有在线项检测中时挂 aria-busy=true，检测都结束后挂 false（规格 §4 要点 7）", () => {
+    const runningCells: CoverageCell[] = [
+      "running",
+      "done",
+      "done",
+      "ondemand",
+      "done",
+      "done",
+      "cli",
+      "cli",
+      "cli",
+      "cli",
+    ];
+    const idleCells: CoverageCell[] = [
+      "done",
+      "done",
+      "done",
+      "ondemand",
+      "done",
+      "done",
+      "cli",
+      "cli",
+      "cli",
+      "cli",
+    ];
+    const running = renderVerdict(
+      { stage: "insufficient" },
+      COVERAGE,
+      runningCells,
+    );
+    const idle = renderVerdict(
+      { stage: "preliminary", level: "low" },
+      COVERAGE,
+      idleCells,
+    );
+
+    expect(running).toContain('aria-busy="true"');
+    expect(idle).not.toContain('aria-busy="true"');
+    expect(idle).toContain('aria-busy="false"');
+  });
 });
 
 describe("卡片重试入口（规格 4.1）", () => {

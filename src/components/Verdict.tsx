@@ -139,7 +139,10 @@ export function VerdictPanel({
   const checking = cells.includes("running");
 
   return (
-    <section className={`console v-${level}`} id="verdict">
+    // aria-busy 挂在整个控制台区域：结论/覆盖度只要还有在线项在跑就没定型，
+    // 与原型给每张 O1-O6 卡片挂 aria-busy 是同一条规则在控制台这一级的呼应
+    // （卡片自己的 aria-busy 归 W3，这里只管控制台整体，不重复也不越界）。
+    <section className={`console v-${level}`} id="verdict" aria-busy={checking}>
       <div className="console-bar">
         <span className="live" data-live={checking ? "true" : "false"}>
           <i aria-hidden="true" />

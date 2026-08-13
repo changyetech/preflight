@@ -136,6 +136,7 @@ describe("coverageCells", () => {
   it("需 CLI 恒为 4 格，且顺序排在在线项之后（与原型 recompute() 拼接顺序一致）", () => {
     const cells = coverageCells(FIRST_SCREEN);
 
+    expect(cells).toHaveLength(10);
     expect(cells.slice(6)).toEqual(["cli", "cli", "cli", "cli"]);
   });
 
