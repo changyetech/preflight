@@ -19,12 +19,17 @@ function renderLanding(lang: Lang): string {
   );
 }
 
-/** 安装命令里的 `<owner>` 占位符在 HTML 里是转义态，直接拿原串断言会假红。 */
+/**
+ * 安装命令含 `--proto '=https'` 的单引号，React 会把它渲染成 `&#x27;`——
+ * 直接拿原串断言会假红。按 React 的转义规则还原后再比。
+ */
 function esc(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
 }
 
 describe("落地内容三段", () => {
@@ -35,6 +40,7 @@ describe("落地内容三段", () => {
     expect(html).toContain(COPY_ZH_HANS.landing.install.title);
     expect(html).toContain(COPY_ZH_HANS.landing.compare.title);
     expect(html).toContain(esc(COPY_ZH_HANS.actions.installCommand));
+    expect(html).toContain(esc(COPY_ZH_HANS.actions.installCommandWindows));
   });
 
   it("对照表渲染出全部 10 个检测项标题", () => {

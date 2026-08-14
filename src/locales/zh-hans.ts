@@ -82,7 +82,10 @@ export const ZH_HANS: Copy = {
     retry: "重试",
     copy: "复制",
     copied: "已复制",
-    installCommand: "brew install <owner>/tap/preflight",
+    installCommand:
+      "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/changyetech/preflight/releases/latest/download/preflight-installer.sh | sh",
+    installCommandWindows:
+      'powershell -c "irm https://github.com/changyetech/preflight/releases/latest/download/preflight-installer.ps1 | iex"',
     meaningLabel: "这意味着什么",
   },
 
@@ -275,7 +278,7 @@ export const ZH_HANS: Copy = {
     install: {
       title: "安装 CLI 补全全部 10 项",
       body: "网页版是快速摸底，能测 6 项；CLI 覆盖全部 10 项，包括本机真实 IP、本地 DNS 配置、代理与 TUN 检测、$TZ 时区一致性。",
-      platforms: "macOS · Linux",
+      platforms: "macOS · Linux · Windows",
     },
     compare: {
       title: "Web 与 CLI 完整功能对照表",

@@ -1086,7 +1086,7 @@ button {
   font-size: 0.8125rem;
 }
 
-/* 「安装 CLI」：左说明、右命令面板（原型 .install-grid / .install-panel）。 */
+/* 「安装 CLI」：说明在上、命令面板在下，两块都占满整行（.install-grid 恒为单列）。 */
 #install .install-copy p {
   max-width: none;
   text-wrap: pretty;
@@ -1113,6 +1113,11 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--r);
   background: var(--sunken);
+}
+
+/* 两条命令（macOS/Linux 的 curl、Windows 的 powershell）上下排。 */
+.install-row + .install-row {
+  margin-top: 0.625rem;
 }
 
 .install-row code {
@@ -1311,18 +1316,13 @@ button {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .install-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 0 3rem;
-  }
-
   .install-row {
     flex-direction: row;
   }
 
-  .install-row code {
-    white-space: nowrap;
-  }
+  /* 这里刻意**不设** white-space: nowrap。命令框占满整行，nowrap 会让它的 min-content
+     变成整行文本宽度，而 .landing 的 grid 子项是默认的 min-width:auto——窄一点的视口下
+     整个落地区会被撑破，页面出现横向滚动条。让它按基础规则换行。 */
 
   .install-row .copy {
     border-block-start: 0;

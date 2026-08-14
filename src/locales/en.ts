@@ -97,8 +97,16 @@ export const EN = {
     retry: "Retry",
     copy: "Copy",
     copied: "Copied",
-    /** 与 README「安装 CLI」的首选方式一致。`<owner>` 在第一个 `cli/v*` tag 前是占位。 */
-    installCommand: "brew install <owner>/tap/preflight",
+    /**
+     * 两条安装命令与 README「安装 CLI」一致——用户会直接复制执行，改这里要同步 README。
+     * 没有 Homebrew 那条：那需要独立的 tap 仓库，已按 docs/deployment.md 第 5 节摘掉。
+     * 命令本身是命令，不翻译；两个语种共用同一份字面量。
+     */
+    installCommand:
+      "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/changyetech/preflight/releases/latest/download/preflight-installer.sh | sh",
+    /** Windows 是一等支持（dist 有 x86_64-pc-windows-msvc，探测侧有 cfg(windows) 分支）。 */
+    installCommandWindows:
+      'powershell -c "irm https://github.com/changyetech/preflight/releases/latest/download/preflight-installer.ps1 | iex"',
     meaningLabel: "What this means",
   },
 
@@ -323,8 +331,8 @@ export const EN = {
     install: {
       title: "Install the CLI for all 10 checks",
       body: "The web version is a quick first look — it covers 6 items. The CLI covers all 10, including your real public IP, local DNS configuration, proxy/TUN detection, and the $TZ timezone check.",
-      /** 安装命令的适用平台（原型 .install-meta .plat）。brew 安装仅覆盖 macOS/Linux，与 Cargo.toml 的 dist targets 一致。 */
-      platforms: "macOS · Linux",
+      /** 安装命令的适用平台（原型 .install-meta .plat），与 Cargo.toml 的 dist targets 一致。 */
+      platforms: "macOS · Linux · Windows",
     },
     compare: {
       title: "Web vs. CLI: Full Feature Comparison",

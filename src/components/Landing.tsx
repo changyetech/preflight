@@ -58,6 +58,10 @@ export function Landing() {
               <code>{COPY.actions.installCommand}</code>
               <CopyButton text={COPY.actions.installCommand} />
             </div>
+            <div className="install-row">
+              <code>{COPY.actions.installCommandWindows}</code>
+              <CopyButton text={COPY.actions.installCommandWindows} />
+            </div>
             <div className="install-meta">
               <span className="plat">{install.platforms}</span>
             </div>

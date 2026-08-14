@@ -59,11 +59,27 @@ describe.each([["en", COPY] as const, ["zh-hans", COPY_ZH_HANS] as const])(
     });
 
     // 安装命令必须指向本仓库产出的 Rust CLI，不得回到已归档的 ai-ipcheck（README「安装 CLI」）。
+    // Homebrew 那条已摘（需要独立 tap 仓库，见 docs/deployment.md 第 5 节），首选方式是 installer 脚本。
     it("灰卡提示的安装命令与 README 的首选方式一致", () => {
       expect(copy.actions.installCommand).toBe(
-        "brew install <owner>/tap/preflight",
+        "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/changyetech/preflight/releases/latest/download/preflight-installer.sh | sh",
       );
       expect(copy.actions.installCommand).not.toContain("ai-ipcheck");
+    });
+
+    // 摘掉 homebrew 后 tap 仓库不存在，落地页给出 brew 命令就是让用户去撞一个不存在的仓库。
+    it("安装命令不得出现 brew——tap 仓库已摘，那条命令会直接失败", () => {
+      expect(copy.actions.installCommand).not.toContain("brew");
+      expect(copy.actions.installCommandWindows).not.toContain("brew");
+    });
+
+    // Windows 是一等支持（dist 有 x86_64-pc-windows-msvc，探测侧有 cfg(windows) 分支），
+    // 落地页必须给得出可执行的 Windows 安装方式，而不是只标一句支持。
+    it("Windows 安装命令指向 .ps1 installer，且平台标注含 Windows", () => {
+      expect(copy.actions.installCommandWindows).toContain(
+        "preflight-installer.ps1",
+      );
+      expect(copy.landing.install.platforms).toContain("Windows");
     });
 
     // 契约 §5.5 呈现约束：缺了这句，用户会拿浏览器 DoH 的绿色结论去为命令行工具背书。
