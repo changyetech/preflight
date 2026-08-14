@@ -29,7 +29,7 @@ cargo install --git https://github.com/changyetech/preflight
 
 **不发布到 crates.io。** 也可以直接从 [Releases](https://github.com/changyetech/preflight/releases) 下对应平台的压缩包，解开把 `preflight` 丢进 `PATH`。预编译二进制覆盖 macOS（Apple Silicon + Intel）、Linux（x86_64 + arm64）与 Windows（x86_64）。
 
-**升级就是把上面的安装命令再跑一遍**，它会覆盖掉旧的那个。**没有 Homebrew 通道**——那需要一个独立的 tap 仓库（Homebrew 的命名硬规则，formula 不能住在主仓库里），目前不值这个维护面。
+**升级用 `preflight update`**——有新版才下载，复用官方 installer；把上面的安装命令再跑一遍效果相同（源码安装的没有 install receipt，`update` 会拒绝，请重新构建替换）。**没有 Homebrew 通道**——那需要一个独立的 tap 仓库（Homebrew 的命名硬规则，formula 不能住在主仓库里），目前不值这个维护面。
 
 **卸载**用 `preflight uninstall`（删二进制与 install receipt，配置保留）；`preflight uninstall --purge` 连配置目录一起删。
 

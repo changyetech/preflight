@@ -35,7 +35,19 @@ make cli-release        # 产物在 target/release/preflight
 preflight --version
 ```
 
-### 1.1 卸载
+### 1.1 更新
+
+```bash
+preflight update    # 已是最新则直接退出；有新版则下载并执行官方安装器
+```
+
+版本探测走 GitHub Release（`releases/latest`）；更新本身复用与首次安装**同一份**官方 installer——receipt、安装路径与 PATH 行都由它维护。退出码沿用 §3.2 注册表：`0` 已最新或更新成功，`1` 检查 / 下载 / 安装任一步失败（失败时原二进制原样保留，可继续使用）。
+
+只支持官方 installer 装的副本：从源码装的（`make cli-release` / `cargo install --git`）没有 install receipt，`update` 会拒绝并提示——请按当初的安装方式重新构建替换。
+
+Windows 上更新完成后，旧的 exe 会以 `preflight.exe.old` 短暂残留在同目录（运行中的 exe 删不掉自己），下次运行任意 `preflight` 命令时自动清理。
+
+### 1.2 卸载
 
 ```bash
 preflight uninstall           # 删除二进制与 install receipt，配置保留
@@ -76,6 +88,7 @@ preflight
 preflight [OPTIONS]                  # 体检（默认命令）
 preflight dns [--check]              # 公共 DNS 服务器清单（可实测连通性）
 preflight config <ACTION>            # 查看与修改配置
+preflight update                     # 更新到最新版（见 §1.1）
 preflight uninstall [--purge]        # 卸载（--purge 连配置一起删）
 ```
 

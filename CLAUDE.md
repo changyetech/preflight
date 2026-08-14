@@ -202,6 +202,7 @@ preflight/
 │   │   ├── domain/    # 纯逻辑：检测项、覆盖度、判级（golden 向量在此消费）
 │   │   ├── probe/     # 10 项探测 + 第三方调用；不碰终端
 │   │   ├── copy/      # 文案：en 为源语言，zh_hans 为完整译文（无字段级回落）
+│   │   ├── update.rs  # `update`：dist-manifest 比版本 + 复用官方 installer 自更新
 │   │   ├── uninstall.rs  # `uninstall`：自删二进制 + receipt，--purge 连配置目录
 │   │   ├── render.rs  # 人读报告（参考 Web 的视觉结构，无表格边框）
 │   │   └── json.rs    # `--json`：机器可读，也是平价验收唯一的 oracle
