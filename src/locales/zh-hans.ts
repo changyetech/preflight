@@ -21,6 +21,7 @@ export const ZH_HANS: Copy = {
     install: "安装 CLI",
     compare: "对照表",
     dns: "DNS 清单",
+    guide: "CLI 手册",
     backToTop: "回到顶部",
     theme: {
       label: "主题",
@@ -279,6 +280,7 @@ export const ZH_HANS: Copy = {
       title: "安装 CLI 补全全部 10 项",
       body: "网页版是快速摸底，能测 6 项；CLI 覆盖全部 10 项，包括本机真实 IP、本地 DNS 配置、代理与 TUN 检测、$TZ 时区一致性。",
       platforms: "macOS · Linux · Windows",
+      guideLink: "查看完整使用手册 →",
     },
     compare: {
       title: "Web 与 CLI 完整功能对照表",
@@ -333,6 +335,243 @@ export const ZH_HANS: Copy = {
     },
     cliHint:
       "想测你这台机器上实际可用的？在 CLI 里执行 preflight dns --check。",
+  },
+
+  guide: {
+    title: "CLI 使用手册 · Preflight",
+    description:
+      "Preflight CLI 的使用方法：安装、命令与参数、退出码、配置、JSON 输出与常见场景。",
+    heading: "CLI 使用手册",
+    lede: "Preflight CLI 在终端中对网络环境执行一次完整体检——10 项全测，最终给出带覆盖度的综合结论。不存储任何检测结果，探测直连第三方服务，不经过本站服务器。本页仅说明使用方法；各检测项的含义见首页。",
+    install: {
+      heading: "安装",
+      intro:
+        "每个平台一条命令——安装脚本会自动从 GitHub Releases 下载对应平台的二进制文件：",
+      linuxLabel: "Linux / macOS",
+      windowsLabel: "Windows（PowerShell）",
+      verify: "安装完成后验证：",
+    },
+    sections: [
+      {
+        heading: "快速开始",
+        paras: ["直接运行 preflight 即可开始体检，无需任何子命令："],
+        code: ["preflight"],
+        table: { headers: [], rows: [] },
+        after: [
+          "所有探测并发执行，完成后一次性输出报告：首先是综合结论（低 / 中 / 高风险，或「数据不足」）及覆盖度（n/10），随后是各检测项的详细结果。",
+          "进度提示仅在交互式终端的 stderr 输出——stdout 始终是一份完整的报告，重定向到文件时不会混入进度信息。",
+        ],
+      },
+      {
+        heading: "命令与参数",
+        paras: ["共三条命令，体检为默认命令："],
+        code: [
+          "preflight [OPTIONS]          # 体检（默认命令）",
+          "preflight dns [--check]      # 公共 DNS 服务器清单",
+          "preflight config <ACTION>    # 查看与修改配置",
+        ],
+        table: {
+          headers: ["参数", "说明"],
+          rows: [
+            [
+              "--lang <LANG>",
+              "界面语言：en / zh-hans。全局参数，可置于任意位置。",
+            ],
+            ["--json", "输出机器可读的 JSON。需置于子命令之前。"],
+            ["-v, --verbose", "在报告中附上各检测项的说明。"],
+            ["-V / --version", "输出短版本号 / 完整版本信息。"],
+          ],
+        },
+        after: [
+          "未显式指定语言时，按以下顺序解析：--lang 参数 > 配置项 language > 系统 locale > 英文。",
+        ],
+      },
+      {
+        heading: "体检与退出码",
+        paras: ["退出码是脚本集成时的关键约定："],
+        code: [],
+        table: {
+          headers: ["退出码", "含义"],
+          rows: [
+            [
+              "0",
+              "体检完成，与风险档位无关。风险档位应从报告或 JSON 输出中读取，而非退出码——若以退出码表达风险，脚本将无法区分「高风险」与「工具运行失败」。",
+            ],
+            ["1", "工具自身运行失败（配置不合法、语言无效等）。"],
+            [
+              "2",
+              "体检已执行，但未产出任何贡献信号，结论为「数据不足」。报告仍会正常输出。",
+            ],
+          ],
+        },
+        after: [
+          "当 stdout 不是终端（管道、重定向）时自动关闭彩色输出；也可通过 NO_COLOR 环境变量或 config set no-color true 关闭。报告宽度在渲染前根据终端窗口测量一次；重定向输出时使用固定宽度。",
+        ],
+      },
+      {
+        heading: "preflight dns",
+        paras: [
+          "列出内置的公共 DNS 服务器清单（IP / 提供商 / 地区 / 过滤级别，与本站 DNS 清单页使用同一份数据）。附加 --check 时，将向每台服务器发送真实 DNS 查询，实测连通性与延迟：",
+        ],
+        code: [
+          "preflight dns",
+          "preflight dns --check",
+          "preflight --json dns --check",
+        ],
+        table: {
+          headers: ["状态", "判据"],
+          rows: [
+            [
+              "ok",
+              "收到应答，且 TXID 匹配、RCODE 为 NOERROR、至少包含一条非私网 A 记录。",
+            ],
+            [
+              "suspicious",
+              "收到应答但不满足上述全部条件——可能存在劫持或污染。",
+            ],
+            ["unreachable", "超时未收到有效应答。"],
+          ],
+        },
+        after: [],
+      },
+      {
+        heading: "preflight config",
+        paras: [
+          "config path 打印配置文件路径；config list 与 config get 打印生效值（合并全部来源之后）；config set 与 config unset 写入配置文件：",
+        ],
+        code: [
+          "preflight config set language zh-hans",
+          "preflight config set timeout 20",
+          "preflight config set proxycheck-key   # 交互式输入，不回显",
+          "preflight config unset timeout",
+        ],
+        table: {
+          headers: ["键", "取值", "默认", "说明"],
+          rows: [
+            ["language", "en / zh-hans", "跟随系统 locale", "界面语言"],
+            [
+              "proxycheck-key",
+              "交互式输入",
+              "未设置",
+              "proxycheck.io API key，见下文",
+            ],
+            ["timeout", "1–120（秒）", "10", "网络探测超时"],
+            ["no-color", "true / false", "false", "关闭彩色输出"],
+          ],
+        },
+        after: [
+          "可配置的键为白名单——判级阈值与检测项开关不可配置。",
+          "API key 有意不提供明文参数：明文会写入 shell 历史记录，并出现在 ps 的进程列表中。",
+          "若刚写入的键被更高优先级的来源覆盖（--lang、PROXYCHECK_API_KEY、NO_COLOR），命令会在 stderr 给出提示。",
+        ],
+      },
+      {
+        heading: "配置来源与优先级",
+        paras: [
+          "优先级固定为：命令行参数 > 环境变量 > 配置文件 > 内置默认值。",
+          "配置文件为 TOML 格式，键名使用下划线（proxycheck_key、no_color）。遇到未知键会报错退出，而非静默忽略——拼写错误的键不会表现为「已配置但未生效」。Unix 系统上文件权限设为 600。",
+        ],
+        code: [],
+        table: {
+          headers: ["平台", "配置文件路径"],
+          rows: [
+            [
+              "Linux / macOS",
+              "$XDG_CONFIG_HOME/preflight/config.toml，未设 XDG 时为 ~/.config/preflight/config.toml",
+            ],
+            ["Windows", "%APPDATA%\\preflight\\config.toml"],
+            ["任意", "环境变量 PREFLIGHT_CONFIG 可指定任意路径，优先级最高。"],
+          ],
+        },
+        after: [],
+      },
+      {
+        heading: "环境变量",
+        paras: [],
+        code: [],
+        table: {
+          headers: ["变量", "作用"],
+          rows: [
+            [
+              "PROXYCHECK_API_KEY",
+              "proxycheck key，优先于配置文件；空值视为未设置。",
+            ],
+            [
+              "NO_COLOR",
+              "存在且非空即关闭彩色输出（遵循 no-color.org 约定，不校验具体值）。",
+            ],
+            ["PREFLIGHT_CONFIG", "覆盖配置文件路径。"],
+          ],
+        },
+        after: [],
+      },
+      {
+        heading: "proxycheck API key",
+        paras: [
+          "「IP 类型与风险」检测及归属查询通过 proxycheck.io 完成。未设置 key 时使用其匿名额度（每日 100 次查询）；设置免费 key 后提升至每日 1000 次：",
+        ],
+        code: [
+          "preflight config set proxycheck-key    # 或 export PROXYCHECK_API_KEY=…",
+          "preflight config get proxycheck-key    # 只报「已设置 / 未设置」",
+        ],
+        table: { headers: [], rows: [] },
+        after: [
+          "key 不会出现在任何输出中——包括报告、--json 与错误信息。CLI 直连 proxycheck、使用你自己的配额，不经过本站，也不占用网页版的共享配额。",
+        ],
+      },
+      {
+        heading: "--json 输出",
+        paras: [
+          "preflight --json 输出单个 JSON 对象：verdict（形态与档位）、coverage（done / failed / total）、signals（三态：true / false / null——null 表示未知，不等同于 false），以及 checks 下每个检测项各一个条目（完成时带各自字段，失败时带 upstream / quotaExhausted / local 之一的原因）。",
+        ],
+        code: [
+          "{",
+          '  "verdict":  { "stage": "final", "level": "low" },',
+          '  "coverage": { "done": 10, "failed": 0, "total": 10 },',
+          '  "signals":  { "ipv6Leak": false, "dnsEgressLeak": false, … },',
+          '  "checks":   { "O1": { "status": "done", … }, … }',
+          "}",
+        ],
+        table: { headers: [], rows: [] },
+        after: [
+          'preflight --json dns 使用独立 schema：{ "servers": [ … ] }，每项包含 ip / name / region / variant；执行过 --check 时额外包含 check 块。',
+        ],
+      },
+    ],
+    scenarios: {
+      heading: "典型场景",
+      items: [
+        {
+          title: "切换代理节点后",
+          body: "在执行对 IP 敏感的操作前先运行一次体检——确认 DNS、UDP、IPv6 流量均未绕过代理，且出口 IP 的风险分处于正常范围。",
+          code: ["preflight"],
+        },
+        {
+          title: "脚本与自动化",
+          body: "结合 --json 与退出码使用。风险档位从 JSON 输出中读取；退出码仅表示工具是否正常运行完毕。",
+          code: [
+            "out=$(preflight --json) || exit 1",
+            "level=$(echo \"$out\" | jq -r '.verdict.level')",
+            '[ "$level" = "high" ] && echo "高风险出口，中止后续操作" >&2 && exit 1',
+          ],
+        },
+        {
+          title: "已启用代理，但仍触发风控",
+          body: "查看报告中的 O5（DNS 出口泄露）、O6（UDP 出口一致性）、O3（IPv6 泄露）与 C3（TUN 未开启）；附加 -v 可查看各检测项的说明。",
+          code: ["preflight -v"],
+        },
+        {
+          title: "选择可用的公共 DNS",
+          body: "在本机实测清单中每台服务器的连通性与延迟，同时识别可疑应答。",
+          code: ["preflight dns --check"],
+        },
+        {
+          title: "网络较慢导致探测超时",
+          body: "调大探测超时（1–120 秒）。",
+          code: ["preflight config set timeout 30"],
+        },
+      ],
+    },
   },
 
   legal: {

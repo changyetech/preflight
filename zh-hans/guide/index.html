@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CLI 使用手册 · Preflight</title>
+    <meta
+      name="description"
+      content="Preflight CLI 的使用方法：安装、命令与参数、退出码、配置、JSON 输出与常见场景。"
+    />
+    <link rel="canonical" href="https://preflight.omnikit.run/zh-hans/guide/" />
+    <link rel="alternate" hreflang="en" href="https://preflight.omnikit.run/guide/" />
+    <link rel="alternate" hreflang="zh-Hans" href="https://preflight.omnikit.run/zh-hans/guide/" />
+    <link rel="alternate" hreflang="x-default" href="https://preflight.omnikit.run/guide/" />
+    <script>
+      (function () {
+        var pref = null;
+        try {
+          pref = localStorage.getItem("preflight-theme");
+        } catch (e) {}
+        if (pref !== "light" && pref !== "dark") pref = "system";
+        var dark =
+          pref === "dark" ||
+          (pref === "system" &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        var el = document.documentElement;
+        el.setAttribute("data-theme-pref", pref);
+        el.setAttribute("data-theme", dark ? "dark" : "light");
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -69,6 +69,7 @@ This repo documents its own **contracts** and **specs** under `docs/` (contract 
 - Configuration: 仓库所需的全部配置 → `docs/` — **[docs/configuration.md](docs/configuration.md)**：环境变量、Worker Secret 与绑定、GitHub 仓库与 Secrets、三条 workflow 的触发条件、CLI 的用户配置与键白名单、配置就位检查清单、绝不入库的清单
 - Deployment: 部署与发版手册 → `docs/` — **[docs/deployment.md](docs/deployment.md)**：Web 部署到 Cloudflare（含验证与 `wrangler rollback` 回滚）、CLI 打 `cli/v*` tag 发 Release、dist 配置的改法与「`release.yml` 是生成产物不要手改」。**回答「怎么操作」，配置项本身在 configuration.md**
 - Third-party integration reference: proxycheck.io → `docs/` — **[docs/proxycheck.md](docs/proxycheck.md)**：风险分基准分表与官方分档建议、必带的 `p=0`/`tag=0`（`tag=0` 是隐私要求）、配额规则、响应字段、「HTTP 200 也可能不是合法 JSON」这个坑、v2 与 v3 的差异。**带核实日期**——第三方会改
+- CLI user guide: CLI 使用手册 → `docs/` — **[docs/cli-guide.md](docs/cli-guide.md)**：安装、命令与参数、退出码、配置来源与优先级、`--json` 输出、使用场景。**面向用户回答「怎么用」**，判级规则仍只在 verdict.md
 - API interface specifications (endpoints, request/response schemas) → `docs/` — **[docs/api.md](docs/api.md)**：`/api/geo` 与 `/api/risk` 的请求/响应 schema、响应信封、错误码注册表、隐私约束
 - Error format and error code registry → `docs/` — 见 [docs/api.md](docs/api.md) 第 1 / 4 节
 - Response envelope format, retry/backoff strategies, auth contracts → `docs/` — 见 [docs/api.md](docs/api.md) 第 1 节
@@ -177,8 +178,8 @@ preflight/
 ├── .github/workflows/ # web.yml（部署 Web）/ cli.yml（CLI 质量门）/
 │                     #   release.yml（**dist 生成，不要手改**；tag `cli/v*` 发版）
 │                     #   三者触发条件零交集，见 docs/deployment.md
-├── index.html         # 英文首页（源语言）。Vite 多页构建共 8 个入口：
-│                     #   首页 / dns/ / privacy/ / terms/ ×（根 = en，zh-hans/ = 中文）
+├── index.html         # 英文首页（源语言）。Vite 多页构建共 10 个入口：
+│                     #   首页 / dns/ / guide/ / privacy/ / terms/ ×（根 = en，zh-hans/ = 中文）
 │                     #   入口清单在 vite.config.ts 的 environments.client.rollupOptions.input
 ├── vite.config.ts     # Vite + cloudflare() 插件；多页入口挂在 environments.client
 ├── wrangler.jsonc     # Worker 输入配置（绑定、DO、限流）；输出配置由插件生成
@@ -190,7 +191,7 @@ preflight/
 │   ├── api.ts         # 调用本站 /api/geo 与 /api/risk（契约见 docs/api.md）
 │   ├── i18n.tsx theme.ts turnstile.ts  # 语种上下文 / 主题切换 / Turnstile 挂载
 │   ├── components/    # Card / cards / Verdict / Landing / Nav / Footer /
-│   │                  #   LangSwitch / ThemeSwitch / BackToTop / DnsPage / LegalPage
+│   │                  #   LangSwitch / ThemeSwitch / BackToTop / DnsPage / GuidePage / LegalPage
 │   ├── domain/        # 纯逻辑：结论判级、覆盖度、时区比对、IPv6、DNS/UDP 出口、对照表
 │   └── probes/        # 浏览器直连的第三方探测（ipify / stun / dnsEgress）
 ├── Cargo.toml         # 纯 workspace（members = ["cli"]）+ dist 发布配置

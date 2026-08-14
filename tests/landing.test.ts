@@ -15,7 +15,7 @@ import type { Lang } from "../src/copy";
 
 function renderLanding(lang: Lang): string {
   return renderToStaticMarkup(
-    createElement(CopyProvider, { lang }, createElement(Landing)),
+    createElement(CopyProvider, { lang }, createElement(Landing, { lang })),
   );
 }
 
@@ -41,6 +41,26 @@ describe("落地内容三段", () => {
     expect(html).toContain(COPY_ZH_HANS.landing.compare.title);
     expect(html).toContain(esc(COPY_ZH_HANS.actions.installCommand));
     expect(html).toContain(esc(COPY_ZH_HANS.actions.installCommandWindows));
+  });
+
+  // 安装区块通往 /guide/ 的入口（spec docs/specs/2026-08-14-cli-guide-page.md 决策 3）：
+  // 中文首页不能把人送去英文手册页。
+  it.each([
+    ["en", "/guide/"] as const,
+    ["zh-hans", "/zh-hans/guide/"] as const,
+  ])("%s 版安装区块含指向本语种手册页的链接", (lang, href) => {
+    const html = renderLanding(lang);
+
+    expect(html).toContain(`href="${href}"`);
+  });
+
+  // 与顶栏跨页链接同一约定：新标签打开，避免打断正在进行的检测。
+  it("手册链接在新标签打开并带 noopener", () => {
+    const html = renderLanding("en");
+    const anchor = html.match(/<a[^>]*class="install-guide-link"[^>]*>/)?.[0];
+
+    expect(anchor).toContain('target="_blank"');
+    expect(anchor).toContain('rel="noopener"');
   });
 
   it("对照表渲染出全部 10 个检测项标题", () => {

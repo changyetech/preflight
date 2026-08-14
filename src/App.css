@@ -113,28 +113,34 @@ summary:focus-visible {
   color: var(--fg);
 }
 
-/* DNS 清单：顶栏唯一的跨页目的地，与锚点组是两类东西，因此不并入 .nav-links，
-   靠三点把它和锚点区分开——始终可见（锚点在窄屏隐藏）、贴右与工具区同侧、
+/* 跨页链接组（DNS 清单 + CLI 手册）：与锚点组是两类东西，因此不并入 .nav-links，
+   靠三点把它们和锚点区分开——始终可见（锚点在窄屏隐藏）、贴右与工具区同侧、
    颜色比锚点的 --muted 重一档，读起来是「另一个页面」而不是第 6 个锚点。
    margin 的 auto 在宽视口是空操作（.nav-links 的 flex:1 已经吃掉了空隙），
-   只在窄屏锚点组隐藏后接管，把它和工具区一起顶到右侧。 */
-/* 分隔线只在宽视口出现：它的作用是把 DNS 从锚点组里分出来，窄屏锚点组整个隐藏，
+   只在窄屏锚点组隐藏后接管，把整组和工具区一起顶到右侧。 */
+/* 分隔线只在宽视口出现：它的作用是把跨页组从锚点组里分出来，窄屏锚点组整个隐藏，
    线就没有要分隔的对象了，还要白吃 1rem——那 1rem 正是 360px 顶栏溢出的差额。 */
-.nav-dns {
+.nav-pages {
   margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.nav-pages a {
   font-size: 0.875rem;
   color: var(--fg);
   text-decoration: none;
   white-space: nowrap;
-  flex-shrink: 0;
 }
 
-.nav-dns:hover {
+.nav-pages a:hover {
   opacity: 0.7;
 }
 
-/* 已经在 DNS 页时不再强调，避免顶栏出现一个指向当前页的高亮链接 */
-.nav-dns[aria-current="page"] {
+/* 已经在该页时不再强调，避免顶栏出现一个指向当前页的高亮链接 */
+.nav-pages a[aria-current="page"] {
   color: var(--muted);
 }
 
@@ -1164,6 +1170,18 @@ button {
   letter-spacing: 0.05em;
 }
 
+/* 安装区块通往 /guide/ 的入口：贴右，与平台标注同一行 */
+.install-guide-link {
+  margin-inline-start: auto;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.install-guide-link:hover {
+  text-decoration: underline;
+}
+
 /* 「Web 与 CLI 对照表」：桌面表格，窄屏堆叠成卡片（原型只做横向滚动，未做移动端堆叠——
    本任务按计划文本要求补上，保留 <thead> 供读屏使用，值用 data-label 标出所属列）。 */
 .compare-table-wrap {
@@ -1412,7 +1430,7 @@ button {
     display: flex;
   }
 
-  .nav-dns {
+  .nav-pages {
     padding-inline-end: 1rem;
     border-inline-end: 1px solid var(--hairline);
   }
@@ -1619,4 +1637,114 @@ button {
   border-top: 1px solid var(--border);
   font-size: 13px;
   color: var(--muted);
+}
+
+/* ---------- CLI 使用手册页（/guide/、/zh-hans/guide/） ---------- */
+
+/* 内容容器与首页 .page、DNS 页 .dns-main 同宽同内边距 */
+.guide-main {
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem;
+}
+
+@media (min-width: 48rem) {
+  .guide-main {
+    padding: 2rem 1.5rem 4rem;
+  }
+}
+
+.guide-main h1 {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 12px;
+}
+
+.guide-lede {
+  margin: 0 0 32px;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--text);
+}
+
+.guide-section {
+  margin: 0 0 32px;
+}
+
+.guide-section h2 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 8px;
+}
+
+.guide-section p {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+
+.guide-code {
+  margin: 8px 0 12px;
+  padding: 12px 16px;
+  background: var(--hairline);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.guide-code code {
+  font: 400 0.8125rem/1.6 var(--mono);
+  color: var(--text);
+  white-space: pre;
+}
+
+.guide-table-wrap {
+  margin: 8px 0 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.guide-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.guide-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 6px 12px;
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+.guide-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--text);
+  vertical-align: top;
+}
+
+/* 首列多为命令 / 键名 / 退出码，用等宽并保持不折行 */
+.guide-table td:first-child {
+  font-family: var(--mono);
+  color: var(--text-h);
+  white-space: nowrap;
+}
+
+.guide-scenario {
+  margin: 0 0 20px;
+}
+
+.guide-scenario h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 4px;
 }

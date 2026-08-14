@@ -3,6 +3,7 @@
 
 import { CopyButton } from "./Card";
 import { COMPARE_TABLE } from "../domain/compareTable";
+import { pageUrl, type Lang } from "../copy";
 import { useCopy } from "../i18n";
 
 /**
@@ -16,7 +17,7 @@ const WHY_ITEMS = [
   { checkId: "C2", cli: true },
 ] as const;
 
-export function Landing() {
+export function Landing({ lang }: { lang: Lang }) {
   const COPY = useCopy();
   const { why, install, compare } = COPY.landing;
 
@@ -64,6 +65,16 @@ export function Landing() {
             </div>
             <div className="install-meta">
               <span className="plat">{install.platforms}</span>
+              {/* 手册入口跟着安装场景走（spec docs/specs/2026-08-14-cli-guide-page.md 决策 3）：
+                  刚复制完安装命令的用户最需要手册。新标签打开 + noopener，与顶栏跨页链接同一约定。 */}
+              <a
+                className="install-guide-link"
+                href={pageUrl(lang, "/guide/")}
+                target="_blank"
+                rel="noopener"
+              >
+                {install.guideLink}
+              </a>
             </div>
           </div>
         </div>

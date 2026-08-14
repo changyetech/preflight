@@ -22,6 +22,7 @@ import { Nav } from "./components/Nav";
 import { VerdictPanel } from "./components/Verdict";
 import { CopyProvider, useCopy } from "./i18n";
 import { DnsPage } from "./components/DnsPage";
+import { GuidePage } from "./components/GuidePage";
 import { LegalPage, type LegalDoc } from "./components/LegalPage";
 import { usePanel } from "./usePanel";
 
@@ -102,7 +103,7 @@ function AppShell({ lang }: { lang: Lang }) {
           </ul>
         </section>
 
-        <Landing />
+        <Landing lang={lang} />
 
         <Footer lang={lang} />
       </main>
@@ -126,6 +127,8 @@ function App() {
     <CopyProvider lang={lang}>
       {pathname.includes("/dns") ? (
         <DnsPage lang={lang} />
+      ) : pathname.includes("/guide") ? (
+        <GuidePage lang={lang} />
       ) : legalDoc ? (
         <LegalPage lang={lang} doc={legalDoc} />
       ) : (

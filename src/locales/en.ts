@@ -22,9 +22,11 @@ export const EN = {
     why: "Why",
     install: "Install CLI",
     compare: "Comparison",
-    /** 唯一的跨页导航项（其余都是首页锚点），因此顶栏与锚点组分开排布。
+    /** 跨页导航项（其余都是首页锚点），因此顶栏与锚点组分开排布。
      *  短标签：顶栏容不下「Public DNS list」那样的完整标题。 */
     dns: "DNS list",
+    /** 第二个跨页导航项：CLI 使用手册（spec docs/specs/2026-08-14-cli-guide-page.md）。 */
+    guide: "CLI guide",
     /** 回顶按钮只有图标，标签给读屏用。 */
     backToTop: "Back to top",
     /** 主题切换器：三态下拉（浅色/深色/跟随系统），规格 §2 决策 1。 */
@@ -333,6 +335,8 @@ export const EN = {
       body: "The web version is a quick first look — it covers 6 items. The CLI covers all 10, including your real public IP, local DNS configuration, proxy/TUN detection, and the $TZ timezone check.",
       /** 安装命令的适用平台（原型 .install-meta .plat），与 Cargo.toml 的 dist targets 一致。 */
       platforms: "macOS · Linux · Windows",
+      /** 安装区块通往 /guide/ 的入口（spec docs/specs/2026-08-14-cli-guide-page.md 决策 3）。 */
+      guideLink: "Read the full CLI guide →",
     },
     compare: {
       title: "Web vs. CLI: Full Feature Comparison",
@@ -395,6 +399,269 @@ export const EN = {
     },
     cliHint:
       "Want to test which servers actually work from your machine? Run preflight dns --check in the CLI.",
+  },
+
+  /**
+   * CLI 使用手册页（/guide/，spec docs/specs/2026-08-14-cli-guide-page.md）。
+   * 底稿是 docs/cli-guide.md——只谈「怎么用」，判级规则不复述（契约红线）。
+   * `sections` 每项为统一形状（paras / code / table / after，空数组表示该块缺席）：
+   * 统一形状让 en/zh 的结构约束经得起 `Widen` 类型的展开。
+   */
+  guide: {
+    title: "CLI Guide · Preflight",
+    description:
+      "How to use the Preflight CLI: install, commands and options, exit codes, configuration, JSON output, and common scenarios.",
+    heading: "CLI Guide",
+    lede: "Preflight CLI performs a complete network environment checkup in your terminal — all 10 checks, concluding with an overall verdict and its coverage. It stores no results, and its probes contact third-party services directly, never through this site's servers. This page covers usage only; the meaning of each check is explained on the home page.",
+    install: {
+      heading: "Installation",
+      intro:
+        "One command per platform — the installer script downloads the matching binary from GitHub Releases:",
+      linuxLabel: "Linux / macOS",
+      windowsLabel: "Windows (PowerShell)",
+      verify: "After installation, verify:",
+    },
+    sections: [
+      {
+        heading: "Quick start",
+        paras: [
+          "Running preflight with no arguments starts the checkup — no subcommand is required:",
+        ],
+        code: ["preflight"],
+        table: { headers: [], rows: [] },
+        after: [
+          "All probes run concurrently; once they complete, the report is printed in a single pass: the overall verdict (low / medium / high risk, or “insufficient data”) with its coverage (n/10), followed by the detailed result of each check.",
+          "Progress indicators are written to stderr, and only on an interactive terminal — stdout always carries a clean report, so output redirected to a file never contains progress lines.",
+        ],
+      },
+      {
+        heading: "Commands and options",
+        paras: ["There are three commands; the checkup is the default:"],
+        code: [
+          "preflight [OPTIONS]          # checkup (default command)",
+          "preflight dns [--check]      # public DNS server list",
+          "preflight config <ACTION>    # view and change configuration",
+        ],
+        table: {
+          headers: ["Option", "Notes"],
+          rows: [
+            [
+              "--lang <LANG>",
+              "Interface language: en / zh-hans. A global option, accepted in any position.",
+            ],
+            [
+              "--json",
+              "Machine-readable JSON output. Must precede the subcommand.",
+            ],
+            [
+              "-v, --verbose",
+              "Include each check's explanation in the report.",
+            ],
+            [
+              "-V / --version",
+              "Print the short version number / full version information.",
+            ],
+          ],
+        },
+        after: [
+          "When no language is specified explicitly, it is resolved in the following order: the --lang option, the language configuration key, the system locale, then English.",
+        ],
+      },
+      {
+        heading: "The checkup and its exit codes",
+        paras: ["Exit codes are the contract for script integration:"],
+        code: [],
+        table: {
+          headers: ["Exit code", "Meaning"],
+          rows: [
+            [
+              "0",
+              "The checkup completed, regardless of risk level. Read the level from the report or the JSON output, not from the exit code — encoding risk in the exit code would leave scripts unable to distinguish “high risk” from “tool failure”.",
+            ],
+            [
+              "1",
+              "The tool itself failed (invalid configuration, unsupported language, etc.).",
+            ],
+            [
+              "2",
+              "The checkup ran but produced no contributing signal; the verdict is “insufficient data”. The report is still printed.",
+            ],
+          ],
+        },
+        after: [
+          "Colored output is disabled automatically when stdout is not a terminal (pipes, redirects); the NO_COLOR environment variable or config set no-color true also disables it. Report width is measured from the terminal window once before rendering; redirected output uses a fixed width.",
+        ],
+      },
+      {
+        heading: "preflight dns",
+        paras: [
+          "Lists the built-in public DNS servers (IP / provider / region / filtering level — the same dataset as this site's DNS list page). With --check, a real DNS query is sent to each server to measure reachability and latency:",
+        ],
+        code: [
+          "preflight dns",
+          "preflight dns --check",
+          "preflight --json dns --check",
+        ],
+        table: {
+          headers: ["Status", "Criteria"],
+          rows: [
+            [
+              "ok",
+              "A response was received with a matching TXID, an RCODE of NOERROR, and at least one non-private A record.",
+            ],
+            [
+              "suspicious",
+              "A response was received but fails one or more of the above criteria — possible hijacking or pollution.",
+            ],
+            [
+              "unreachable",
+              "No valid response was received before the timeout.",
+            ],
+          ],
+        },
+        after: [],
+      },
+      {
+        heading: "preflight config",
+        paras: [
+          "config path prints the configuration file location; config list and config get print effective values (after merging all sources); config set and config unset write to the file:",
+        ],
+        code: [
+          "preflight config set language zh-hans",
+          "preflight config set timeout 20",
+          "preflight config set proxycheck-key   # prompts interactively, never echoed",
+          "preflight config unset timeout",
+        ],
+        table: {
+          headers: ["Key", "Values", "Default", "Notes"],
+          rows: [
+            ["language", "en / zh-hans", "system locale", "Interface language"],
+            [
+              "proxycheck-key",
+              "interactive prompt",
+              "unset",
+              "proxycheck.io API key — see below",
+            ],
+            ["timeout", "1–120 (seconds)", "10", "Network probe timeout"],
+            ["no-color", "true / false", "false", "Disable colored output"],
+          ],
+        },
+        after: [
+          "The configurable keys form a whitelist — verdict thresholds and check toggles are not configurable.",
+          "The API key deliberately has no plaintext option: it would be written to shell history and appear in ps process listings.",
+          "If a key you have just set is overridden by a higher-priority source (--lang, PROXYCHECK_API_KEY, NO_COLOR), the command reports this on stderr.",
+        ],
+      },
+      {
+        heading: "Configuration sources and precedence",
+        paras: [
+          "Precedence is fixed: command-line option > environment variable > configuration file > built-in default.",
+          "The configuration file is TOML with underscore-separated keys (proxycheck_key, no_color). Unknown keys are an error rather than being silently ignored — a misspelled key never appears to be “configured but ineffective”. On Unix the file is written with 600 permissions.",
+        ],
+        code: [],
+        table: {
+          headers: ["Platform", "Config file path"],
+          rows: [
+            [
+              "Linux / macOS",
+              "$XDG_CONFIG_HOME/preflight/config.toml, or ~/.config/preflight/config.toml",
+            ],
+            ["Windows", "%APPDATA%\\preflight\\config.toml"],
+            [
+              "Any",
+              "The PREFLIGHT_CONFIG environment variable points anywhere and wins over both.",
+            ],
+          ],
+        },
+        after: [],
+      },
+      {
+        heading: "Environment variables",
+        paras: [],
+        code: [],
+        table: {
+          headers: ["Variable", "Effect"],
+          rows: [
+            [
+              "PROXYCHECK_API_KEY",
+              "proxycheck key; takes precedence over the configuration file. An empty value is treated as unset.",
+            ],
+            [
+              "NO_COLOR",
+              "Disables colored output whenever present and non-empty (per the no-color.org convention; the value itself is not inspected).",
+            ],
+            ["PREFLIGHT_CONFIG", "Overrides the config file path."],
+          ],
+        },
+        after: [],
+      },
+      {
+        heading: "proxycheck API key",
+        paras: [
+          "The IP type & risk check and ownership lookups are performed via proxycheck.io. Without a key, the CLI uses the anonymous allowance (100 queries per day); a free key raises this to 1,000:",
+        ],
+        code: [
+          "preflight config set proxycheck-key    # or: export PROXYCHECK_API_KEY=…",
+          "preflight config get proxycheck-key    # only reports set / unset",
+        ],
+        table: { headers: [], rows: [] },
+        after: [
+          "The key never appears in any output — the report, --json, or error messages. The CLI contacts proxycheck directly using your own quota; requests never pass through this site and do not consume the web version's shared quota.",
+        ],
+      },
+      {
+        heading: "--json output",
+        paras: [
+          "preflight --json prints a single JSON object: verdict (stage and level), coverage (done / failed / total), signals (tri-state: true / false / null — null means unknown, which is distinct from false), and one entry per check under checks (completed entries carry their fields; failed entries carry a reason of upstream, quotaExhausted, or local).",
+        ],
+        code: [
+          "{",
+          '  "verdict":  { "stage": "final", "level": "low" },',
+          '  "coverage": { "done": 10, "failed": 0, "total": 10 },',
+          '  "signals":  { "ipv6Leak": false, "dnsEgressLeak": false, … },',
+          '  "checks":   { "O1": { "status": "done", … }, … }',
+          "}",
+        ],
+        table: { headers: [], rows: [] },
+        after: [
+          'preflight --json dns uses a separate schema: { "servers": [ … ] }, each entry carrying ip / name / region / variant, with an additional check block when --check was run.',
+        ],
+      },
+    ],
+    scenarios: {
+      heading: "Typical scenarios",
+      items: [
+        {
+          title: "After switching proxy nodes",
+          body: "Run a checkup before performing IP-sensitive operations — confirm that DNS, UDP, and IPv6 traffic is not bypassing the proxy, and that the exit IP's risk score is within a normal range.",
+          code: ["preflight"],
+        },
+        {
+          title: "Scripts and automation",
+          body: "Combine --json with the exit codes. The risk level is read from the JSON output; the exit code only indicates whether the tool ran to completion.",
+          code: [
+            "out=$(preflight --json) || exit 1",
+            "level=$(echo \"$out\" | jq -r '.verdict.level')",
+            '[ "$level" = "high" ] && echo "high-risk exit, aborting" >&2 && exit 1',
+          ],
+        },
+        {
+          title: "Proxy enabled, yet still flagged",
+          body: "Review O5 (DNS egress leak), O6 (UDP egress consistency), O3 (IPv6 leak), and C3 (TUN off) in the report; add -v for each check's explanation.",
+          code: ["preflight -v"],
+        },
+        {
+          title: "Choosing a usable public DNS",
+          body: "Measure the reachability and latency of every server in the list from your machine, identifying suspicious responses along the way.",
+          code: ["preflight dns --check"],
+        },
+        {
+          title: "Probes time out on a slow network",
+          body: "Increase the probe timeout (1–120 seconds).",
+          code: ["preflight config set timeout 30"],
+        },
+      ],
+    },
   },
 
   /**

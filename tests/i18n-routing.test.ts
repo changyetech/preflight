@@ -145,6 +145,33 @@ describe("两语种各自是独立静态资源，不是彼此的软 404 兜底",
     },
   );
 
+  // CLI 使用手册页同样是独立静态资源（spec docs/specs/2026-08-14-cli-guide-page.md）。
+  it("/guide/ 返回 200 且是英文 CLI 手册页", async () => {
+    const response = await SELF.fetch("https://example.com/guide/");
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain('lang="en"');
+    expect(html).toContain(COPY.guide.title);
+  });
+
+  it("/zh-hans/guide/ 返回 200 且是中文 CLI 手册页", async () => {
+    const response = await SELF.fetch("https://example.com/zh-hans/guide/");
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain('lang="zh-Hans"');
+    expect(html).toContain(COPY_ZH_HANS.guide.title);
+  });
+
+  it.each(["/guide/xxx", "/zh-hans/guide/xxx"])(
+    "%s 是真实 404，不做 SPA 回退",
+    async (path) => {
+      const response = await SELF.fetch(`https://example.com${path}`);
+      expect(response.status).toBe(404);
+    },
+  );
+
   // 隐私说明 / 使用条款同样是独立静态资源（spec docs/specs/2026-08-14-legal-pages.md）。
   it.each([
     ["/privacy/", "en", COPY.legal.privacy.title],

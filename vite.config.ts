@@ -24,6 +24,11 @@ export default defineConfig({
             zhHans: resolve(import.meta.dirname, "zh-hans/index.html"),
             dns: resolve(import.meta.dirname, "dns/index.html"),
             zhHansDns: resolve(import.meta.dirname, "zh-hans/dns/index.html"),
+            guide: resolve(import.meta.dirname, "guide/index.html"),
+            zhHansGuide: resolve(
+              import.meta.dirname,
+              "zh-hans/guide/index.html",
+            ),
             privacy: resolve(import.meta.dirname, "privacy/index.html"),
             zhHansPrivacy: resolve(
               import.meta.dirname,

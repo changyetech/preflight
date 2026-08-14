@@ -1,8 +1,10 @@
-// 顶栏的 DNS 清单入口。
+// 顶栏的跨页入口：DNS 清单 + CLI 手册。
 //
-// 这是全站通往 /dns/ 的唯一路径：Web 面板没有 DNS 检测卡（C2 是 CLI-only），
+// DNS 入口是全站通往 /dns/ 的唯一路径：Web 面板没有 DNS 检测卡（C2 是 CLI-only），
 // 页脚的入口已撤（那里只留法务两页），落地内容里也只有说明没有链接。
 // 断掉它 = DNS 页在站内不可达，因此单独立测。
+// CLI 手册入口（spec docs/specs/2026-08-14-cli-guide-page.md）在站内的另一个入口
+// 只有首页安装区块，顶栏这条同样值得锁住。
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createElement } from "react";
@@ -59,6 +61,34 @@ describe("顶栏 DNS 清单入口", () => {
 
   it("只有身处 DNS 页时才标 aria-current", () => {
     expect(renderNav("en", "/dns/")).toContain('aria-current="page"');
+    expect(renderNav("en", "/")).not.toContain('aria-current="page"');
+  });
+});
+
+describe("顶栏 CLI 手册入口", () => {
+  it.each([
+    ["en", "/guide/", COPY.nav.guide] as const,
+    ["zh-hans", "/zh-hans/guide/", COPY_ZH_HANS.nav.guide] as const,
+  ])("%s 版入口带正确语种前缀与本语种标签", (lang, href, label) => {
+    const html = renderNav(lang);
+
+    expect(html).toContain(`href="${href}"`);
+    expect(html).toContain(label);
+  });
+
+  it("在新标签打开并带 noopener", () => {
+    const html = renderNav("en");
+    const guideAnchor = html.match(/<a[^>]*class="nav-guide"[^>]*>/)?.[0];
+
+    expect(guideAnchor).toContain('target="_blank"');
+    expect(guideAnchor).toContain('rel="noopener"');
+  });
+
+  it("只有身处手册页时才标 aria-current", () => {
+    const onGuide = renderNav("en", "/guide/");
+    const guideAnchor = onGuide.match(/<a[^>]*class="nav-guide"[^>]*>/)?.[0];
+
+    expect(guideAnchor).toContain('aria-current="page"');
     expect(renderNav("en", "/")).not.toContain('aria-current="page"');
   });
 });
