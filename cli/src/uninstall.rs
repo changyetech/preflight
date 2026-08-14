@@ -27,6 +27,10 @@ pub fn run(purge: bool, text: &Text) -> Result<()> {
     );
     // 默认配置路径：复用 config.rs 的推导但**不看 PREFLIGHT_CONFIG**——
     // 用户显式指定的文件不碰，--purge 只清默认目录（spec §3）。
+    // 这里的 `None` 同时是 --purge 的安全边界，不是随手省略：`resolve_path` 的
+    // PREFLIGHT_CONFIG 分支把用户给的路径原样返回（不追加 `preflight` 这一段），
+    // 换成 `path_from_env` 就等于让 `PREFLIGHT_CONFIG=~/dotfiles/preflight.toml`
+    // 把下面的 remove_dir_all 指向 `~/dotfiles`。
     let config_file = crate::config::resolve_path(
         None,
         xdg.as_deref(),

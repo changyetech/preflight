@@ -153,6 +153,26 @@ fn run() -> Result<i32> {
     let cli = Cli::parse();
     let system_locale = lang::system_tag();
 
+    // `uninstall` 必须**先于配置文件加载**分发：配置文件是 deny_unknown_fields，
+    // 一个拼错的键（或 `language = "ar"`）就会让每一条命令退出 1——包括这条
+    // 专门用来把它删掉的命令。因此语言只从 `--lang` + 系统 locale 解析，
+    // 拿默认 ConfigFile 走同一条 Settings::resolve；`--lang` 本身非法仍照常报错，
+    // 那是用户给的 flag，不是坏文件的锅。
+    if let Some(Command::Uninstall { purge }) = cli.command {
+        let settings = Settings::resolve(
+            &ConfigFile::default(),
+            Sources {
+                flag_lang: cli.lang.as_deref(),
+                env_proxycheck_key: None,
+                env_no_color: None,
+                system_locale: system_locale.as_deref(),
+            },
+        )
+        .map_err(|err| render_lang_error(err, system_locale.as_deref()))?;
+        uninstall::run(purge, &copy::text(settings.lang))?;
+        return Ok(0);
+    }
+
     let config_path = config::path_from_env();
     let file = config::load(config_path.as_deref())
         .map_err(|err| annotate_config_error(err, cli.lang.as_deref(), system_locale.as_deref()))?;
@@ -183,10 +203,8 @@ fn run() -> Result<i32> {
             Ok(0)
         }
         Some(Command::Dns { check }) => run_dns(&cli, &text, &settings, check),
-        Some(Command::Uninstall { purge }) => {
-            uninstall::run(purge, &text)?;
-            Ok(0)
-        }
+        // 已在配置文件加载之前处理并返回。
+        Some(Command::Uninstall { .. }) => unreachable!(),
         None => run_checkup(&cli, &text, &settings),
     }
 }
