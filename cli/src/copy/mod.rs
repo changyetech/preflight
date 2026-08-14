@@ -79,7 +79,6 @@ copy_leaf! {
         config_write,
         lang_unknown,
         /// 卸载时某一项删不掉（权限等）。具体路径由调用方追加在冒号之后。
-        #[allow(dead_code)]
         uninstall_remove,
     }
 }
@@ -375,7 +374,6 @@ copy_leaf! {
 copy_leaf! {
     /// `preflight uninstall` 的文案。路径与重装命令是字面量，
     /// 由调用方裸拼接在前缀之后——标点与空格由取值自带（同 `ErrorText` 约定）。
-    #[allow(dead_code)]
     UninstallText {
         /// 每删掉一项打一行的前缀，路径由调用方追加。
         removed,
@@ -404,7 +402,6 @@ copy_node! {
         dns_egress: DnsEgressText,
         udp_egress: UdpEgressText,
         dns_cmd: DnsCommandText,
-        #[allow(dead_code)]
         uninstall: UninstallText,
     }
 }

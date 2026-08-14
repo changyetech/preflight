@@ -69,6 +69,12 @@ enum Command {
         #[arg(long)]
         check: bool,
     },
+    /// Remove preflight from this machine
+    Uninstall {
+        /// Also remove the config directory
+        #[arg(long)]
+        purge: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -177,6 +183,10 @@ fn run() -> Result<i32> {
             Ok(0)
         }
         Some(Command::Dns { check }) => run_dns(&cli, &text, &settings, check),
+        Some(Command::Uninstall { purge }) => {
+            uninstall::run(purge, &text)?;
+            Ok(0)
+        }
         None => run_checkup(&cli, &text, &settings),
     }
 }
@@ -548,6 +558,20 @@ mod tests {
         match cli.command {
             Some(Command::Dns { check }) => assert!(check),
             _ => panic!("expected Dns command"),
+        }
+    }
+
+    #[test]
+    fn uninstall_subcommand_and_purge_flag_are_accepted() {
+        let cli = Cli::try_parse_from(["preflight", "uninstall"]).unwrap();
+        match cli.command {
+            Some(Command::Uninstall { purge }) => assert!(!purge),
+            _ => panic!("expected Uninstall command"),
+        }
+        let cli = Cli::try_parse_from(["preflight", "uninstall", "--purge"]).unwrap();
+        match cli.command {
+            Some(Command::Uninstall { purge }) => assert!(purge),
+            _ => panic!("expected Uninstall command"),
         }
     }
 
