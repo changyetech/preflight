@@ -1,5 +1,6 @@
-# 应用名当前是**占位**：改名窗口在第一个 `cli/v*` tag 之前。
-# 见 docs/plans/2026-08-12-cli-rust-rewrite.md「未决事项」。
+# 应用名已定为 preflight（ADR-0017），改名窗口随第一个 `cli/v*` tag 关闭。
+# `repository` / `homepage` 从 workspace 继承，dist 生成 installer URL 与 Homebrew
+# formula 时都要读它们——去掉任何一个 `dist init` 都会报错或告警。
 
 [package]
 name = "preflight"
@@ -8,6 +9,8 @@ description = "网络环境体检：出口 IP、DNS、代理、IP 风控与时�
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [[bin]]
 name = "preflight"

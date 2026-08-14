@@ -1,8 +1,9 @@
 # Preflight Web 的部署。
 #
-# 与 cli.yml 的 paths 互不重叠，例外是两份两端共吃的数据文件——改它们必须两侧同时验证：
-# docs/verdict-cases.json（判级契约的可执行形式，docs/verdict.md 第 7 节）与
-# docs/country-codes.json（O5 判定用的国家名 → ISO2 映射，Web 侧打进 bundle）。
+# 与 cli.yml 的 paths 互不重叠，例外是三份两端共吃的数据文件——改它们必须两侧同时验证：
+# docs/verdict-cases.json（判级契约的可执行形式，docs/verdict.md 第 7 节）、
+# docs/country-codes.json（O5 判定用的国家名 → ISO2 映射，Web 侧打进 bundle）与
+# docs/dns-servers.json（公共 DNS 清单，Web 侧 DnsPage 打进 bundle）。
 #
 # **本仓库只有 CLI 发 GitHub Release**：安装命令用的 `releases/latest` 依赖这条约束，
 # Web 走 Cloudflare 部署，不发 Release。
@@ -18,8 +19,12 @@ on:
       - "src/**"
       - "worker/**"
       - "public/**"
+      # 多页构建的 8 个入口：根为源语言 en，zh-hans/ 为中文（vite.config.ts 的 input 清单）
       - "index.html"
-      - "en/**"
+      - "dns/**"
+      - "privacy/**"
+      - "terms/**"
+      - "zh-hans/**"
       - "vite.config.ts"
       - "vitest.config.ts"
       - "wrangler.jsonc"
@@ -28,6 +33,7 @@ on:
       - "tsconfig*.json"
       - "docs/verdict-cases.json"
       - "docs/country-codes.json"
+      - "docs/dns-servers.json"
       - ".github/workflows/web.yml"
 
 concurrency:
@@ -54,7 +60,21 @@ jobs:
 
       # 部署用的是**插件生成的** dist/preflight/wrangler.json，不是根目录那份输入配置——
       # 对根 wrangler.jsonc 直接 deploy 会绕过 Vite 产物、改用 wrangler 自己的打包。
+      # secret 没设时 GitHub 会把 `${{ }}` 展开成**空字符串**，而 wrangler 判断环境变量用的是
+      # `variableName in process.env`（不是判真假）——空串照样算「已设」，于是它会拿着一个空的
+      # account id 去调 API，报出来的错跟真正的原因毫无关系。先挡一道，让失败信息说人话。
+      - name: Check deploy secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          : "${CLOUDFLARE_API_TOKEN:?repo secret 未设，见 docs/configuration.md 3.2}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?repo secret 未设，见 docs/configuration.md 3.2}"
+
+      # CLOUDFLARE_ACCOUNT_ID 必须显式给：不给的话 wrangler 会去问 API「这个 token 能访问
+      # 哪些账号」，token 一旦关联到多于一个账号，非交互的 CI 里就直接报错退出。
       - name: Deploy
         run: pnpm exec wrangler deploy -c dist/preflight/wrangler.json
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

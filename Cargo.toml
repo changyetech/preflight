@@ -1,5 +1,22 @@
 # 纯 workspace，不含 [package]——根目录是 Web 项目的家，Rust crate 隔离在 cli/ 下。
 # 计划：docs/plans/2026-08-12-cli-rust-rewrite--foundation.md
+#
+# 多平台交叉编译与 Release 由 dist（原 cargo-dist）负责。发布步骤见 docs/deployment.md 第 3 节。
+#
+# ⚠️ 下面 `[workspace.metadata.dist]` 与 `[profile.dist]` 两段由 `dist init` 生成并**整段重写**：
+#    往里加中文注释会在下次 init 时被吞掉（所以这段说明放在文件顶部）。改完配置必须重跑
+#    `dist init --yes` 才能同步到 .github/workflows/release.yml，再用
+#    `dist plan --tag=cli/v0.2.0` 复测。
+#
+# `installers` 只有 shell 与 powershell，**没有 homebrew**：那需要一个独立的
+# changyetech/homebrew-tap 仓库（Homebrew 的命名硬规则，formula 不能住在主仓库里），
+# 当前不值这个维护面。要加回来见 docs/deployment.md 第 5 节。
+#
+# `pr-run-mode = "skip"` 是非默认项：dist 默认给 release.yml 挂 `on: pull_request` 做 dry-run，
+# 那会与 cli.yml 的 PR 触发重叠，破坏「三条 workflow 触发条件零交集」（docs/configuration.md §3.3）。
+#
+# tag 用**斜杠形式** `cli/v0.2.0`：dist 的解析规则会忽略 `/` 之前非 package 名的前缀，
+# 因此 tag 前缀与应用叫什么解耦。
 
 [workspace]
 members = ["cli"]
@@ -9,25 +26,30 @@ resolver = "3"
 edition = "2024"
 license = "MIT"
 rust-version = "1.90"
+# dist 生成 installer 的下载 URL 要靠它，缺了 `dist init` 直接报错。
+repository = "https://github.com/changyetech/preflight"
+# 摘掉 homebrew 后当前没人读它（它是 formula 的必填项），留着是为了将来加回来时不用再想一遍。
+# 指仓库而非 preflight.omnikit.run——自定义域名还是注释状态（wrangler.jsonc），上线后再换。
+homepage = "https://github.com/changyetech/preflight"
 
-# 多平台交叉编译与 Release 由 dist（原 cargo-dist）负责。
-#
-# ⚠️ 这份配置**尚未生效**：`tap` 指向的仓库还不存在，`dist init` 也还没跑过
-#    （它才会生成 .github/workflows/*-release.yml）。前置条件见
-#    docs/plans/2026-08-12-cli-rust-rewrite--release.md。
-#
-# tag 用**斜杠形式** `cli/v0.2.0`：dist 文档化的解析规则会忽略 `/` 之前非 package 名的
-# 前缀，因此 tag 前缀与应用最终叫什么完全解耦——名字还没定，tag 却已经可以定了。
-# 落地前必须用 `dist plan --tag=cli/v0.2.0` 实测确认。
+# Config for 'dist'
 [workspace.metadata.dist]
+# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
 cargo-dist-version = "0.32.0"
-ci = ["github"]
-installers = ["shell", "powershell", "homebrew"]
-tap = "OWNER/homebrew-tap"                      # TODO: 仓库 owner 未定
-targets = [
-    "aarch64-apple-darwin",
-    "x86_64-apple-darwin",
-    "aarch64-unknown-linux-gnu",
-    "x86_64-unknown-linux-gnu",
-    "x86_64-pc-windows-msvc",
-]
+# CI backends to support
+ci = "github"
+# The installers to generate for each app
+installers = ["shell", "powershell"]
+# Which actions to run on pull requests
+pr-run-mode = "skip"
+# Target platforms to build apps for (Rust target-triple syntax)
+targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+# Path that installers should place binaries in
+install-path = "CARGO_HOME"
+# Whether to install an updater program
+install-updater = false
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
