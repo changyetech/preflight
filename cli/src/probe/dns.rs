@@ -87,6 +87,7 @@ pub fn parse_scutil_dns(output: &str) -> Vec<String> {
 /// 解析 `networksetup -getdnsservers <服务>` 的输出。
 ///
 /// 用户没手动设置时它返回一句英文说明而不是地址，因此**只收能解析成 IP 的行**。
+#[cfg(any(target_os = "windows", target_os = "macos", test))]
 pub fn parse_networksetup_dns(output: &str) -> Vec<String> {
     dedup(
         output
@@ -100,6 +101,7 @@ pub fn parse_networksetup_dns(output: &str) -> Vec<String> {
 }
 
 /// 解析 `networksetup -listallnetworkservices`：首行是说明文字，`*` 前缀表示已禁用。
+#[cfg(any(target_os = "macos", test))]
 pub fn parse_network_services(output: &str) -> Vec<String> {
     output
         .lines()
