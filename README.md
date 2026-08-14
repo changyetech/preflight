@@ -9,19 +9,27 @@
 
 ## 安装 CLI
 
-```bash
-brew install <owner>/tap/preflight
-```
-
-或者：
+**macOS / Linux**
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/<owner>/preflight/releases/latest/download/preflight-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/changyetech/preflight/releases/latest/download/preflight-installer.sh | sh
 ```
 
-有 Rust 工具链的话也可以 `cargo install --git https://github.com/<owner>/preflight`。**不发布到 crates.io。**
+**Windows（PowerShell）**
 
-> 仓库地址与应用名在第一个 `cli/v*` tag 之前是占位状态，见 [docs/plans/2026-08-12-cli-rust-rewrite.md](docs/plans/2026-08-12-cli-rust-rewrite.md) 的「未决事项」。
+```powershell
+powershell -c "irm https://github.com/changyetech/preflight/releases/latest/download/preflight-installer.ps1 | iex"
+```
+
+**从源码**——有 Rust 工具链（1.90+）的话：
+
+```bash
+cargo install --git https://github.com/changyetech/preflight
+```
+
+**不发布到 crates.io。** 也可以直接从 [Releases](https://github.com/changyetech/preflight/releases) 下对应平台的压缩包，解开把 `preflight` 丢进 `PATH`。预编译二进制覆盖 macOS（Apple Silicon + Intel）、Linux（x86_64 + arm64）与 Windows（x86_64）。
+
+**升级就是把上面的安装命令再跑一遍**，它会覆盖掉旧的那个。**没有 Homebrew 通道**——那需要一个独立的 tap 仓库（Homebrew 的命名硬规则，formula 不能住在主仓库里），目前不值这个维护面。
 
 ## 使用
 
@@ -46,7 +54,7 @@ preflight config set timeout 20        # 网络探测超时，1–120 秒
 preflight config set no-color true     # 关闭彩色输出
 ```
 
-## 8 个检测项
+## 10 个检测项
 
 | ID | 检测项 | Web | CLI |
 |---|---|---|---|
@@ -54,8 +62,10 @@ preflight config set no-color true     # 关闭彩色输出
 | O2 | 系统时区一致性（对应图形界面应用） | ✅ | ✅ |
 | O3 | IPv6 泄露 | ✅ | ✅ |
 | O4 | IP 类型与风险 | 按需 | 自动 |
+| O5 | DNS 出口泄露（DNS 查询是不是与出口 IP 从同一处出网） | ✅ | ✅ |
+| O6 | UDP 出口一致性（UDP 的出口是不是与 TCP 观测到的出口 IP 一致） | ✅ | ✅ |
 | C1 | 本机真实 IP（国内直连回显） | — | ✅ |
-| C2 | 本地 DNS 与 DNS 泄露 | — | ✅ |
+| C2 | 本地 DNS 服务器配置 | — | ✅ |
 | C3 | 代理检测（环境变量 / 系统代理 / TUN） | — | ✅ |
 | C4 | `$TZ` 时区一致性（命令行工具认的那个） | — | ✅ |
 
@@ -81,7 +91,7 @@ make check-all     # 两边都跑
 
 Web 是 React 19 + Vite + Cloudflare Worker，CLI 是 Rust。两端共享 `docs/verdict.md` 与 `docs/verdict-cases.json`——判级规则改一处，两边的 CI 同时变红。
 
-**配置**（环境变量、Worker Secret、GitHub Secrets、CI、上线检查清单）见 **[docs/configuration.md](docs/configuration.md)**。
+**配置**（环境变量、Worker Secret、GitHub Secrets、CI）见 **[docs/configuration.md](docs/configuration.md)**；**部署与发版**（Cloudflare 上线、回滚、打 `cli/v*` tag 发 CLI）见 **[docs/deployment.md](docs/deployment.md)**。
 
 约定与架构见 [CLAUDE.md](CLAUDE.md)，术语见 [CONTEXT.md](CONTEXT.md)。
 

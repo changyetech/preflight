@@ -5,6 +5,8 @@
 
 > **红线：本文出现的所有 secret 都不入库。** 仓库里只有占位（`.env.example`）与引用（`${{ secrets.* }}`），真值走 `wrangler secret put`、GitHub Secrets 或用户本机的配置文件（[ADR-0008](./adr/0008-privacy-informed-consent-upfront.md)）。
 
+> 本文回答**「有哪些配置项、值从哪来」**。「按什么顺序部署、出事怎么退回来」在 **[deployment.md](./deployment.md)**。
+
 ---
 
 ## 0. 总览
@@ -18,7 +20,7 @@
 | `RISK_RATE_LIMITER` | 绑定 | `wrangler.jsonc` | 部署失败 |
 | `ASSETS` | 绑定 | `wrangler.jsonc` | 静态资源 404 |
 | `CLOUDFLARE_API_TOKEN` | **secret** | GitHub Secret | `web.yml` 部署步骤失败 |
-| `HOMEBREW_TAP_TOKEN` | **secret** | GitHub Secret | CLI 发版时推 tap 失败 |
+| `CLOUDFLARE_ACCOUNT_ID` | 标识符 | GitHub Secret | token 关联多个账号时 `web.yml` 部署失败 |
 | CLI 的 `proxycheck_key` | **secret** | 用户本机 | CLI 配额 100 次/天而非 1000 |
 
 **只有 CLI 是零配置可用的**——不配任何东西也能跑完 10 项，只是 proxycheck 走无 key 的 100 次/天。Web 侧则必须配齐 Turnstile 与 proxycheck 才有完整功能。
@@ -91,35 +93,38 @@ wrangler secret put TURNSTILE_SECRET_KEY
 
 ### 2.3 部署
 
-```bash
-pnpm deploy    # = build + wrangler deploy -c dist/preflight/wrangler.json
-```
+`pnpm deploy`，或合进 `main` 让 `web.yml` 自动部署。**不要**直接对根 `wrangler.jsonc` 执行 `wrangler deploy`——那会绕过 Vite 产物、改用 wrangler 自己的打包。根配置是**输入**，真正部署用的是 `@cloudflare/vite-plugin` 生成的 `dist/preflight/wrangler.json`。
 
-**不要**直接对根 `wrangler.jsonc` 执行 `wrangler deploy`——那会绕过 Vite 产物、改用 wrangler 自己的打包。根配置是**输入**，真正部署用的是 `@cloudflare/vite-plugin` 生成的 `dist/preflight/wrangler.json`。
-
-### 2.4 待人工完成的两项
-
-**自定义域名**：`wrangler.jsonc` 里的 `routes` 目前是注释状态。启用步骤写在该文件的注释里（确认 zone 已托管 → 取消注释并填实际 `zone_name` → `pnpm deploy` → `curl -sI` 验证证书）。
-
-**Observability**：当前**显式关闭**。原因是官方文档未给出 Workers Logs 是否默认记录客户端 IP 的明确结论，也没找到按字段排除 IP 的配置项——在结论确认前，关掉才符合 [ADR-0008](./adr/0008-privacy-informed-consent-upfront.md) 的零留存承诺。**核实清楚之前不要打开。**
+完整步骤、部署后验证与回滚见 [deployment.md §2](./deployment.md)；自定义域名与 observability 这两项待人工完成的收尾见 [deployment.md §4](./deployment.md)。
 
 ---
 
 ## 3. GitHub
 
-### 3.1 需要两个仓库
+### 3.1 只需要一个仓库
 
 | 仓库 | 用途 | 可见性 |
 |---|---|---|
-| `<owner>/preflight` | 主仓库 | **必须 public**——`cargo install --git` 与 Homebrew tap 对私有仓库都要凭证，一行安装命令就不成立了 |
-| `<owner>/homebrew-tap` | Homebrew formula | public。Homebrew 硬性要求 tap 是**独立仓库** |
+| `changyetech/preflight` | 主仓库，Web 与 CLI 都在这儿 | **必须 public**，理由见下 |
+
+**必须 public**：installer 脚本与预编译二进制都是主仓库的 Release 资产，转私有会让三条安装通道一起断——`installer.sh` 连脚本本身都取不到（401）、`cargo install --git` 要 git 凭证、Releases 页面直接看不见。
+
+**没有 Homebrew tap 仓库。** `brew install <owner>/<tap>/<formula>` 会被解析成 `github.com/<owner>/homebrew-<tap>`——`homebrew-` 前缀是命名硬规则，formula 不可能住在主仓库里，所以走 Homebrew 就必然多一个仓库。当前不值这个维护面，`installers` 里只留了 shell 与 powershell。要加回来见 [deployment.md §5](./deployment.md)。
 
 ### 3.2 Secrets
 
 | Secret | 给谁用 | 权限 |
 |---|---|---|
 | `CLOUDFLARE_API_TOKEN` | `web.yml` 的部署步骤 | Workers 部署权限 |
-| `HOMEBREW_TAP_TOKEN` | dist 生成的 release workflow | 对 tap 仓库有 write |
+| `CLOUDFLARE_ACCOUNT_ID` | 同上 | 不是凭证，是账号标识符 |
+
+`release.yml` **不需要任何 secret**——它只往本仓库发 Release，用 GitHub 自动注入的 `GITHUB_TOKEN` 就够了。（加回 Homebrew 通道的话会多出一个 `HOMEBREW_TAP_TOKEN`，见 [deployment.md §5](./deployment.md)。）
+
+`CLOUDFLARE_ACCOUNT_ID` **必须显式给**。不给的话 wrangler 会去问 API「这个 token 能访问哪些账号」，恰好一个时能自动推断出来，多于一个就在非交互的 CI 里直接报错退出——也就是说不配它，CI 能不能跑取决于账号数量哪天变没变。
+
+它按理不算 secret（没有 token，拿到 account ID 什么也做不了），仍走 Secret 而不是写进 `wrangler.jsonc`：主仓库是 public，没必要公开账号指纹；而且 `wrangler.jsonc` 同时被 vitest 读，能不动就不动。
+
+> **secret 没设时 GitHub 会把 `${{ secrets.X }}` 展开成空字符串，而不是不注入这个变量。** wrangler 判断环境变量用的是 `variableName in process.env`（不是判真假），空串照样算「已设」——于是它会拿着空的 account id 去调 API，报出来的错跟真正的原因毫无关系。`web.yml` 因此在部署前有一步 `Check deploy secrets` 显式挡空值。**新增任何走 `env:` 注入的 secret，都要一并加进那步**，否则又会退回到「错误信息指向错的地方」。
 
 ### 3.3 三条 workflow，触发条件零交集
 
@@ -127,27 +132,28 @@ pnpm deploy    # = build + wrangler deploy -c dist/preflight/wrangler.json
 |---|---|---|
 | `web.yml` | push main + paths（`src/**`、`worker/**`、`docs/verdict-cases.json` 等） | lint → build → test → 部署 |
 | `cli.yml` | PR/push + paths（`cli/**`、`Cargo.*`、`docs/verdict-cases.json`） | fmt → clippy → test |
-| dist 生成的 release workflow | tag `cli/v*` | 多平台交叉编译 → Release → 推 tap |
+| `release.yml`（**dist 生成，不要手改**） | tag `cli/v*` | 多平台交叉编译 → 生成 installer → 发 GitHub Release |
 
-`docs/verdict-cases.json` **刻意同时出现在前两条的 paths 里**——它是判级契约的可执行形式，改它必须两端同时验证（[verdict.md §7](./verdict.md)）。
+`docs/verdict-cases.json`、`docs/country-codes.json`、`docs/dns-servers.json` 三份**刻意同时出现在前两条的 paths 里**——它们是两端共吃的数据，改了必须两端同时验证（[verdict.md §7](./verdict.md)）。
+
+`release.yml` 的 `on:` 只有 `push.tags`。dist 默认还会挂 `on: pull_request` 做 dry-run，那会与 `cli.yml` 的 PR 触发重叠，所以配置里用 `pr-run-mode = "skip"` 关掉了——**零交集是靠这个配置项维持的**，重跑 `dist init` 前先确认它还在。
 
 > `web.yml` 的 paths 在 `push` 下写了一遍；`cli.yml` 因为同时挂 `push` 与 `pull_request`，**同一份 paths 重复了两次**。GitHub Actions 不支持 YAML 锚点，这个重复是被迫的——**改一处必须改两处**。
 
 ---
 
-## 4. 发布 CLI
+## 4. 发布 CLI 用到的配置
 
-前置：§3 的两个仓库与 `HOMEBREW_TAP_TOKEN` 就位，**且应用最终名已定**。
+发布**步骤**见 [deployment.md §3](./deployment.md)。这里只登记配置项本身。
 
-```bash
-dist init                        # 生成 release workflow（首次）
-dist plan --tag=cli/v0.2.0       # 必须先实测解析通过
-git tag cli/v0.2.0 && git push --tags
-```
+| 配置项 | 在哪 | 值 |
+|---|---|---|
+| `repository` | `Cargo.toml` 的 `[workspace.package]` | `https://github.com/changyetech/preflight`。dist 靠它生成 installer 的下载 URL，**缺了 `dist init` 直接报错** |
+| `homepage` | 同上 | 同上。当前非必需（它是给 Homebrew formula 用的），加回 Homebrew 通道时会变成必需，留着省事 |
+| `installers` | `[workspace.metadata.dist]` | `["shell", "powershell"]`。**没有 `homebrew`**，理由见 §3.1 |
+| `pr-run-mode` | 同上 | `"skip"`。维持三条 workflow 零交集，见 §3.3 |
 
-**tag 用斜杠形式 `cli/v0.2.0`**：dist 文档化的解析规则会忽略 `/` 之前非 package 名的前缀，因此 tag 前缀与应用最终叫什么**完全解耦**。
-
-`Cargo.toml` 的 `[workspace.metadata.dist]` 里 `tap = "OWNER/homebrew-tap"` 目前是**占位**，定了 owner 要改。
+`[workspace.metadata.dist]` 与 `[profile.dist]` 两段**由 `dist init` 整段重写**，手写注释会被吞——说明都放在 `Cargo.toml` 文件顶部。改完必须重跑 `dist init --yes` 才会同步到 `.github/workflows/release.yml`。
 
 **约束：本仓库只有 CLI 发 GitHub Release**（Web 走 Cloudflare 部署）。安装命令里的 `releases/latest` 依赖这条——Web 一旦也发 Release，那个 URL 就会被串掉。
 
@@ -189,7 +195,9 @@ preflight config unset timeout         # 移除该键，恢复内置默认
 
 ---
 
-## 6. 上线检查清单
+## 6. 配置就位检查清单
+
+**首次部署与发版的操作清单在 [deployment.md §1](./deployment.md)**，这里只核对本文登记的配置项有没有配全。
 
 **本地开发**
 - [ ] `pnpm install` 且 `cp .env.example .env`
@@ -197,29 +205,24 @@ preflight config unset timeout         # 移除该键，恢复内置默认
 - [ ] `make check-cli` 通过
 
 **Cloudflare**
-- [ ] `wrangler secret put PROXYCHECK_API_KEY`
-- [ ] `wrangler secret put TURNSTILE_SECRET_KEY`
+- [ ] `PROXYCHECK_API_KEY` / `TURNSTILE_SECRET_KEY` 两个 Worker Secret 已设（§2.2）
 - [ ] 构建环境有 `VITE_TURNSTILE_SITE_KEY`
-- [ ] `pnpm deploy` 成功，`/api/geo` 返回 200
-- [ ] 自定义域名（`wrangler.jsonc` 的 `routes`）已启用并验证证书
-- [ ] observability 保持关闭，直到 IP 留存问题核实清楚
+- [ ] observability 保持关闭，直到 IP 留存问题核实清楚（[deployment.md §4](./deployment.md)）
 
 **GitHub**
-- [ ] 主仓库 public，`<owner>/homebrew-tap` 已建
-- [ ] `CLOUDFLARE_API_TOKEN` / `HOMEBREW_TAP_TOKEN` 已设
+- [ ] 主仓库 public（`installer.sh` 与二进制都是它的 Release 资产）
+- [ ] `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 已设
 - [ ] 改 `cli/**` 不触发 `web.yml`，改 `src/**` 不触发 `cli.yml`
-- [ ] 改 `docs/verdict-cases.json` **两条都触发**
+- [ ] 改 `docs/verdict-cases.json`、`country-codes.json`、`dns-servers.json` 任一，**前两条都触发**
 
 **CLI 发布**
-- [ ] 应用最终名已定（这是最后的免费改名窗口）
-- [ ] `Cargo.toml` 里的 `tap` 占位已替换
+- [ ] `Cargo.toml` 的 `repository` / `installers` / `pr-run-mode` 都在（§4）
 - [ ] `dist plan --tag=cli/v0.2.0` 解析通过
-- [ ] 发版后 `brew install <owner>/tap/preflight` 与 installer 一行命令实测可用
 
 ---
 
 ## 7. 绝不入库的东西
 
-`PROXYCHECK_API_KEY` · `TURNSTILE_SECRET_KEY` · `CLOUDFLARE_API_TOKEN` · `HOMEBREW_TAP_TOKEN` · 用户的 `~/.config/preflight/config.toml`
+`PROXYCHECK_API_KEY` · `TURNSTILE_SECRET_KEY` · `CLOUDFLARE_API_TOKEN` · 用户的 `~/.config/preflight/config.toml`
 
 `.env` 已在 `.gitignore` 里。CLI 侧还有一层：`Settings` 手写了 `Debug` 实现，key 在调试输出里显示为 `<set>` 而不是原值——派生的 `Debug` 会在 panic backtrace 里把它原样打出来。

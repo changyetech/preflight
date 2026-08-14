@@ -43,6 +43,15 @@ Web application
 | `make check-all` | Web 与 CLI 都跑 |
 | `make clean` | 删除 `dist`、`.wrangler` 等产物 |
 
+**跑单个测试**（Makefile 只有全量 target，调试时直接用底层命令）：
+
+```bash
+pnpm vitest run tests/verdict.test.ts      # 单个文件
+pnpm vitest run -t "两端判级一致"           # 按用例名过滤
+cargo test --package preflight verdict     # CLI：按名字过滤
+cargo test -- --nocapture                  # CLI：看 println 输出
+```
+
 **构建产物布局**（由 `@cloudflare/vite-plugin` 决定）：
 
 - `dist/client/` — 静态资源（`index.html`、`en/index.html`、`assets/`）
@@ -57,7 +66,8 @@ Web application
 This repo documents its own **contracts** and **specs** under `docs/` (contract documents live directly under `docs/`, not in sub-directories):
 
 - Domain contract: 判级规则 → `docs/` — **[docs/verdict.md](docs/verdict.md)**：检测项注册表、信号域、三档判级与三形态、覆盖度、两端差异登记表、CLI 配置键白名单。**Web 与 CLI 两个实现共同的判据**，判级规则只在此文件修改
-- Configuration: 仓库所需的全部配置 → `docs/` — **[docs/configuration.md](docs/configuration.md)**：环境变量、Worker Secret 与绑定、GitHub 仓库与 Secrets、三条 workflow 的触发条件、CLI 的用户配置与键白名单、上线检查清单、绝不入库的清单
+- Configuration: 仓库所需的全部配置 → `docs/` — **[docs/configuration.md](docs/configuration.md)**：环境变量、Worker Secret 与绑定、GitHub 仓库与 Secrets、三条 workflow 的触发条件、CLI 的用户配置与键白名单、配置就位检查清单、绝不入库的清单
+- Deployment: 部署与发版手册 → `docs/` — **[docs/deployment.md](docs/deployment.md)**：Web 部署到 Cloudflare（含验证与 `wrangler rollback` 回滚）、CLI 打 `cli/v*` tag 发 Release、dist 配置的改法与「`release.yml` 是生成产物不要手改」。**回答「怎么操作」，配置项本身在 configuration.md**
 - Third-party integration reference: proxycheck.io → `docs/` — **[docs/proxycheck.md](docs/proxycheck.md)**：风险分基准分表与官方分档建议、必带的 `p=0`/`tag=0`（`tag=0` 是隐私要求）、配额规则、响应字段、「HTTP 200 也可能不是合法 JSON」这个坑、v2 与 v3 的差异。**带核实日期**——第三方会改
 - API interface specifications (endpoints, request/response schemas) → `docs/` — **[docs/api.md](docs/api.md)**：`/api/geo` 与 `/api/risk` 的请求/响应 schema、响应信封、错误码注册表、隐私约束
 - Error format and error code registry → `docs/` — 见 [docs/api.md](docs/api.md) 第 1 / 4 节
@@ -164,20 +174,30 @@ preflight/
 ├── AGENTS.md          # → @CLAUDE.md
 ├── CONTEXT.md         # Ubiquitous language glossary (domain terms only, no implementation)
 ├── Makefile           # 统一命令入口（dev / build / preview / test / lint / check）
-├── index.html         # 英文入口（源语言）；zh-hans/index.html 为中文入口（Vite 多页构建）
+├── .github/workflows/ # web.yml（部署 Web）/ cli.yml（CLI 质量门）/
+│                     #   release.yml（**dist 生成，不要手改**；tag `cli/v*` 发版）
+│                     #   三者触发条件零交集，见 docs/deployment.md
+├── index.html         # 英文首页（源语言）。Vite 多页构建共 8 个入口：
+│                     #   首页 / dns/ / privacy/ / terms/ ×（根 = en，zh-hans/ = 中文）
+│                     #   入口清单在 vite.config.ts 的 environments.client.rollupOptions.input
 ├── vite.config.ts     # Vite + cloudflare() 插件；多页入口挂在 environments.client
 ├── wrangler.jsonc     # Worker 输入配置（绑定、DO、限流）；输出配置由插件生成
 ├── src/               # 前端
 │   ├── App.tsx        # 页面骨架：顶部 sticky 导航 + 首屏结论区 + 检测卡 + 落地内容
 │   ├── copy.ts        # 语种注册表 LOCALES + 文案聚合（en / zh-hans 均为完整 Copy，无字段级回落）
 │   ├── locales/       # 分语种文案：en.ts（源语言，推导 Copy 类型）/ zh-hans.ts（完整译文）
-│   ├── usePanel.ts    # 检测面板状态机（O1-O4 的编排）
-│   ├── components/    # Card / Verdict / Landing / LangSwitch
-│   ├── domain/        # 纯逻辑：结论判级、覆盖度、时区比对、IPv6、对照表
-│   └── probes/        # 浏览器直连的第三方探测（ipify）
+│   ├── usePanel.ts    # 检测面板状态机（O1-O6 的编排）
+│   ├── api.ts         # 调用本站 /api/geo 与 /api/risk（契约见 docs/api.md）
+│   ├── i18n.tsx theme.ts turnstile.ts  # 语种上下文 / 主题切换 / Turnstile 挂载
+│   ├── components/    # Card / cards / Verdict / Landing / Nav / Footer /
+│   │                  #   LangSwitch / ThemeSwitch / BackToTop / DnsPage / LegalPage
+│   ├── domain/        # 纯逻辑：结论判级、覆盖度、时区比对、IPv6、DNS/UDP 出口、对照表
+│   └── probes/        # 浏览器直连的第三方探测（ipify / stun / dnsEgress）
 ├── Cargo.toml         # 纯 workspace（members = ["cli"]）+ dist 发布配置
 ├── cli/               # Preflight CLI（Rust）——判级契约的**全集实现**，10 项全测
 │   └── src/
+│       ├── main.rs    # CLI 入口：参数解析、config 子命令、并发编排（thread::scope）
+│       ├── config.rs lang.rs  # 用户配置（键白名单见 docs/verdict.md）/ 语种解析
 │       ├── domain/    # 纯逻辑：检测项、覆盖度、判级（golden 向量在此消费）
 │       ├── probe/     # 10 项探测 + 第三方调用；不碰终端
 │       ├── copy/      # 文案：en 为源语言，zh_hans 为完整译文（无字段级回落）
@@ -187,15 +207,18 @@ preflight/
 │   ├── index.ts       # 入口：/api/* 路由，其余交给 env.ASSETS
 │   ├── geo.ts risk.ts # 两个接口的处理器（契约见 docs/api.md）
 │   ├── quota.ts       # QuotaCounter Durable Object（ADR-0002）
+│   ├── env.ts response.ts  # 绑定类型 / 响应信封与错误码（docs/api.md 第 1、4 节）
 │   └── proxycheck.ts stopforumspam.ts turnstile.ts  # 第三方调用
 ├── tests/             # Vitest（vitest-pool-workers，miniflare 内跑真实 Worker）
-├── refs/ipcheck/      # Reference: the published ipcheck CLI repo (read-only source material)
+│                      # 同时覆盖 Worker、前端 domain 纯逻辑与 CLI 无关的共享数据
+├── refs/              # Read-only reference material（ipcheck 旧 CLI 仓库、MyIP、设计稿 HTML）
 └── docs/
     ├── verdict.md     # 判级契约（normative）：Web 与 CLI 共同的判据
     ├── verdict-cases.json  # 判级契约的 golden 向量，两端参数化测试共吃同一份
-   ├── country-codes.json  # 英文国家名 → ISO2，O5 判定所需；两端共吃（Web 打进 bundle，CLI include_str!）
+    ├── country-codes.json  # 英文国家名 → ISO2，O5 判定所需；两端共吃（Web 打进 bundle，CLI include_str!）
     ├── dns-servers.json   # 公共 DNS 清单（IP/品牌/地区/过滤级别），两端共吃（Web bundle / CLI include_str!）
     ├── configuration.md  # 配置清单：环境变量、Secret、绑定、CI、检查清单
+    ├── deployment.md   # 部署手册：Web 上线/回滚、CLI 打 tag 发版、dist 配置的改法
     ├── proxycheck.md  # proxycheck.io 集成参考：基准分表、配额、必带参数、已知坑
     ├── api.md         # API contract: /api/geo & /api/risk schemas, error code registry
     ├── adr/           # Architecture Decision Records (0001-*.md, sequentially numbered)
