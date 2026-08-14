@@ -49,7 +49,7 @@ struct Cli {
 /// `--version` 的完整输出：版本号 + 版权行。年份取运行时当前年，不写死。
 fn long_version() -> String {
     format!(
-        "{}\n© {} Preflight",
+        "{}\n© {} Hangzhou Changye Network Technology Co., Ltd.",
         env!("CARGO_PKG_VERSION"),
         jiff::Zoned::now().year()
     )
@@ -557,7 +557,10 @@ mod tests {
         let Err(err) = Cli::try_parse_from(["preflight", "--version"]) else {
             panic!("--version 应走 DisplayVersion 的错误路径");
         };
-        let copyright = format!("© {} Preflight", jiff::Zoned::now().year());
+        let copyright = format!(
+            "© {} Hangzhou Changye Network Technology Co., Ltd.",
+            jiff::Zoned::now().year()
+        );
         assert!(
             err.to_string().contains(&copyright),
             "--version 输出应包含版权行「{copyright}」：{err}"

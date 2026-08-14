@@ -50,9 +50,18 @@ describe("页脚双栏披露", () => {
     for (const href of hrefs) {
       expect(html).toContain(`href="${href}"`);
     }
-    // 三个入口都在新标签打开，且带 noopener。
-    expect(html.match(/target="_blank"/g)).toHaveLength(hrefs.length);
+    // 三个入口都在新标签打开，且带 noopener（版权行的公司外链另计，见下一条）。
+    expect(html.match(/target="_blank"/g)).toHaveLength(hrefs.length + 1);
     expect(html.match(/rel="noopener"/g)).toHaveLength(hrefs.length);
+  });
+
+  // 版权行：公司名可点，指向官网；外站链接必须带 noreferrer。
+  it("版权行的公司名链到官网并在新标签打开", () => {
+    const html = renderFooter("en");
+
+    expect(html).toContain("Hangzhou Changye Network Technology Co., Ltd.");
+    expect(html).toContain('href="https://changyetech.com"');
+    expect(html).toContain('rel="noopener noreferrer"');
   });
 
   // 硬性红线（brief 要点 1）：原型页脚的「本页为设计稿」声明、「示例数据 · 非真实检测」标记

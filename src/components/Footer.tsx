@@ -24,9 +24,20 @@ export function Footer({ lang }: { lang: Lang }) {
           <p>{footer.onDemandBody}</p>
         </div>
       </div>
-      {/* 版权行不进 locales：符号、年份、产品名均无语种差异；年份取运行时当前年。 */}
+      {/* 版权行不进 locales：符号、年份、公司名均无语种差异；年份取运行时当前年。
+          公司名指向官网，外站一律新标签 + rel="noopener noreferrer"。 */}
       <p className="footer-copyright">
-        © {new Date().getFullYear()} Preflight
+        <span>
+          © {new Date().getFullYear()}{" "}
+          <a
+            className="footer-company"
+            href="https://changyetech.com"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Hangzhou Changye Network Technology Co., Ltd.
+          </a>
+        </span>
         {/* 子页入口收在右下角。路径一律走 pageUrl 拼语种前缀，中文首页的页脚不能把人送去英文子页。
             一律新标签打开：页脚是查阅入口，不该打断用户正在页面上进行的检测。
             带 rel="noopener"——即便同源也照挂，避免新页面拿到 window.opener。 */}
