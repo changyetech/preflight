@@ -31,12 +31,12 @@
 - [ ] Cloudflare 账号下已有 Workers 权限的 API Token
 - [ ] `wrangler secret put PROXYCHECK_API_KEY`
 - [ ] `wrangler secret put TURNSTILE_SECRET_KEY`
-- [ ] 构建环境有 `VITE_TURNSTILE_SITE_KEY`（公开值，进前端 bundle，走构建期环境变量而不是 secret）
 
 **GitHub**（只需要主仓库这一个，没有 tap 仓库——见 §5）
 - [ ] `changyetech/preflight` 是 **public**——installer 脚本与二进制都是本仓库的 Release 资产，转私有会让安装通道一起 401
 - [ ] 仓库 Secret `CLOUDFLARE_API_TOKEN` 已设（`web.yml` 用）
 - [ ] 仓库 Secret `CLOUDFLARE_ACCOUNT_ID` 已设——不给的话 token 一旦关联多个账号，CI 里的 `wrangler deploy` 直接报错退出
+- [ ] 仓库 **Variable** `VITE_TURNSTILE_SITE_KEY` 已设（`web.yml` build 步骤注入；公开值，进前端 bundle。**不要**设在 Worker 运行时变量——前端读不到，且会被 deploy 清掉。见 [configuration.md §3.2](./configuration.md)）
 
 `release.yml` **不需要配任何 secret**，用 GitHub 自动注入的 `GITHUB_TOKEN` 就够。
 
