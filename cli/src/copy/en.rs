@@ -7,7 +7,7 @@
 use super::{
     C4FixText, CheckText, ChecksText, ConfigText, CoverageText, DnsCommandText, DnsEgressText,
     ErrorText, FailureText, FooterText, GroupText, NoteText, O1FieldsText, Text, UdpEgressText,
-    UninstallText, ValueText, VerdictText,
+    UninstallText, UpdateText, ValueText, VerdictText,
 };
 
 pub const EN: Text = Text {
@@ -32,6 +32,9 @@ pub const EN: Text = Text {
         config_write: "Cannot write the config file",
         lang_unknown: "Unsupported language",
         uninstall_remove: "Cannot remove",
+        update_fetch: "Cannot check for updates",
+        update_no_receipt: "This copy of preflight was not installed by the official installer — update it the way it was installed (source builds: rebuild and replace the binary)",
+        update_run: "The installer did not complete",
     },
 
     verdict: VerdictText {
@@ -234,5 +237,12 @@ pub const EN: Text = Text {
         config_kept: "Config file kept: ",
         config_kept_hint: "Delete it manually if you no longer need it.",
         reinstall_hint: "To reinstall: ",
+    },
+
+    update: UpdateText {
+        up_to_date: "Already up to date: v",
+        updating_prefix: "Updating v",
+        updating_connector: " → v",
+        updated: "Updated to v",
     },
 };

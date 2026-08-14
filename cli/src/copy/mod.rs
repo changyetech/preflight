@@ -80,6 +80,13 @@ copy_leaf! {
         lang_unknown,
         /// 卸载时某一项删不掉（权限等）。具体路径由调用方追加在冒号之后。
         uninstall_remove,
+        /// 检查/下载更新失败（manifest 拉取、解析、installer 下载）。
+        /// 具体原因由调用方追加在冒号之后。
+        update_fetch,
+        /// 无 install receipt（源码安装）时拒绝更新的完整说明，无动态部分。
+        update_no_receipt,
+        /// installer 执行失败（非零退出）。
+        update_run,
     }
 }
 
@@ -386,6 +393,22 @@ copy_leaf! {
     }
 }
 
+copy_leaf! {
+    /// `preflight update` 的文案。版本号是字面量，由调用方裸拼接在前缀之后——
+    /// 标点与空格由取值自带（同 `ErrorText` 约定）。`v` 前缀属于版本号的呈现习惯，
+    /// 不随语种变化，包含在片段里。
+    UpdateText {
+        /// 已是最新时的整行前缀，当前版本号由调用方追加。
+        up_to_date,
+        /// 更新行的前缀，旧版本号由调用方追加。
+        updating_prefix,
+        /// 更新行里新旧版本号之间的连接（如「 → v」），新版本号由调用方追加。
+        updating_connector,
+        /// 更新成功收尾的前缀，新版本号由调用方追加。
+        updated,
+    }
+}
+
 copy_node! {
     /// 全部文案。
     Text {
@@ -403,6 +426,7 @@ copy_node! {
         udp_egress: UdpEgressText,
         dns_cmd: DnsCommandText,
         uninstall: UninstallText,
+        update: UpdateText,
     }
 }
 
