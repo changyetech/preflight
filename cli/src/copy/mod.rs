@@ -335,8 +335,6 @@ copy_leaf! {
         col_provider,
         /// 列名：地区。
         col_region,
-        /// 列名：是否国内。
-        col_domestic,
         /// 列名：用途（过滤级别）。
         col_variant,
         /// 列名：延迟（仅 --check）。
@@ -351,8 +349,6 @@ copy_leaf! {
         variant_family,
         /// variant = adblock：拦广告/追踪。
         variant_adblock,
-        /// 国内标记词。
-        domestic_yes,
         /// --check 状态：通。
         check_ok,
         /// --check 状态：应答可疑。

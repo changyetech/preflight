@@ -28,7 +28,6 @@ pub fn dns_servers(
                 "ip": entry.ip,
                 "name": entry.name,
                 "region": entry.region,
-                "domestic": entry.domestic,
                 "variant": entry.variant,
             });
             if let Some(results) = results {

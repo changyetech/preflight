@@ -3,7 +3,7 @@
 //! 与 `country-codes.json` 同模式（ADR-0005）：`include_str!` 让 cargo 把这份表登记为
 //! 构建依赖，改 JSON 会触发重编译。解析在首次访问时做一次，之后复用。
 //!
-//! C2 探测（`probe/dns.rs`）的「已知服务商识别 + 国内标记」与 `dns` 命令的清单展示
+//! C2 探测（`probe/dns.rs`）的「已知服务商识别」与 `dns` 命令的清单展示
 //! 共用这一份数据——同一台机器上两处对同一 IP 的称呼因此一致。
 
 use std::sync::OnceLock;
@@ -28,9 +28,8 @@ pub struct Entry {
     pub ip: String,
     /// 品牌名 / 专名，两语种共用不翻译。
     pub name: String,
-    /// ISO2 国家码。
+    /// ISO2 国家码。C2 的「国内 DNS」提醒由 `region == "CN"` 推导，不另存标记。
     pub region: String,
-    pub domestic: bool,
     pub variant: Variant,
 }
 
@@ -74,7 +73,7 @@ mod tests {
     fn lookup_finds_known_provider() {
         let e = lookup("1.1.1.1").expect("1.1.1.1 应在注册表中");
         assert_eq!(e.name, "Cloudflare");
-        assert!(!e.domestic);
+        assert_eq!(e.region, "US");
         assert_eq!(e.variant, Variant::Standard);
     }
 
@@ -84,10 +83,10 @@ mod tests {
     }
 
     #[test]
-    fn domestic_entries_flagged_correctly() {
-        assert!(lookup("223.5.5.5").unwrap().domestic);
-        assert!(lookup("114.114.114.114").unwrap().domestic);
-        assert!(!lookup("8.8.8.8").unwrap().domestic);
+    fn domestic_entries_are_marked_by_region() {
+        assert_eq!(lookup("223.5.5.5").unwrap().region, "CN");
+        assert_eq!(lookup("114.114.114.114").unwrap().region, "CN");
+        assert_eq!(lookup("8.8.8.8").unwrap().region, "US");
     }
 
     #[test]

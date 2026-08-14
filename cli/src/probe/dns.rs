@@ -16,6 +16,7 @@ pub struct Server {
     pub entry: Option<&'static crate::domain::dns_servers::Entry>,
     /// 是否是私网地址（局域网路由器）。
     pub private: bool,
+    /// 是否是国内 DNS（注册表条目的 `region == "CN"`）。
     pub domestic: bool,
 }
 
@@ -43,7 +44,7 @@ pub fn describe(address: &str) -> Server {
         address: address.to_string(),
         entry: known,
         private,
-        domestic: known.is_some_and(|e| e.domestic),
+        domestic: known.is_some_and(|e| e.region == "CN"),
     }
 }
 

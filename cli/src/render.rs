@@ -242,15 +242,8 @@ pub fn dns_table(
         .map(|e| display_width(&e.name))
         .max()
         .unwrap_or(0);
-    let unfolded_est = longest_ip
-        + 2
-        + longest_name
-        + 2
-        + 2
-        + 2
-        + display_width(text.dns_cmd.col_domestic)
-        + 2
-        + display_width(text.dns_cmd.variant_standard);
+    let unfolded_est =
+        longest_ip + 2 + longest_name + 2 + 2 + 2 + display_width(text.dns_cmd.variant_standard);
     let fold_region = unfolded_est > width;
 
     // 排序索引（--check 时按延迟升序，不通的排末尾）。
@@ -280,7 +273,6 @@ pub fn dns_table(
     if !fold_region {
         hdr.push(text.dns_cmd.col_region.to_string());
     }
-    hdr.push(text.dns_cmd.col_domestic.to_string());
     hdr.push(text.dns_cmd.col_variant.to_string());
     if has_check {
         hdr.push(text.dns_cmd.col_latency.to_string());
@@ -308,13 +300,6 @@ pub fn dns_table(
             row.push(entry.region.clone());
         }
 
-        // Domestic
-        row.push(if entry.domestic {
-            text.dns_cmd.domestic_yes.to_string()
-        } else {
-            String::new()
-        });
-
         // Variant
         row.push(variant_label(entry.variant, text).to_string());
 
@@ -341,7 +326,7 @@ pub fn dns_table(
 
     // 列宽：取每列 display_width 的最大值。
     let num_cols = matrix[0].len();
-    let col_widths: Vec<usize> = (0..num_cols)
+    let mut col_widths: Vec<usize> = (0..num_cols)
         .map(|c| {
             matrix
                 .iter()
@@ -350,6 +335,13 @@ pub fn dns_table(
                 .unwrap_or(0)
         })
         .collect();
+
+    // 表格整幅与体检报表对齐（同一个 `style.width()`）：富余的空间摊给提供商列，
+    // 右端因此与卡片、分组发丝线齐平——两个命令的输出看起来才是同一份排版。
+    let used = 2 + col_widths.iter().sum::<usize>() + 2 * (num_cols - 1);
+    if used < width {
+        col_widths[1] += width - used;
+    }
 
     // 渲染。
     let mut out = String::new();
@@ -1908,6 +1900,34 @@ mod tests {
     use crate::domain::checks::Failure;
     use crate::lang::Lang;
     use crate::probe::TimezoneCheck;
+
+    /// `dns` 表格的整幅宽度必须与体检报表一致——两个命令是同一份排版。
+    #[test]
+    fn dns_table_spans_the_report_width() {
+        let text = copy::text(Lang::En);
+        let style = Style::new(false);
+        let out = dns_table(crate::domain::dns_servers::all(), None, &text, &style);
+        for line in out.lines().filter(|l| l.contains('─')) {
+            assert_eq!(
+                display_width(line),
+                style.width(),
+                "发丝线未撑满整幅：{line}"
+            );
+        }
+    }
+
+    /// CN 列已移除：国内与否由 `region` 列承担，不再单列。
+    #[test]
+    fn dns_table_has_no_domestic_column() {
+        let text = copy::text(Lang::ZhHans);
+        let style = Style::new(false);
+        let out = dns_table(crate::domain::dns_servers::all(), None, &text, &style);
+        let header = out
+            .lines()
+            .find(|l| l.contains(text.dns_cmd.col_ip))
+            .unwrap();
+        assert!(!header.contains("国内"), "{header}");
+    }
 
     fn blank() -> Report {
         Report {
