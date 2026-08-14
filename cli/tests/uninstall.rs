@@ -45,6 +45,9 @@ impl Sandbox {
             .args(["--lang", "en"])
             .env("XDG_CONFIG_HOME", self.root.join("cfg"))
             .env("HOME", self.root.join("home"))
+            // Windows 的 config 走 %APPDATA%、receipt 走 %LOCALAPPDATA%，不覆盖就会删到真实目录。
+            .env("APPDATA", self.root.join("cfg"))
+            .env("LOCALAPPDATA", self.root.join("cfg"))
             .env_remove("PREFLIGHT_CONFIG")
             .output()
             .unwrap()
