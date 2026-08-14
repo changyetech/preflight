@@ -11,7 +11,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { Nav } from "../src/components/Nav";
-import { CopyProvider } from "../src/i18n";
+import { CopyProvider } from "../src/CopyProvider";
 import { COPY, COPY_ZH_HANS } from "../src/copy";
 import type { Lang } from "../src/copy";
 

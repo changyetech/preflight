@@ -17,7 +17,7 @@ import type { CoverageCell } from "../src/coverageMeter";
 import { COPY, COPY_ZH_HANS } from "../src/copy";
 import type { Coverage } from "../src/domain/coverage";
 import type { GeoData } from "../src/domain/types";
-import { CopyProvider } from "../src/i18n";
+import { CopyProvider } from "../src/CopyProvider";
 import type { Lang } from "../src/copy";
 
 const GEO: GeoData = {
