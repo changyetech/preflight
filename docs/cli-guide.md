@@ -35,6 +35,23 @@ make cli-release        # 产物在 target/release/preflight
 preflight --version
 ```
 
+### 1.1 卸载
+
+```bash
+preflight uninstall           # 删除二进制与 install receipt，配置保留
+preflight uninstall --purge   # 连配置目录一起删除
+```
+
+手动清理（二进制已损坏、或想逐项确认时）：
+
+| 对象 | Linux / macOS | Windows |
+|---|---|---|
+| 二进制 | 安装器按 `$XDG_BIN_HOME` → `$XDG_DATA_HOME/../bin` → `~/.local/bin` 顺序落盘，通常在 `~/.local/bin/preflight` | PowerShell 安装器的对应目录 |
+| install receipt | `${XDG_CONFIG_HOME:-~/.config}/preflight/preflight-receipt.json` | `%LOCALAPPDATA%\preflight\preflight-receipt.json` |
+| 配置文件 | `${XDG_CONFIG_HOME:-~/.config}/preflight/config.toml` | `%APPDATA%\preflight\config.toml` |
+
+安装器若曾向 shell rc（`~/.profile` 等）追加过 PATH 行，`uninstall` 不会去改它——留着无害，介意就手动删除该行。
+
 ---
 
 ## 2. 快速开始
@@ -55,6 +72,7 @@ preflight
 preflight [OPTIONS]                  # 体检（默认命令）
 preflight dns [--check]              # 公共 DNS 服务器清单（可实测连通性）
 preflight config <ACTION>            # 查看与修改配置
+preflight uninstall [--purge]        # 卸载（--purge 连配置一起删）
 ```
 
 ### 3.1 全局与顶层参数
