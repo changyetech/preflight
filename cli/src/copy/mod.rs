@@ -78,6 +78,9 @@ copy_leaf! {
         config_parse,
         config_write,
         lang_unknown,
+        /// 卸载时某一项删不掉（权限等）。具体路径由调用方追加在冒号之后。
+        #[allow(dead_code)]
+        uninstall_remove,
     }
 }
 
@@ -369,6 +372,22 @@ copy_leaf! {
     }
 }
 
+copy_leaf! {
+    /// `preflight uninstall` 的文案。路径与重装命令是字面量，
+    /// 由调用方裸拼接在前缀之后——标点与空格由取值自带（同 `ErrorText` 约定）。
+    #[allow(dead_code)]
+    UninstallText {
+        /// 每删掉一项打一行的前缀，路径由调用方追加。
+        removed,
+        /// 默认模式收尾：配置文件保留在哪，路径由调用方追加。
+        config_kept,
+        /// 紧随其后的第二行：不需要就手动删。
+        config_kept_hint,
+        /// 重装命令的前缀。命令本身是字面 CLI 语法，不随语种变化，写死在 uninstall.rs。
+        reinstall_hint,
+    }
+}
+
 copy_node! {
     /// 全部文案。
     Text {
@@ -385,6 +404,8 @@ copy_node! {
         dns_egress: DnsEgressText,
         udp_egress: UdpEgressText,
         dns_cmd: DnsCommandText,
+        #[allow(dead_code)]
+        uninstall: UninstallText,
     }
 }
 

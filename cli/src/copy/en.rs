@@ -7,7 +7,7 @@
 use super::{
     C4FixText, CheckText, ChecksText, ConfigText, CoverageText, DnsCommandText, DnsEgressText,
     ErrorText, FailureText, FooterText, GroupText, NoteText, O1FieldsText, Text, UdpEgressText,
-    ValueText, VerdictText,
+    UninstallText, ValueText, VerdictText,
 };
 
 pub const EN: Text = Text {
@@ -31,6 +31,7 @@ pub const EN: Text = Text {
         config_parse: "The config file is invalid",
         config_write: "Cannot write the config file",
         lang_unknown: "Unsupported language",
+        uninstall_remove: "Cannot remove",
     },
 
     verdict: VerdictText {
@@ -226,5 +227,12 @@ pub const EN: Text = Text {
         check_suspicious: "Suspicious",
         check_unreachable: "Unreachable",
         footer_hint: "Run `preflight dns --check` to test which servers actually work from here.",
+    },
+
+    uninstall: UninstallText {
+        removed: "Removed: ",
+        config_kept: "Config file kept: ",
+        config_kept_hint: "Delete it manually if you no longer need it.",
+        reinstall_hint: "To reinstall: ",
     },
 };
