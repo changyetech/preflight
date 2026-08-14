@@ -15,13 +15,13 @@
   // 真正的构建/部署由 @cloudflare/vite-plugin 生成 dist/preflight/wrangler.json 并自行填 directory。
   "assets": {
     "directory": "./dist/client",
-    "binding": "ASSETS",
+    "binding": "ASSETS"
   },
 
   // proxycheck 日配额守卫：单实例 Durable Object，SQLite 后端（ADR-0002）。
   // 只存「日期 + 当日计数」两个标量，不含 IP、不含任何用户数据（ADR-0008）。
   "durable_objects": {
-    "bindings": [{ "name": "QUOTA", "class_name": "QuotaCounter" }],
+    "bindings": [{ "name": "QUOTA", "class_name": "QuotaCounter" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["QuotaCounter"] }],
 
@@ -31,8 +31,8 @@
     {
       "name": "RISK_RATE_LIMITER",
       "namespace_id": "1001",
-      "simple": { "limit": 10, "period": 60 },
-    },
+      "simple": { "limit": 10, "period": 60 }
+    }
   ],
 
   // 域名绑定：待人工执行（无 Cloudflare 账号凭据，未实际部署）。
@@ -50,6 +50,6 @@
   // 在结论确认前，保守起见先关闭 observability，避免违反 ADR-0008 的零留存承诺。
   // 待人工核实后（见验证记录），如确认可安全开启并排除 IP 字段，再打开并调整此处配置。
   "observability": {
-    "enabled": false,
-  },
+    "enabled": false
+  }
 }
