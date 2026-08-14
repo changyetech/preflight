@@ -196,14 +196,16 @@ preflight/
 │   └── probes/        # 浏览器直连的第三方探测（ipify / stun / dnsEgress）
 ├── Cargo.toml         # 纯 workspace（members = ["cli"]）+ dist 发布配置
 ├── cli/               # Preflight CLI（Rust）——判级契约的**全集实现**，10 项全测
-│   └── src/
-│       ├── main.rs    # CLI 入口：参数解析、config 子命令、并发编排（thread::scope）
-│       ├── config.rs lang.rs  # 用户配置（键白名单见 docs/verdict.md）/ 语种解析
-│       ├── domain/    # 纯逻辑：检测项、覆盖度、判级（golden 向量在此消费）
-│       ├── probe/     # 10 项探测 + 第三方调用；不碰终端
-│       ├── copy/      # 文案：en 为源语言，zh_hans 为完整译文（无字段级回落）
-│       ├── render.rs  # 人读报告（参考 Web 的视觉结构，无表格边框）
-│       └── json.rs    # `--json`：机器可读，也是平价验收唯一的 oracle
+│   ├── src/
+│   │   ├── main.rs    # CLI 入口：参数解析、config 子命令、并发编排（thread::scope）
+│   │   ├── config.rs lang.rs  # 用户配置（键白名单见 docs/verdict.md）/ 语种解析
+│   │   ├── domain/    # 纯逻辑：检测项、覆盖度、判级（golden 向量在此消费）
+│   │   ├── probe/     # 10 项探测 + 第三方调用；不碰终端
+│   │   ├── copy/      # 文案：en 为源语言，zh_hans 为完整译文（无字段级回落）
+│   │   ├── uninstall.rs  # `uninstall`：自删二进制 + receipt，--purge 连配置目录
+│   │   ├── render.rs  # 人读报告（参考 Web 的视觉结构，无表格边框）
+│   │   └── json.rs    # `--json`：机器可读，也是平价验收唯一的 oracle
+│   └── tests/         # CLI 集成测试（cargo test；跑真实二进制，与根 tests/ 无关）
 ├── worker/            # Cloudflare Worker
 │   ├── index.ts       # 入口：/api/* 路由，其余交给 env.ASSETS
 │   ├── geo.ts risk.ts # 两个接口的处理器（契约见 docs/api.md）

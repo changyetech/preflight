@@ -31,6 +31,8 @@ cargo install --git https://github.com/changyetech/preflight
 
 **升级就是把上面的安装命令再跑一遍**，它会覆盖掉旧的那个。**没有 Homebrew 通道**——那需要一个独立的 tap 仓库（Homebrew 的命名硬规则，formula 不能住在主仓库里），目前不值这个维护面。
 
+**卸载**用 `preflight uninstall`（删二进制与 install receipt，配置保留）；`preflight uninstall --purge` 连配置目录一起删。
+
 ## 使用
 
 ```bash

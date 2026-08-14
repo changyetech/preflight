@@ -46,9 +46,13 @@ preflight uninstall --purge   # 连配置目录一起删除
 
 | 对象 | Linux / macOS | Windows |
 |---|---|---|
-| 二进制 | 安装器按 `$XDG_BIN_HOME` → `$XDG_DATA_HOME/../bin` → `~/.local/bin` 顺序落盘，通常在 `~/.local/bin/preflight` | PowerShell 安装器的对应目录 |
+| 二进制 | 安装器按 `$XDG_BIN_HOME` → `$XDG_DATA_HOME/../bin` → `~/.local/bin` 顺序落盘，通常在 `~/.local/bin/preflight` | 同一套回退顺序，通常在 `%USERPROFILE%\.local\bin\preflight.exe` |
 | install receipt | `${XDG_CONFIG_HOME:-~/.config}/preflight/preflight-receipt.json` | `%LOCALAPPDATA%\preflight\preflight-receipt.json` |
 | 配置文件 | `${XDG_CONFIG_HOME:-~/.config}/preflight/config.toml` | `%APPDATA%\preflight\config.toml` |
+
+表里是**安装器**的落点。从源码装的（`make cli-release` 的 `target/release/preflight`、或 `cargo install --git` 的 `~/.cargo/bin/preflight`）不在其中，按自己当初放的位置找；这两种安装也都没有 install receipt。
+
+`--purge` 删的只是上表「配置文件」那一格的**默认目录**。用 `PREFLIGHT_CONFIG` 指向别处的配置文件永远不碰——里面若存着 `proxycheck_key`，卸载后它仍在 `$PREFLIGHT_CONFIG` 指的那个路径上，要清得自己删。
 
 安装器若曾向 shell rc（`~/.profile` 等）追加过 PATH 行，`uninstall` 不会去改它——留着无害，介意就手动删除该行。
 
@@ -85,7 +89,7 @@ preflight uninstall [--purge]        # 卸载（--purge 连配置一起删）
 | `-h, --help` | — | 帮助 |
 | `-V` / `--version` | — | 短版本号 / 完整版本信息（含版权行） |
 
-语言未显式指定时依次取：`--lang` > 配置文件 `language` > 系统 locale > 英文。
+语言未显式指定时依次取：`--lang` > 配置文件 `language` > 系统 locale > 英文。`uninstall` 是唯一的例外：它在读配置文件**之前**就分发（配置文件坏掉时它必须还能跑），因此只认 `--lang` 与系统 locale。
 
 ### 3.2 `preflight`（体检）
 
