@@ -2,6 +2,7 @@
 // 底稿是 docs/cli-guide.md：只讲「怎么用」，判级规则不复述（契约红线）。
 
 import { type Lang } from "../copy";
+import { Footer } from "./Footer";
 import { Nav } from "./Nav";
 import { useCopy } from "../i18n";
 
@@ -84,6 +85,8 @@ export function GuidePage({ lang }: { lang: Lang }) {
             </div>
           ))}
         </section>
+
+        <Footer lang={lang} compact />
       </main>
     </>
   );

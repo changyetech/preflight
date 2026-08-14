@@ -7,23 +7,35 @@
 import { pageUrl, type Lang } from "../copy";
 import { useCopy } from "../i18n";
 
-export function Footer({ lang }: { lang: Lang }) {
+// compact：只保留版权行（版权 + 法务链接）。披露两栏讲的是首页检测行为
+// （自动发起/需手动触发），dns/guide 这类静态内容页不发起检测，披露放上去是错误陈述。
+export function Footer({
+  lang,
+  compact = false,
+}: {
+  lang: Lang;
+  compact?: boolean;
+}) {
   const COPY = useCopy();
   const { footer } = COPY;
 
   return (
     <footer className="site-footer">
-      <p className="footer-lede">{footer.privacy}</p>
-      <div className="footer-cols">
-        <div>
-          <span className="eyebrow">{footer.autoLabel}</span>
-          <p>{footer.autoBody}</p>
-        </div>
-        <div>
-          <span className="eyebrow">{footer.onDemandLabel}</span>
-          <p>{footer.onDemandBody}</p>
-        </div>
-      </div>
+      {!compact && (
+        <>
+          <p className="footer-lede">{footer.privacy}</p>
+          <div className="footer-cols">
+            <div>
+              <span className="eyebrow">{footer.autoLabel}</span>
+              <p>{footer.autoBody}</p>
+            </div>
+            <div>
+              <span className="eyebrow">{footer.onDemandLabel}</span>
+              <p>{footer.onDemandBody}</p>
+            </div>
+          </div>
+        </>
+      )}
       {/* 版权行不进 locales：符号、年份、公司名均无语种差异；年份取运行时当前年。
           公司名指向官网，外站一律新标签 + rel="noopener noreferrer"。 */}
       <p className="footer-copyright">

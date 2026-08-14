@@ -4,6 +4,7 @@
 import dnsData from "../../docs/dns-servers.json";
 import { type Lang } from "../copy";
 import { CopyButton } from "./Card";
+import { Footer } from "./Footer";
 import { Nav } from "./Nav";
 import { useCopy } from "../i18n";
 
@@ -62,6 +63,8 @@ function DnsShell({ lang }: { lang: Lang }) {
         </div>
 
         <p className="dns-cli-hint">{COPY.dns.cliHint}</p>
+
+        <Footer lang={lang} compact />
       </main>
     </>
   );

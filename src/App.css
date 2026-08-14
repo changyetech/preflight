@@ -5,7 +5,7 @@
   max-width: 76rem;
   margin: 0 auto;
   /* 底边距只需一点呼吸：页脚是 .page 的最后一个元素，留大了就是版权行下的空洞。
-     （dns/guide/legal 各自的容器以内容收尾、无页脚，底边距维持 3/4rem，不再与此处同值。） */
+     dns/guide 也带页脚，底边距与此同值；legal 以内容收尾、无页脚，维持 3/4rem。 */
   padding: 1.25rem 1rem 1.5rem;
 }
 
@@ -1414,6 +1414,12 @@ button {
   line-height: 1.85;
   color: var(--muted);
 }
+
+/* compact 页脚（dns/guide）：版权行就是第一个元素，1.5rem 上边距由容器 padding 出，别叠加 */
+.footer-copyright:first-child {
+  margin-top: 0;
+}
+
 /* 返回顶部按钮固定在右下（inset-inline-end 1rem，宽 2.75rem）。页底收紧后版权行离页底
    只剩 1.5/2rem，视口窄于「页宽 + 按钮位」时按钮会压住右下的法务链接——给行尾留出按钮位。 */
 @media (max-width: 84rem) {
@@ -1495,12 +1501,13 @@ button {
 .dns-main {
   max-width: 76rem;
   margin: 0 auto;
-  padding: 1.25rem 1rem 3rem;
+  /* 底边距与首页 .page 同：页脚是容器最后一个元素，留白只需一点呼吸 */
+  padding: 1.25rem 1rem 1.5rem;
 }
 
 @media (min-width: 48rem) {
   .dns-main {
-    padding: 2rem 1.5rem 4rem;
+    padding: 2rem 1.5rem 2rem;
   }
 }
 
@@ -1656,12 +1663,13 @@ button {
 .guide-main {
   max-width: 76rem;
   margin: 0 auto;
-  padding: 1.25rem 1rem 3rem;
+  /* 底边距与首页 .page 同：页脚是容器最后一个元素，留白只需一点呼吸 */
+  padding: 1.25rem 1rem 1.5rem;
 }
 
 @media (min-width: 48rem) {
   .guide-main {
-    padding: 2rem 1.5rem 4rem;
+    padding: 2rem 1.5rem 2rem;
   }
 }
 
