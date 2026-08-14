@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Ascent 起飞 · 全量层矢量母版（任意尺寸缩放用），规格见 docs/specs/2026-08-14-logo-redesign.md。
+       颜色随系统主题切换；需要固定配色时直接改两个 stroke 值。 -->
+  <style>
+    .b { stroke: oklch(50% 0.145 250); }
+    .p { stroke: oklch(43% 0.11 155); }
+    @media (prefers-color-scheme: dark) {
+      .b { stroke: oklch(72% 0.13 248); }
+      .p { stroke: oklch(80% 0.14 155); }
+    }
+  </style>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path class="b" opacity=".3" stroke-width="2.5" d="M7 47a27 27 0 0 1 50 0"/>
+    <path class="b" stroke-width="8" d="M16 38.5l9.5 9.5"/>
+    <path class="b" stroke-width="8" d="M25.5 48L52 15"/>
+    <path class="p" stroke-width="8" d="M47.17 21.01L52 15"/>
+  </g>
+</svg>

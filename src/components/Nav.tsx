@@ -21,8 +21,23 @@ export function Nav({
     <nav className="nav">
       <div className="nav-in">
         {/* 品牌链回当前语种首页；停在首页时点它就是重新加载，符合 logo 的通行预期。 */}
+        {/* 内联 SVG 而非 <img src="/favicon.svg">：颜色要跟站点 data-theme 主题走，
+            <img> 里的 favicon 只认系统 prefers-color-scheme。几何为 logo 简化层，
+            规格见 docs/specs/2026-08-14-logo-redesign.md。 */}
         <a className="brand" href={home}>
-          <img src="/favicon.svg" alt="" width="20" height="19" />
+          <svg viewBox="0 0 64 64" width="20" height="20" aria-hidden="true">
+            <g fill="none" strokeLinecap="round" strokeLinejoin="round">
+              <path
+                stroke="var(--accent)"
+                opacity=".4"
+                strokeWidth="4.5"
+                d="M7 47a27 27 0 0 1 50 0"
+              />
+              <path stroke="var(--accent)" strokeWidth="9" d="M15 38l10 10" />
+              <path stroke="var(--accent)" strokeWidth="9" d="M25 48L52 15" />
+              <path stroke="var(--ok)" strokeWidth="9" d="M47 21.2L52 15" />
+            </g>
+          </svg>
           {COPY.nav.brand}
         </a>
         <div className="nav-links">
