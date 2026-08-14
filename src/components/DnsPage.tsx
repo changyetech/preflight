@@ -3,8 +3,8 @@
 
 import dnsData from "../../docs/dns-servers.json";
 import { type Lang } from "../copy";
-import { LangSwitch } from "./LangSwitch";
-import { ThemeSwitch } from "./ThemeSwitch";
+import { CopyButton } from "./Card";
+import { Nav } from "./Nav";
 import { useCopy } from "../i18n";
 
 type Variant = "standard" | "security" | "family" | "adblock";
@@ -13,7 +13,6 @@ type DnsServer = {
   ip: string;
   name: string;
   region: string;
-  domestic: boolean;
   variant: Variant;
 };
 
@@ -31,17 +30,7 @@ function DnsShell({ lang }: { lang: Lang }) {
 
   return (
     <>
-      <header className="dns-header">
-        <div className="dns-header-bar">
-          <a href={lang === "en" ? "/" : "/zh-hans"} className="dns-brand">
-            {COPY.nav.brand}
-          </a>
-          <div className="dns-header-actions">
-            <ThemeSwitch />
-            <LangSwitch lang={lang} pageSlug="/dns/" />
-          </div>
-        </div>
-      </header>
+      <Nav lang={lang} pageSlug="/dns/" />
 
       <main className="dns-main">
         <h1>{COPY.dns.heading}</h1>
@@ -53,17 +42,18 @@ function DnsShell({ lang }: { lang: Lang }) {
                 <th>{COPY.dns.tableHeaders.ip}</th>
                 <th>{COPY.dns.tableHeaders.provider}</th>
                 <th>{COPY.dns.tableHeaders.region}</th>
-                <th>{COPY.dns.tableHeaders.domestic}</th>
                 <th>{COPY.dns.tableHeaders.filter}</th>
               </tr>
             </thead>
             <tbody>
               {SERVERS.map((s) => (
                 <tr key={s.ip}>
-                  <td className="dns-ip">{s.ip}</td>
+                  <td className="dns-ip">
+                    <span>{s.ip}</span>
+                    <CopyButton text={s.ip} />
+                  </td>
                   <td>{s.name}</td>
                   <td className="dns-region">{s.region}</td>
-                  <td>{s.domestic ? COPY.dns.domesticYes : ""}</td>
                   <td>{variantLabel(s.variant, COPY)}</td>
                 </tr>
               ))}
@@ -72,10 +62,6 @@ function DnsShell({ lang }: { lang: Lang }) {
         </div>
 
         <p className="dns-cli-hint">{COPY.dns.cliHint}</p>
-
-        <a href={lang === "en" ? "/" : "/zh-hans"} className="dns-back-link">
-          {"<"} {COPY.dns.backHome}
-        </a>
       </main>
     </>
   );

@@ -131,15 +131,19 @@ describe("两语种各自是独立静态资源，不是彼此的软 404 兜底",
     expect(html).toContain(COPY_ZH_HANS.dns.title);
   });
 
-  it("/dns（无尾斜杠）301 重定向到 /dns/", async () => {
-    const response = await SELF.fetch("https://example.com/dns");
+  it.each(["/dns", "/zh-hans/dns"])(
+    "%s（无尾斜杠）由 Static Assets 补上尾斜杠后到达内容",
+    async (path) => {
+      const response = await SELF.fetch(`https://example.com${path}`);
 
-    // /dns 不带尾斜杠必须能到达内容（不是 404），不管是 301 重定向后还是直接 200。
-    // 线上 html_handling 的具体行为待核实（见文件头注释）。
-    expect(response.status).not.toBe(404);
-    const html = await response.text();
-    expect(html).toContain(COPY.dns.title);
-  });
+      // 尾斜杠由 Static Assets 的 html_handling 自行处理（307），Worker 不掺和。
+      expect(response.status).not.toBe(404);
+      const html = await response.text();
+      expect(html).toContain(
+        path.startsWith("/zh-hans") ? COPY_ZH_HANS.dns.title : COPY.dns.title,
+      );
+    },
+  );
 
   it.each(["/dns/xxx", "/zh-hans/dns/xxx"])(
     "%s 是真实 404，不做 SPA 回退",

@@ -314,13 +314,12 @@ export const ZH_HANS: Copy = {
   dns: {
     title: "公共 DNS 服务器 · Preflight",
     description:
-      "策展的公共 DNS 解析器清单——Cloudflare、Google、Quad9、AliDNS 等，标注地区、过滤级别，以及是否由中国大陆运营。",
+      "策展的公共 DNS 解析器清单——Cloudflare、Google、Quad9、AliDNS 等，标注地区与过滤级别。",
     heading: "公共 DNS 服务器",
     tableHeaders: {
       ip: "IP",
       provider: "提供商",
       region: "地区",
-      domestic: "国内",
       filter: "用途",
     },
     variants: {
@@ -329,9 +328,7 @@ export const ZH_HANS: Copy = {
       family: "家庭保护",
       adblock: "拦截广告",
     },
-    domesticYes: "国内",
     cliHint:
       "想测你这台机器上实际可用的？在 CLI 里执行 preflight dns --check。",
-    backHome: "返回 Preflight",
   },
 };

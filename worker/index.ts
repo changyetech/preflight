@@ -26,12 +26,6 @@ export default {
       return fail(ERROR.NOT_FOUND, "no such endpoint");
     }
 
-    // /dns → /dns/：Static Assets 的 html_handling 在 miniflare 里不提供该重定向，
-    // 线上待核实。仅此一条，不引入通用尾斜杠重写逻辑（spec §5.3）。
-    if (url.pathname === "/dns") {
-      return Response.redirect(url.origin + "/dns/", 301);
-    }
-
     return env.ASSETS.fetch(request);
   },
 } satisfies ExportedHandler<Env>;

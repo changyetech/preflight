@@ -14,12 +14,11 @@ import {
 } from "./components/cards";
 import { coverageCells } from "./coverageMeter";
 import { CLI_CHECK_IDS } from "./domain/checks";
-import { langFromPathname, localeOf, type Lang } from "./copy";
+import { langFromPathname, type Lang } from "./copy";
 import { BackToTop } from "./components/BackToTop";
 import { Footer } from "./components/Footer";
-import { LangSwitch } from "./components/LangSwitch";
 import { Landing } from "./components/Landing";
-import { ThemeSwitch } from "./components/ThemeSwitch";
+import { Nav } from "./components/Nav";
 import { VerdictPanel } from "./components/Verdict";
 import { CopyProvider, useCopy } from "./i18n";
 import { DnsPage } from "./components/DnsPage";
@@ -48,26 +47,7 @@ function AppShell({ lang }: { lang: Lang }) {
       </a>
 
       {/* 顶部 sticky 导航：品牌 + 各段锚点 + nav-tools（主题/语言）。锚点目标靠 CSS scroll-margin-top 避开吸顶条。 */}
-      <nav className="nav">
-        <div className="nav-in">
-          {/* 品牌链回当前语种首页；停在首页时点它就是重新加载，符合 logo 的通行预期。 */}
-          <a className="brand" href={localeOf(lang).path}>
-            <img src="/favicon.svg" alt="" width="20" height="19" />
-            {COPY.nav.brand}
-          </a>
-          <div className="nav-links">
-            <a href="#checks">{COPY.nav.checks}</a>
-            <a href="#cli-checks">{COPY.nav.cliChecks}</a>
-            <a href="#why">{COPY.nav.why}</a>
-            <a href="#install">{COPY.nav.install}</a>
-            <a href="#compare">{COPY.nav.compare}</a>
-          </div>
-          <div className="nav-tools">
-            <ThemeSwitch />
-            <LangSwitch lang={lang} />
-          </div>
-        </div>
-      </nav>
+      <Nav lang={lang} />
 
       <main className="page" id="main-content" tabIndex={-1}>
         <header className="masthead">

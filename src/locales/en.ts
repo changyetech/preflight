@@ -369,13 +369,12 @@ export const EN = {
   dns: {
     title: "Public DNS Servers · Preflight",
     description:
-      "A curated list of public DNS resolvers — Cloudflare, Google, Quad9, AliDNS and more — with their region, filtering level, and whether they are operated from mainland China.",
+      "A curated list of public DNS resolvers — Cloudflare, Google, Quad9, AliDNS and more — with their region and filtering level.",
     heading: "Public DNS Servers",
     tableHeaders: {
       ip: "IP",
       provider: "Provider",
       region: "Region",
-      domestic: "CN",
       filter: "Filter",
     },
     variants: {
@@ -384,10 +383,8 @@ export const EN = {
       family: "Family",
       adblock: "Ad-block",
     },
-    domesticYes: "CN",
     cliHint:
       "Want to test which servers actually work from your machine? Run preflight dns --check in the CLI.",
-    backHome: "Back to Preflight",
   },
 } as const;
 

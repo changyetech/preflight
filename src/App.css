@@ -1358,6 +1358,10 @@ button {
 }
 
 .footer-copyright {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
   margin: 1.5rem 0 0;
   font-size: 0.78125rem;
   line-height: 1.85;
@@ -1428,44 +1432,17 @@ button {
 
 /* ---- DNS 页面（/dns/、/zh-hans/dns/） ---- */
 
-.dns-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  height: var(--nav-h);
-  display: flex;
-  align-items: center;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 0 20px;
-}
-
-.dns-header-bar {
-  width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.dns-brand {
-  font-weight: 600;
-  font-size: 15px;
-  color: var(--text-h);
-  text-decoration: none;
-}
-
-.dns-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
+/* 内容容器与首页 .page 同宽同内边距 */
 .dns-main {
-  max-width: 800px;
+  max-width: 76rem;
   margin: 0 auto;
-  padding: 32px 20px 80px;
+  padding: 1.25rem 1rem 3rem;
+}
+
+@media (min-width: 48rem) {
+  .dns-main {
+    padding: 2rem 1.5rem 4rem;
+  }
 }
 
 .dns-main h1 {
@@ -1509,6 +1486,13 @@ button {
   white-space: nowrap;
 }
 
+/* 复制按钮跟在 IP 后同一行，尺寸压到与表格行高相称（复用 .copy 的外观） */
+.dns-table .dns-ip .copy {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.75rem;
+  vertical-align: baseline;
+}
+
 .dns-table .dns-region {
   color: var(--muted);
   white-space: nowrap;
@@ -1525,19 +1509,7 @@ button {
   line-height: 1.6;
 }
 
-.dns-back-link {
-  display: inline-block;
-  font-size: 14px;
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.dns-back-link:hover {
-  text-decoration: underline;
-}
-
 .footer-dns-link {
-  margin-left: 16px;
   color: var(--muted);
   text-decoration: none;
   font-size: 13px;
