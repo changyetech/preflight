@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy · Preflight</title>
+    <meta
+      name="description"
+      content="What Preflight does and does not do with your data: no accounts, no database, no cookies, no stored check results."
+    />
+    <link rel="canonical" href="https://preflight.omnikit.run/privacy/" />
+    <link
+      rel="alternate"
+      hreflang="en"
+      href="https://preflight.omnikit.run/privacy/"
+    />
+    <link
+      rel="alternate"
+      hreflang="zh-Hans"
+      href="https://preflight.omnikit.run/zh-hans/privacy/"
+    />
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://preflight.omnikit.run/privacy/"
+    />
+    <script>
+      (function () {
+        var pref = null;
+        try {
+          pref = localStorage.getItem("preflight-theme");
+        } catch (e) {}
+        if (pref !== "light" && pref !== "dark") pref = "system";
+        var dark =
+          pref === "dark" ||
+          (pref === "system" &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        var el = document.documentElement;
+        el.setAttribute("data-theme-pref", pref);
+        el.setAttribute("data-theme", dark ? "dark" : "light");
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

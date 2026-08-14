@@ -145,6 +145,31 @@ describe("两语种各自是独立静态资源，不是彼此的软 404 兜底",
     },
   );
 
+  // 隐私说明 / 使用条款同样是独立静态资源（spec docs/specs/2026-08-14-legal-pages.md）。
+  it.each([
+    ["/privacy/", "en", COPY.legal.privacy.title],
+    ["/terms/", "en", COPY.legal.terms.title],
+    ["/zh-hans/privacy/", "zh-Hans", COPY_ZH_HANS.legal.privacy.title],
+    ["/zh-hans/terms/", "zh-Hans", COPY_ZH_HANS.legal.terms.title],
+  ])("%s 返回 200 且是对应语种的页面", async (path, htmlLang, title) => {
+    const response = await SELF.fetch(`https://example.com${path}`);
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain(`lang="${htmlLang}"`);
+    expect(html).toContain(title);
+  });
+
+  it.each([
+    "/privacy/xxx",
+    "/terms/xxx",
+    "/zh-hans/privacy/xxx",
+    "/zh-hans/terms/xxx",
+  ])("%s 是真实 404，不做 SPA 回退", async (path) => {
+    const response = await SELF.fetch(`https://example.com${path}`);
+    expect(response.status).toBe(404);
+  });
+
   it.each(["/dns/xxx", "/zh-hans/dns/xxx"])(
     "%s 是真实 404，不做 SPA 回退",
     async (path) => {

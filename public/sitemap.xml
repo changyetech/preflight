@@ -12,4 +12,16 @@
   <url>
     <loc>https://preflight.omnikit.run/zh-hans/dns/</loc>
   </url>
+  <url>
+    <loc>https://preflight.omnikit.run/privacy/</loc>
+  </url>
+  <url>
+    <loc>https://preflight.omnikit.run/zh-hans/privacy/</loc>
+  </url>
+  <url>
+    <loc>https://preflight.omnikit.run/terms/</loc>
+  </url>
+  <url>
+    <loc>https://preflight.omnikit.run/zh-hans/terms/</loc>
+  </url>
 </urlset>

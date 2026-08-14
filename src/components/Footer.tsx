@@ -4,9 +4,10 @@
 // 硬性红线：原型页脚里的「本页为设计稿」声明是关于稿件本身的元信息，不是产品内容，
 // 绝不落地——落地就是把设计稿声明发到生产站上。
 
+import { pageUrl, type Lang } from "../copy";
 import { useCopy } from "../i18n";
 
-export function Footer() {
+export function Footer({ lang }: { lang: Lang }) {
   const COPY = useCopy();
   const { footer } = COPY;
 
@@ -26,9 +27,20 @@ export function Footer() {
       {/* 版权行不进 locales：符号、年份、产品名均无语种差异；年份取运行时当前年。 */}
       <p className="footer-copyright">
         © {new Date().getFullYear()} Preflight
-        <a href="/dns/" className="footer-dns-link">
-          {COPY.footer.dnsLink}
-        </a>
+        {/* 子页入口收在右下角。路径一律走 pageUrl 拼语种前缀，中文首页的页脚不能把人送去英文子页。
+            一律新标签打开：页脚是查阅入口，不该打断用户正在页面上进行的检测。
+            带 rel="noopener"——即便同源也照挂，避免新页面拿到 window.opener。 */}
+        <span className="footer-links">
+          <a href={pageUrl(lang, "/dns/")} target="_blank" rel="noopener">
+            {COPY.footer.dnsLink}
+          </a>
+          <a href={pageUrl(lang, "/privacy/")} target="_blank" rel="noopener">
+            {COPY.legal.privacyLink}
+          </a>
+          <a href={pageUrl(lang, "/terms/")} target="_blank" rel="noopener">
+            {COPY.legal.termsLink}
+          </a>
+        </span>
       </p>
     </footer>
   );

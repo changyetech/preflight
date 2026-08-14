@@ -13,7 +13,7 @@ import type { Lang } from "../src/copy";
 
 function renderFooter(lang: Lang): string {
   return renderToStaticMarkup(
-    createElement(CopyProvider, { lang }, createElement(Footer)),
+    createElement(CopyProvider, { lang }, createElement(Footer, { lang })),
   );
 }
 
@@ -34,6 +34,25 @@ describe("页脚双栏披露", () => {
     expect(html).toContain(COPY.footer.privacy);
     expect(html).toContain(COPY.footer.autoBody);
     expect(html).toContain(COPY.footer.onDemandBody);
+  });
+
+  // 子页入口（spec docs/specs/2026-08-14-legal-pages.md）：链接必须带当前语种前缀，
+  // 中文首页的页脚不能把人送到英文子页。
+  it.each([
+    ["en", ["/dns/", "/privacy/", "/terms/"]] as const,
+    [
+      "zh-hans",
+      ["/zh-hans/dns/", "/zh-hans/privacy/", "/zh-hans/terms/"],
+    ] as const,
+  ])("%s 版页脚的三个子页入口带正确语种前缀", (lang, hrefs) => {
+    const html = renderFooter(lang);
+
+    for (const href of hrefs) {
+      expect(html).toContain(`href="${href}"`);
+    }
+    // 三个入口都在新标签打开，且带 noopener。
+    expect(html.match(/target="_blank"/g)).toHaveLength(hrefs.length);
+    expect(html.match(/rel="noopener"/g)).toHaveLength(hrefs.length);
   });
 
   // 硬性红线（brief 要点 1）：原型页脚的「本页为设计稿」声明、「示例数据 · 非真实检测」标记

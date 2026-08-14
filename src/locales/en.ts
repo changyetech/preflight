@@ -386,6 +386,79 @@ export const EN = {
     cliHint:
       "Want to test which servers actually work from your machine? Run preflight dns --check in the CLI.",
   },
+
+  /**
+   * 隐私说明与使用条款（spec docs/specs/2026-08-14-legal-pages.md）。
+   * 这里的每一句都是对现网行为的陈述——第三方清单、p=0/tag=0、localStorage 只存主题——
+   * 行为改了，这段文案必须同步改，否则页面就成了与事实不符的声明。
+   */
+  legal: {
+    privacyLink: "Privacy",
+    termsLink: "Terms",
+    updated: "Last updated: 2026-08-14",
+    privacy: {
+      title: "Privacy · Preflight",
+      heading: "Privacy",
+      lede: "Preflight has no accounts, no database, and no analytics. Nothing you check here is stored.",
+      sections: [
+        {
+          heading: "What we store",
+          body: "Nothing. Every check is either computed in your browser or passed straight through to a third party and returned to you. No check result, no IP address, and no report is written to any store we keep.",
+        },
+        {
+          heading: "Third parties your browser contacts",
+          body: "Three checks run automatically as soon as the page loads, directly from your browser: the IPv6 check queries ipify, the DNS egress check queries ip-api.com, and the UDP egress check queries stun.cloudflare.com and stun.l.google.com. The IP risk check only runs when you trigger it: Cloudflare Turnstile loads first for bot verification, then your exit IP is sent to proxycheck.io and StopForumSpam. Each of these services sees your exit IP and handles it under its own privacy policy.",
+        },
+        {
+          heading: "Cookies and local storage",
+          body: "This site sets no cookies and runs no analytics. The only thing kept on your device is your theme preference (light / dark / system), stored under the key preflight-theme in localStorage; it never leaves your browser. Your language is decided by the URL path and is not remembered anywhere.",
+        },
+        {
+          heading: "Risk lookups are untagged",
+          body: "Requests to proxycheck.io carry p=0 and tag=0, so the lookup is not tagged and does not show up as a labelled query in their dashboard.",
+        },
+        {
+          heading: "The command-line tool",
+          body: "The Preflight CLI talks to third-party services directly and never routes your checks through this site. It writes nothing but your own configuration file, on your own machine.",
+        },
+        {
+          heading: "Hosting",
+          body: "The site runs on Cloudflare Workers. Cloudflare handles the request at its edge as it does for any site on its network.",
+        },
+      ],
+    },
+    terms: {
+      title: "Terms · Preflight",
+      heading: "Terms",
+      lede: "Short version: this is a free diagnostic tool, offered as is. Use it on networks you are responsible for.",
+      sections: [
+        {
+          heading: "Provided as is",
+          body: "Preflight is provided free of charge, as is, without warranty of any kind. Checks may fail, return stale data, or be unavailable without notice.",
+        },
+        {
+          heading: "Signals, not guarantees",
+          body: "Every verdict describes signals observed at one moment from one vantage point. A clean result is not a guarantee of anonymity, security, or compliance, and a flagged result is not proof of wrongdoing. Do not rely on this tool as your only basis for a decision that matters.",
+        },
+        {
+          heading: "Acceptable use",
+          body: "Use Preflight to check networks you own or are authorised to test. Do not automate it against the endpoints at scale, and do not use it as part of an attack or to evade abuse controls. Rate limits and a daily quota apply and may be enforced without notice.",
+        },
+        {
+          heading: "Third-party services",
+          body: "Checks rely on ipify, ip-api.com, Cloudflare STUN and Turnstile, proxycheck.io, and StopForumSpam. Their data and terms are their own; we make no representation about their accuracy or availability.",
+        },
+        {
+          heading: "Availability",
+          body: "There is no uptime commitment. Endpoints, checks, and this site may change or be withdrawn at any time.",
+        },
+        {
+          heading: "Liability",
+          body: "To the maximum extent permitted by law, we are not liable for any loss or damage arising from the use of, or reliance on, this site or its results.",
+        },
+      ],
+    },
+  },
 } as const;
 
 /**

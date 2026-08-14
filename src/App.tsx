@@ -22,6 +22,7 @@ import { Nav } from "./components/Nav";
 import { VerdictPanel } from "./components/Verdict";
 import { CopyProvider, useCopy } from "./i18n";
 import { DnsPage } from "./components/DnsPage";
+import { LegalPage, type LegalDoc } from "./components/LegalPage";
 import { usePanel } from "./usePanel";
 
 function AppShell({ lang }: { lang: Lang }) {
@@ -103,7 +104,7 @@ function AppShell({ lang }: { lang: Lang }) {
 
         <Landing />
 
-        <Footer />
+        <Footer lang={lang} />
       </main>
 
       <BackToTop />
@@ -112,12 +113,24 @@ function AppShell({ lang }: { lang: Lang }) {
 }
 
 function App() {
-  const lang = langFromPathname(window.location.pathname);
-  const isDnsPage = window.location.pathname.includes("/dns");
+  const pathname = window.location.pathname;
+  const lang = langFromPathname(pathname);
+  // 子页各自是独立静态资源，路径已由构建产物决定，这里只按路径选渲染哪个组件。
+  const legalDoc: LegalDoc | null = pathname.includes("/privacy")
+    ? "privacy"
+    : pathname.includes("/terms")
+      ? "terms"
+      : null;
 
   return (
     <CopyProvider lang={lang}>
-      {isDnsPage ? <DnsPage lang={lang} /> : <AppShell lang={lang} />}
+      {pathname.includes("/dns") ? (
+        <DnsPage lang={lang} />
+      ) : legalDoc ? (
+        <LegalPage lang={lang} doc={legalDoc} />
+      ) : (
+        <AppShell lang={lang} />
+      )}
     </CopyProvider>
   );
 }

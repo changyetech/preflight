@@ -1509,13 +1509,74 @@ button {
   line-height: 1.6;
 }
 
-.footer-dns-link {
+/* 右下角子页入口：DNS 清单 / 隐私说明 / 使用条款。窄屏时允许换行，不把版权行撑开。 */
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.footer-links a {
   color: var(--muted);
   text-decoration: none;
   font-size: 13px;
 }
 
-.footer-dns-link:hover {
+.footer-links a:hover {
   text-decoration: underline;
   color: var(--accent);
+}
+
+/* ---------- 隐私说明 / 使用条款页 ---------- */
+
+.legal-main {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem;
+}
+
+@media (min-width: 48rem) {
+  .legal-main {
+    padding: 2rem 1.5rem 4rem;
+  }
+}
+
+.legal-main h1 {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 12px;
+}
+
+.legal-lede {
+  margin: 0 0 32px;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--text);
+}
+
+.legal-section {
+  margin: 0 0 28px;
+}
+
+.legal-section h2 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 8px;
+}
+
+.legal-section p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+
+.legal-updated {
+  margin: 32px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--muted);
 }

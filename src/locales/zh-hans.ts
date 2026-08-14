@@ -331,4 +331,72 @@ export const ZH_HANS: Copy = {
     cliHint:
       "想测你这台机器上实际可用的？在 CLI 里执行 preflight dns --check。",
   },
+
+  legal: {
+    privacyLink: "隐私说明",
+    termsLink: "使用条款",
+    updated: "最后更新：2026-08-14",
+    privacy: {
+      title: "隐私说明 · Preflight",
+      heading: "隐私说明",
+      lede: "Preflight 没有账号、没有数据库、不做访问统计。你在这里检测的一切都不会被存下来。",
+      sections: [
+        {
+          heading: "我们存了什么",
+          body: "什么都没存。每一项检测要么在你的浏览器里算完，要么原样转发给第三方再把结果返给你。检测结果、IP 地址、报告，都不会写进我们持有的任何存储。",
+        },
+        {
+          heading: "浏览器会直接访问的第三方",
+          body: "页面加载后会自动发起三项检测，均由浏览器直接发出：IPv6 检测访问 ipify，DNS 出口检测访问 ip-api.com，UDP 出口检测访问 stun.cloudflare.com 与 stun.l.google.com。IP 风险检测只在你手动触发时才跑：先加载 Cloudflare Turnstile 做人机验证，随后出口 IP 会被发送至 proxycheck.io 与 StopForumSpam。这些服务都会看到你的出口 IP，并按各自的隐私政策处理。",
+        },
+        {
+          heading: "Cookie 与本地存储",
+          body: "本站不设置任何 Cookie，也不接入访问统计。留在你设备上的只有主题偏好（浅色 / 深色 / 跟随系统），存在 localStorage 的 preflight-theme 键里，不会离开你的浏览器。语言完全由 URL 路径决定，不做任何记忆。",
+        },
+        {
+          heading: "风险查询不带标记",
+          body: "发往 proxycheck.io 的请求带 p=0 与 tag=0，因此这次查询不会被打标，也不会作为一条具名查询出现在对方的后台里。",
+        },
+        {
+          heading: "命令行工具",
+          body: "Preflight CLI 直接访问第三方服务，检测流量从不经过本站。它除了你自己机器上的配置文件之外不写任何东西。",
+        },
+        {
+          heading: "托管",
+          body: "本站跑在 Cloudflare Workers 上，请求由 Cloudflare 边缘按其对网络内任何站点的通行方式处理。",
+        },
+      ],
+    },
+    terms: {
+      title: "使用条款 · Preflight",
+      heading: "使用条款",
+      lede: "简短版：这是一个免费的诊断工具，按现状提供。请在你自己负责的网络上使用。",
+      sections: [
+        {
+          heading: "按现状提供",
+          body: "Preflight 免费提供、按现状提供，不附带任何形式的担保。检测可能失败、可能返回过时数据，也可能在不预先通知的情况下不可用。",
+        },
+        {
+          heading: "是信号，不是保证",
+          body: "每一条结论描述的都是某一时刻、从某一个观测点看到的信号。结论干净不等于你一定匿名、安全或合规；结论被标红也不等于存在违规事实。不要把本工具当作重要决策的唯一依据。",
+        },
+        {
+          heading: "可接受的使用",
+          body: "请只用 Preflight 检测你自有或已获授权测试的网络。不要大规模自动化调用这些接口，也不要把它用于攻击或规避风控。本站有限流与每日配额，且可能在不预先通知的情况下执行。",
+        },
+        {
+          heading: "第三方服务",
+          body: "检测依赖 ipify、ip-api.com、Cloudflare STUN 与 Turnstile、proxycheck.io、StopForumSpam。它们的数据与条款归其各自所有，我们不对其准确性与可用性作任何陈述。",
+        },
+        {
+          heading: "可用性",
+          body: "本站不承诺可用性。接口、检测项与本站本身都可能随时变更或下线。",
+        },
+        {
+          heading: "责任限制",
+          body: "在法律允许的最大范围内，我们不对因使用本站或依赖其结果而产生的任何损失或损害承担责任。",
+        },
+      ],
+    },
+  },
 };
