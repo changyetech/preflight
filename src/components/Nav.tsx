@@ -32,6 +32,21 @@ export function Nav({
           <a href={`${anchorBase}#install`}>{COPY.nav.install}</a>
           <a href={`${anchorBase}#compare`}>{COPY.nav.compare}</a>
         </div>
+        {/* DNS 清单是顶栏里唯一的跨页链接，故意不放进 .nav-links：
+            那一组在 900px 以下整组隐藏——锚点靠垂直滚动就能到达，跨页链接不能，
+            隐藏它等于在窄屏彻底断掉这个页面的入口（Web 面板没有 DNS 检测卡，
+            C2 是 CLI-only，站内没有第二个触发点）。 */}
+        {/* 新标签打开：顶栏在检测面板上方常驻，同标签跳走会打断用户正在进行的检测。
+            带 rel="noopener"——即便同源也照挂，避免新页面拿到 window.opener。 */}
+        <a
+          className="nav-dns"
+          href={pageUrl(lang, "/dns/")}
+          target="_blank"
+          rel="noopener"
+          aria-current={pageSlug === "/dns/" ? "page" : undefined}
+        >
+          {COPY.nav.dns}
+        </a>
         <div className="nav-tools">
           <ThemeSwitch />
           <LangSwitch lang={lang} pageSlug={pageSlug} />

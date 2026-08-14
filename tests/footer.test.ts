@@ -38,19 +38,18 @@ describe("页脚双栏披露", () => {
 
   // 子页入口（spec docs/specs/2026-08-14-legal-pages.md）：链接必须带当前语种前缀，
   // 中文首页的页脚不能把人送到英文子页。
+  // DNS 清单不在此列：它是内容资源不是法务页，入口已移到顶栏（Nav 的 .nav-dns），
+  // 页脚只留法务两页。
   it.each([
-    ["en", ["/dns/", "/privacy/", "/terms/"]] as const,
-    [
-      "zh-hans",
-      ["/zh-hans/dns/", "/zh-hans/privacy/", "/zh-hans/terms/"],
-    ] as const,
-  ])("%s 版页脚的三个子页入口带正确语种前缀", (lang, hrefs) => {
+    ["en", ["/privacy/", "/terms/"]] as const,
+    ["zh-hans", ["/zh-hans/privacy/", "/zh-hans/terms/"]] as const,
+  ])("%s 版页脚的两个法务子页入口带正确语种前缀", (lang, hrefs) => {
     const html = renderFooter(lang);
 
     for (const href of hrefs) {
       expect(html).toContain(`href="${href}"`);
     }
-    // 三个入口都在新标签打开，且带 noopener（版权行的公司外链另计，见下一条）。
+    // 两个入口都在新标签打开，且带 noopener（版权行的公司外链另计，见下一条）。
     expect(html.match(/target="_blank"/g)).toHaveLength(hrefs.length + 1);
     expect(html.match(/rel="noopener"/g)).toHaveLength(hrefs.length);
   });

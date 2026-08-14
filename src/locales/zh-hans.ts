@@ -20,6 +20,7 @@ export const ZH_HANS: Copy = {
     why: "为什么",
     install: "安装 CLI",
     compare: "对照表",
+    dns: "DNS 清单",
     backToTop: "回到顶部",
     theme: {
       label: "主题",
@@ -297,7 +298,6 @@ export const ZH_HANS: Copy = {
     onDemandLabel: "需手动触发",
     onDemandBody:
       "IP 风险检测需你手动触发，届时会先加载 Cloudflare Turnstile 人机验证，随后出口 IP 会被发送至 proxycheck.io 与 StopForumSpam。",
-    dnsLink: "公共 DNS 清单",
   },
 
   errors: {

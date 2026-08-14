@@ -113,6 +113,31 @@ summary:focus-visible {
   color: var(--fg);
 }
 
+/* DNS 清单：顶栏唯一的跨页目的地，与锚点组是两类东西，因此不并入 .nav-links，
+   靠三点把它和锚点区分开——始终可见（锚点在窄屏隐藏）、贴右与工具区同侧、
+   颜色比锚点的 --muted 重一档，读起来是「另一个页面」而不是第 6 个锚点。
+   margin 的 auto 在宽视口是空操作（.nav-links 的 flex:1 已经吃掉了空隙），
+   只在窄屏锚点组隐藏后接管，把它和工具区一起顶到右侧。 */
+/* 分隔线只在宽视口出现：它的作用是把 DNS 从锚点组里分出来，窄屏锚点组整个隐藏，
+   线就没有要分隔的对象了，还要白吃 1rem——那 1rem 正是 360px 顶栏溢出的差额。 */
+.nav-dns {
+  margin-inline-start: auto;
+  font-size: 0.875rem;
+  color: var(--fg);
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.nav-dns:hover {
+  opacity: 0.7;
+}
+
+/* 已经在 DNS 页时不再强调，避免顶栏出现一个指向当前页的高亮链接 */
+.nav-dns[aria-current="page"] {
+  color: var(--muted);
+}
+
 /* 主题与语言是同一组顶栏工具，用 8px 贴近；nav-in 的 1rem 是分隔品牌/链接/工具区这三块的，
    不该落到组内两个控件之间。 */
 .nav-tools {
@@ -1385,6 +1410,11 @@ button {
 
   .nav-links {
     display: flex;
+  }
+
+  .nav-dns {
+    padding-inline-end: 1rem;
+    border-inline-end: 1px solid var(--hairline);
   }
 
   .console-grid {

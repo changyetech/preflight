@@ -22,6 +22,9 @@ export const EN = {
     why: "Why",
     install: "Install CLI",
     compare: "Comparison",
+    /** 唯一的跨页导航项（其余都是首页锚点），因此顶栏与锚点组分开排布。
+     *  短标签：顶栏容不下「Public DNS list」那样的完整标题。 */
+    dns: "DNS list",
     /** 回顶按钮只有图标，标签给读屏用。 */
     backToTop: "Back to top",
     /** 主题切换器：三态下拉（浅色/深色/跟随系统），规格 §2 决策 1。 */
@@ -349,7 +352,6 @@ export const EN = {
     onDemandLabel: "Triggered manually",
     onDemandBody:
       "The IP risk check requires you to trigger it manually, at which point Cloudflare Turnstile loads for bot verification first, then your exit IP is sent to proxycheck.io and StopForumSpam.",
-    dnsLink: "Public DNS list",
   },
 
   errors: {

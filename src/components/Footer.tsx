@@ -38,13 +38,12 @@ export function Footer({ lang }: { lang: Lang }) {
             Hangzhou Changye Network Technology Co., Ltd.
           </a>
         </span>
-        {/* 子页入口收在右下角。路径一律走 pageUrl 拼语种前缀，中文首页的页脚不能把人送去英文子页。
+        {/* 法务两页的入口收在右下角。这里只放法务页：DNS 清单是内容资源不是法务页，
+            入口在顶栏（Nav 的 .nav-dns），别再往这一组里加。
+            路径一律走 pageUrl 拼语种前缀，中文首页的页脚不能把人送去英文子页。
             一律新标签打开：页脚是查阅入口，不该打断用户正在页面上进行的检测。
             带 rel="noopener"——即便同源也照挂，避免新页面拿到 window.opener。 */}
         <span className="footer-links">
-          <a href={pageUrl(lang, "/dns/")} target="_blank" rel="noopener">
-            {COPY.footer.dnsLink}
-          </a>
           <a href={pageUrl(lang, "/privacy/")} target="_blank" rel="noopener">
             {COPY.legal.privacyLink}
           </a>
