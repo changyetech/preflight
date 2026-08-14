@@ -4,7 +4,9 @@
 .page {
   max-width: 76rem;
   margin: 0 auto;
-  padding: 1.25rem 1rem 3rem;
+  /* 底边距只需一点呼吸：页脚是 .page 的最后一个元素，留大了就是版权行下的空洞。
+     （dns/guide/legal 各自的容器以内容收尾、无页脚，底边距维持 3/4rem，不再与此处同值。） */
+  padding: 1.25rem 1rem 1.5rem;
 }
 
 main:focus {
@@ -1362,7 +1364,9 @@ button {
 
 .site-footer {
   margin-top: 4.5rem;
-  padding: 1.5rem 0 3rem;
+  /* 底部不加内边距：页脚在 .page 内，容器自身的 padding-bottom（1.5/2rem）已是页底留白，
+     再叠一层就是版权行下的空洞 */
+  padding: 1.5rem 0 0;
   border-top: 1px solid var(--border);
 }
 
@@ -1410,12 +1414,19 @@ button {
   line-height: 1.85;
   color: var(--muted);
 }
+/* 返回顶部按钮固定在右下（inset-inline-end 1rem，宽 2.75rem）。页底收紧后版权行离页底
+   只剩 1.5/2rem，视口窄于「页宽 + 按钮位」时按钮会压住右下的法务链接——给行尾留出按钮位。 */
+@media (max-width: 84rem) {
+  .footer-copyright {
+    padding-inline-end: 3.75rem;
+  }
+}
 
 /* ---------- 宽视口 ---------- */
 
 @media (min-width: 48rem) {
   .page {
-    padding: 2rem 1.5rem 4rem;
+    padding: 2rem 1.5rem 2rem;
   }
 }
 
