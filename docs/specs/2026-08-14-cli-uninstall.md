@@ -33,12 +33,12 @@ preflight uninstall --purge   # 额外删除用户配置目录
 |---|---|---|---|
 | 二进制本体 | `std::env::current_exe()` | 删 | 删 |
 | install receipt | Unix：`${XDG_CONFIG_HOME:-~/.config}/preflight/preflight-receipt.json`；Windows：`%XDG_CONFIG_HOME%\preflight\preflight-receipt.json`，未设 `XDG_CONFIG_HOME` 时 `%LOCALAPPDATA%\preflight\preflight-receipt.json`（与真实 installer.sh / .ps1 逐行核实，2026-08-14） | 删 | 删 |
-| 用户配置目录 | `${XDG_CONFIG_HOME:-~/.config}/preflight/`（config.rs 既有推导，全平台同一约定） | 保留，结束时提示路径 | 删整个目录 |
+| 用户配置目录 | config.rs 既有推导：Unix `${XDG_CONFIG_HOME:-~/.config}/preflight/`，Windows `%APPDATA%\preflight\` | 保留，结束时提示路径 | 删整个目录 |
 
 注意：
 
 - **Unix 上 receipt 与配置同目录**（`~/.config/preflight/`）。默认模式只删该目录下的 `preflight-receipt.json` 单个文件，不碰目录里其他内容；`--purge` 删整个目录。
-- **Windows 上两者不同目录**（receipt 在 `%LOCALAPPDATA%`，配置走 config.rs 的 XDG 风格路径）。`--purge` 需两处都清：删配置目录，并在 receipt 与配置不同目录时把 receipt 所在的 `preflight` 目录一并删除。
+- **Windows 上两者不同目录**（receipt 在 `%LOCALAPPDATA%\preflight`，配置在 `%APPDATA%\preflight`，均为既有约定）。`--purge` 需两处都清：删配置目录，并在 receipt 与配置不同目录时把 receipt 所在的 `preflight` 目录一并删除。
 - `PREFLIGHT_CONFIG` 指向的自定义配置文件**不碰**——用户显式管理的东西不动，`--purge` 只清默认目录。
 
 ## 4. 执行顺序与自删除
