@@ -9,7 +9,10 @@ use std::path::{Path, PathBuf};
 /// 与真实 installer.sh / installer.ps1 的写入逻辑逐行对齐（2026-08-14 核实）：
 /// 两平台都先认 `XDG_CONFIG_HOME`；未设时 Windows 落 `%LOCALAPPDATA%`，
 /// Unix 落 `~/.config`。返回 `None` 表示连基准目录都推导不出来，按「没有 receipt」处理。
-#[allow(dead_code)]
+// Task 3 的 run() 接线后，expect 会因 lint 不再触发而报警，届时**必须删除本行**——
+// 这是刻意选 expect 而非 allow：接线后忘了摘会被编译器点名。
+// 单测在同文件直接调用它，test target 下它不是死代码，故只在非 test 下挂 expect。
+#[cfg_attr(not(test), expect(dead_code))]
 pub fn receipt_path(
     xdg_config_home: Option<&str>,
     home: Option<&str>,
