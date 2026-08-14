@@ -10,6 +10,7 @@ mod json;
 mod lang;
 mod probe;
 mod render;
+mod uninstall;
 
 use std::io::{IsTerminal, Write};
 
