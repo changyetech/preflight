@@ -13,7 +13,7 @@
 
 | 配置项 | 类型 | 配在哪 | 不配的后果 |
 |---|---|---|---|
-| `VITE_TURNSTILE_SITE_KEY` | 公开值 | 构建期环境变量 | 网页版 O4（IP 风险）不可用，卡片直接说明原因 |
+| `VITE_TURNSTILE_SITE_KEY` | 公开值 | 构建期环境变量（本地 `.env` / CI 用 GitHub Variable，§3.2） | 网页版 O4（IP 风险）不可用，卡片直接说明原因 |
 | `TURNSTILE_SECRET_KEY` | **secret** | Worker Secret | `/api/risk` 全部返回 403 / 2010 |
 | `PROXYCHECK_API_KEY` | **secret** | Worker Secret | `/api/risk` 全部返回 500 / 5001 |
 | `QUOTA` | 绑定 | `wrangler.jsonc` | 部署失败 |
@@ -111,12 +111,16 @@ wrangler secret put TURNSTILE_SECRET_KEY
 
 **没有 Homebrew tap 仓库。** `brew install <owner>/<tap>/<formula>` 会被解析成 `github.com/<owner>/homebrew-<tap>`——`homebrew-` 前缀是命名硬规则，formula 不可能住在主仓库里，所以走 Homebrew 就必然多一个仓库。当前不值这个维护面，`installers` 里只留了 shell 与 powershell。要加回来见 [deployment.md §5](./deployment.md)。
 
-### 3.2 Secrets
+### 3.2 Secrets 与 Variables
 
 | Secret | 给谁用 | 权限 |
 |---|---|---|
 | `CLOUDFLARE_API_TOKEN` | `web.yml` 的部署步骤 | Workers 部署权限 |
 | `CLOUDFLARE_ACCOUNT_ID` | 同上 | 不是凭证，是账号标识符 |
+
+| Variable（Settings → Secrets and variables → Actions → **Variables**） | 给谁用 | 说明 |
+|---|---|---|
+| `VITE_TURNSTILE_SITE_KEY` | `web.yml` 的 build 步骤 | **构建期**变量，Vite 静态内联进前端 bundle。公开值（本来就会出现在 bundle 里），所以走 Variables 而非 Secrets。**在 Cloudflare Dashboard 给 Worker 设运行时变量是无效的**——前端读不到，且每次 `wrangler deploy` 还会把 Dashboard 手工加的变量清掉 |
 
 `release.yml` **不需要任何 secret**——它只往本仓库发 Release，用 GitHub 自动注入的 `GITHUB_TOKEN` 就够了。（加回 Homebrew 通道的话会多出一个 `HOMEBREW_TAP_TOKEN`，见 [deployment.md §5](./deployment.md)。）
 
@@ -206,12 +210,12 @@ preflight config unset timeout         # 移除该键，恢复内置默认
 
 **Cloudflare**
 - [ ] `PROXYCHECK_API_KEY` / `TURNSTILE_SECRET_KEY` 两个 Worker Secret 已设（§2.2）
-- [ ] 构建环境有 `VITE_TURNSTILE_SITE_KEY`
 - [ ] observability 保持关闭，直到 IP 留存问题核实清楚（[deployment.md §4](./deployment.md)）
 
 **GitHub**
 - [ ] 主仓库 public（`installer.sh` 与二进制都是它的 Release 资产）
-- [ ] `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 已设
+- [ ] `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 两个 Secret 已设（§3.2）
+- [ ] `VITE_TURNSTILE_SITE_KEY` 已设为 repo **Variable**——CI 构建期注入，Worker 运行时设置无效（§3.2）
 - [ ] 改 `cli/**` 不触发 `web.yml`，改 `src/**` 不触发 `cli.yml`
 - [ ] 改 `docs/verdict-cases.json`、`country-codes.json`、`dns-servers.json` 任一，**前两条都触发**
 

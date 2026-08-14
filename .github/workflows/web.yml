@@ -53,7 +53,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      # VITE_TURNSTILE_SITE_KEY 是**构建期**变量（import.meta.env 静态内联进前端 bundle），
+      # 在 Worker 运行时设置无效——必须在这一步注入。公开值，走 repo Variables 而非 Secrets，
+      # 见 docs/configuration.md §3.2。
       - run: pnpm build
+        env:
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
       # 测试要读 dist/client 里的真实产物（tests/i18n-routing.test.ts 依赖 env.ASSETS），
       # 所以必须排在 build 之后。
       - run: pnpm vitest run
