@@ -10,6 +10,8 @@ mod json;
 mod lang;
 mod probe;
 mod render;
+mod uninstall;
+mod update;
 
 use std::io::{IsTerminal, Write};
 
@@ -67,6 +69,14 @@ enum Command {
         /// Test each server with a real DNS query
         #[arg(long)]
         check: bool,
+    },
+    /// Update preflight to the latest release
+    Update,
+    /// Remove preflight from this machine
+    Uninstall {
+        /// Also remove the config directory
+        #[arg(long)]
+        purge: bool,
     },
 }
 
@@ -146,6 +156,39 @@ fn run() -> Result<i32> {
     let cli = Cli::parse();
     let system_locale = lang::system_tag();
 
+    // Windows 上一次 update 留下的旧 exe 只能由下一次启动清理（update.rs）。
+    #[cfg(windows)]
+    update::remove_leftover();
+
+    // `uninstall` / `update` 必须**先于配置文件加载**分发：配置文件是
+    // deny_unknown_fields，一个拼错的键（或 `language = "ar"`）就会让每一条命令
+    // 退出 1——包括专门删掉它的 uninstall，以及若某版本把解析弄出 bug 时唯一的
+    // 修复通道 update。因此语言只从 `--lang` + 系统 locale 解析，拿默认 ConfigFile
+    // 走同一条 Settings::resolve（超时因此恒为内置默认，对 update 的两个小请求
+    // 足够）；`--lang` 本身非法仍照常报错，那是用户给的 flag，不是坏文件的锅。
+    if matches!(
+        cli.command,
+        Some(Command::Uninstall { .. } | Command::Update)
+    ) {
+        let settings = Settings::resolve(
+            &ConfigFile::default(),
+            Sources {
+                flag_lang: cli.lang.as_deref(),
+                env_proxycheck_key: None,
+                env_no_color: None,
+                system_locale: system_locale.as_deref(),
+            },
+        )
+        .map_err(|err| render_lang_error(err, system_locale.as_deref()))?;
+        let text = copy::text(settings.lang);
+        match cli.command {
+            Some(Command::Uninstall { purge }) => uninstall::run(purge, &text)?,
+            Some(Command::Update) => update::run(settings.timeout, &text)?,
+            _ => unreachable!(),
+        }
+        return Ok(0);
+    }
+
     let config_path = config::path_from_env();
     let file = config::load(config_path.as_deref())
         .map_err(|err| annotate_config_error(err, cli.lang.as_deref(), system_locale.as_deref()))?;
@@ -176,6 +219,8 @@ fn run() -> Result<i32> {
             Ok(0)
         }
         Some(Command::Dns { check }) => run_dns(&cli, &text, &settings, check),
+        // 已在配置文件加载之前处理并返回。
+        Some(Command::Uninstall { .. } | Command::Update) => unreachable!(),
         None => run_checkup(&cli, &text, &settings),
     }
 }
@@ -547,6 +592,28 @@ mod tests {
         match cli.command {
             Some(Command::Dns { check }) => assert!(check),
             _ => panic!("expected Dns command"),
+        }
+    }
+
+    #[test]
+    fn update_subcommand_is_accepted_and_takes_no_flags() {
+        let cli = Cli::try_parse_from(["preflight", "update"]).unwrap();
+        assert!(matches!(cli.command, Some(Command::Update)));
+        // 刻意没有 --check 等旁支（spec 非目标）——加了记得先回 spec。
+        assert!(Cli::try_parse_from(["preflight", "update", "--check"]).is_err());
+    }
+
+    #[test]
+    fn uninstall_subcommand_and_purge_flag_are_accepted() {
+        let cli = Cli::try_parse_from(["preflight", "uninstall"]).unwrap();
+        match cli.command {
+            Some(Command::Uninstall { purge }) => assert!(!purge),
+            _ => panic!("expected Uninstall command"),
+        }
+        let cli = Cli::try_parse_from(["preflight", "uninstall", "--purge"]).unwrap();
+        match cli.command {
+            Some(Command::Uninstall { purge }) => assert!(purge),
+            _ => panic!("expected Uninstall command"),
         }
     }
 

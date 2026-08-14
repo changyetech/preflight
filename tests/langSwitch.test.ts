@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { LangSwitch } from "../src/components/LangSwitch";
-import { CopyProvider } from "../src/i18n";
+import { CopyProvider } from "../src/CopyProvider";
 import type { Lang } from "../src/copy";
 
 function renderLangSwitch(lang: Lang): string {

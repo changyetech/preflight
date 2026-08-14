@@ -4,7 +4,7 @@
 
 [package]
 name = "preflight"
-version = "0.2.0"
+version = "0.3.0"
 description = "网络环境体检：出口 IP、DNS、代理、IP 风控与时区一致性"
 edition.workspace = true
 license.workspace = true
@@ -31,3 +31,6 @@ simple-dns = "0.12"
 terminal_size = "0.4.4"
 toml = "1.1.4"
 ureq = { version = "3.4.0", default-features = false, features = ["rustls", "platform-verifier", "gzip", "json"] }
+# 卸载时删除运行中的二进制自身：Unix 等价于 unlink，Windows 上处理
+# 「运行中 exe 不能删自己」。uv / rye 同款，两平台一个代码路径。
+self-replace = "1.5.0"

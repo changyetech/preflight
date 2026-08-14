@@ -364,11 +364,13 @@ export const ZH_HANS: Copy = {
       },
       {
         heading: "命令与参数",
-        paras: ["共三条命令，体检为默认命令："],
+        paras: ["共五条命令，体检为默认命令："],
         code: [
-          "preflight [OPTIONS]          # 体检（默认命令）",
-          "preflight dns [--check]      # 公共 DNS 服务器清单",
-          "preflight config <ACTION>    # 查看与修改配置",
+          "preflight [OPTIONS]            # 体检（默认命令）",
+          "preflight dns [--check]        # 公共 DNS 服务器清单",
+          "preflight config <ACTION>      # 查看与修改配置",
+          "preflight update               # 更新到最新版",
+          "preflight uninstall [--purge]  # 卸载（--purge 连配置一起删）",
         ],
         table: {
           headers: ["参数", "说明"],

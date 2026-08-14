@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { Footer } from "../src/components/Footer";
-import { CopyProvider } from "../src/i18n";
+import { CopyProvider } from "../src/CopyProvider";
 import { COPY, COPY_ZH_HANS } from "../src/copy";
 import type { Lang } from "../src/copy";
 

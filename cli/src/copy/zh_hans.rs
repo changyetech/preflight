@@ -4,7 +4,7 @@
 use super::{
     C4FixText, CheckText, ChecksText, ConfigText, CoverageText, DnsCommandText, DnsEgressText,
     ErrorText, FailureText, FooterText, GroupText, NoteText, O1FieldsText, Text, UdpEgressText,
-    ValueText, VerdictText,
+    UninstallText, UpdateText, ValueText, VerdictText,
 };
 
 pub const ZH_HANS: Text = Text {
@@ -27,6 +27,10 @@ pub const ZH_HANS: Text = Text {
         config_parse: "配置文件不合法",
         config_write: "写不了配置文件",
         lang_unknown: "不支持的语言",
+        uninstall_remove: "无法删除",
+        update_fetch: "无法检查更新",
+        update_no_receipt: "这份 preflight 不是官方 installer 安装的——请按当初的安装方式更新（源码构建：重新构建并替换二进制）",
+        update_run: "installer 未能完成",
     },
 
     verdict: VerdictText {
@@ -219,5 +223,19 @@ pub const ZH_HANS: Text = Text {
         check_suspicious: "应答可疑",
         check_unreachable: "不通",
         footer_hint: "用 `preflight dns --check` 实测哪些服务器在你这台机器上真正可用。",
+    },
+
+    uninstall: UninstallText {
+        removed: "已删除：",
+        config_kept: "配置文件已保留：",
+        config_kept_hint: "如不再需要，请手动删除。",
+        reinstall_hint: "重新安装：",
+    },
+
+    update: UpdateText {
+        up_to_date: "已是最新版本：v",
+        updating_prefix: "更新：v",
+        updating_connector: " → v",
+        updated: "已更新到 v",
     },
 };

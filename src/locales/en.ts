@@ -436,11 +436,13 @@ export const EN = {
       },
       {
         heading: "Commands and options",
-        paras: ["There are three commands; the checkup is the default:"],
+        paras: ["There are five commands; the checkup is the default:"],
         code: [
-          "preflight [OPTIONS]          # checkup (default command)",
-          "preflight dns [--check]      # public DNS server list",
-          "preflight config <ACTION>    # view and change configuration",
+          "preflight [OPTIONS]            # checkup (default command)",
+          "preflight dns [--check]        # public DNS server list",
+          "preflight config <ACTION>      # view and change configuration",
+          "preflight update               # update to the latest release",
+          "preflight uninstall [--purge]  # uninstall (--purge also removes the config)",
         ],
         table: {
           headers: ["Option", "Notes"],
