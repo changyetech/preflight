@@ -54,6 +54,15 @@ copy_leaf! {
         key_prompt,
         key_saved,
         key_empty,
+        /// 非 secret 键 `config set` 成功后的确认。secret 有自己的 `key_saved`
+        /// （要顺带说明配额变化），两者不合并。
+        set_saved,
+        /// `config unset` 成功后的确认。
+        unset_saved,
+        /// 写进去了、但当前生效的是更高优先级来源时的提示。来源名（`--lang`、
+        /// 环境变量名）是字面量，由渲染层裸拼接在后面——**标点与空格由取值自带**，
+        /// 中英文的冒号宽度不同，不能由渲染层写死。
+        override_notice,
         /// `config list` 里 secret 值的状态词（如「已设置」）。键名是字面 TOML 键，
         /// 不随语种变化，写死在 main.rs；这里只放状态词。
         list_value_set,

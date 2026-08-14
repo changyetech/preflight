@@ -76,18 +76,51 @@ enum ConfigAction {
     Path,
     /// List the effective value of every key (secrets are never echoed)
     List,
-    /// Set a value interactively (input is not echoed)
-    Set { key: SettableKey },
-    /// Show whether a value is set (secrets are never echoed)
-    Get { key: SettableKey },
+    /// Set a value (the API key is read interactively and never echoed)
+    Set {
+        #[command(subcommand)]
+        target: SetTarget,
+    },
+    /// Remove a key from the config file, restoring the built-in default
+    Unset { key: ConfigKey },
+    /// Show the effective value of a key (secrets are never echoed)
+    Get { key: ConfigKey },
 }
 
-/// 可通过 `config set` 写入的键。这里只放 secret——其余键直接编辑配置文件即可，
-/// 多一条写入路径就多一处优先级歧义。
+/// `config set` 的目标。刻意做成**子命令**而不是「键 + 可选值」的一对位置参数：
+/// 只有这样才能在**解析层**就拒绝 `config set proxycheck-key <KEY>`——明文 key
+/// 会进 shell history 与 `ps`，这条防线不能退到运行时。
+/// 顺带的好处：每个键的取值类型与范围由 clap 校验，非法值根本进不了配置文件。
+#[derive(Subcommand)]
+enum SetTarget {
+    /// Interface language: en / zh-hans
+    Language { value: String },
+    /// proxycheck API key — read interactively, never echoed
+    ProxycheckKey,
+    /// Network probe timeout, in seconds
+    Timeout {
+        #[arg(value_parser = clap::value_parser!(u64).range(1..=120))]
+        value: u64,
+    },
+    /// Disable colored output: true / false
+    NoColor {
+        #[arg(action = clap::ArgAction::Set, value_parser = clap::value_parser!(bool))]
+        value: bool,
+    },
+}
+
+/// `config get` / `config unset` 的键，与配置文件白名单一一对应（docs/verdict.md §8）。
+/// 判级阈值与检测项开关永远不在此列。
 #[derive(Clone, Copy, ValueEnum)]
-enum SettableKey {
+enum ConfigKey {
+    #[value(name = "language")]
+    Language,
     #[value(name = "proxycheck-key")]
     ProxycheckKey,
+    #[value(name = "timeout")]
+    Timeout,
+    #[value(name = "no-color")]
+    NoColor,
 }
 
 /// 退出码约定：
@@ -132,7 +165,14 @@ fn run() -> Result<i32> {
 
     match cli.command {
         Some(Command::Config { action }) => {
-            run_config(action, &text, config_path.as_deref(), file, &settings)?;
+            run_config(
+                action,
+                &text,
+                config_path.as_deref(),
+                file,
+                &settings,
+                cli.lang.as_deref(),
+            )?;
             Ok(0)
         }
         Some(Command::Dns { check }) => run_dns(&cli, &text, &settings, check),
@@ -228,6 +268,7 @@ fn run_config(
     config_path: Option<&std::path::Path>,
     mut file: ConfigFile,
     settings: &Settings,
+    flag_lang: Option<&str>,
 ) -> Result<()> {
     // `list` 打的是**合并后的生效值**（flag > 环境变量 > 配置文件 > 默认），
     // 不是配置文件原文——用户想问的是「现在到底用的什么」。不依赖配置文件路径，
@@ -262,9 +303,13 @@ fn run_config(
             println!("{}: {}", text.config.path_label, path.display());
         }
 
+        // `get` 与 `list` 同口径，打的都是**生效值**（flag > 环境变量 > 配置文件 > 默认）。
         ConfigAction::Get { key } => match key {
+            ConfigKey::Language => println!("{}", settings.lang),
+            ConfigKey::Timeout => println!("{}", settings.timeout.as_secs()),
+            ConfigKey::NoColor => println!("{}", settings.no_color),
             // 只报状态，绝不回显 key 本身。
-            SettableKey::ProxycheckKey => println!(
+            ConfigKey::ProxycheckKey => println!(
                 "{}",
                 if settings.proxycheck_key.is_some() {
                     text.config.key_state_set
@@ -274,8 +319,25 @@ fn run_config(
             ),
         },
 
-        ConfigAction::Set { key } => match key {
-            SettableKey::ProxycheckKey => {
+        ConfigAction::Set { target } => match target {
+            SetTarget::Language { value } => {
+                // 先校验再落盘：非法的 language 会让**之后的每一条命令**都启动不了。
+                lang::parse_explicit(&value).map_err(|err| lang_error(text, err))?;
+                file.language = Some(value);
+                save_config(path, &file, text, ConfigKey::Language, flag_lang)?;
+            }
+
+            SetTarget::Timeout { value } => {
+                file.timeout = Some(value);
+                save_config(path, &file, text, ConfigKey::Timeout, flag_lang)?;
+            }
+
+            SetTarget::NoColor { value } => {
+                file.no_color = Some(value);
+                save_config(path, &file, text, ConfigKey::NoColor, flag_lang)?;
+            }
+
+            SetTarget::ProxycheckKey => {
                 // 交互式、不回显。刻意不提供 `--proxycheck-key <KEY>` 明文 flag：
                 // 那会把 secret 写进 shell history，也会出现在 `ps` 的进程列表里。
                 let entered = rpassword::prompt_password(format!("{} ", text.config.key_prompt))
@@ -290,12 +352,65 @@ fn run_config(
                 file.proxycheck_key = Some(entered);
                 config::save(path, &file)
                     .map_err(|err| err.context(text.errors.config_write.to_string()))?;
+                // key 有自己的成功文案（要顺带说配额从 100 涨到 1000）。
                 println!("{}", text.config.key_saved);
+                warn_if_overridden(text, ConfigKey::ProxycheckKey, flag_lang);
             }
         },
+
+        ConfigAction::Unset { key } => {
+            // 幂等：本来就没设也照常写一次，用户要的是"之后按默认走"这个结果。
+            match key {
+                ConfigKey::Language => file.language = None,
+                ConfigKey::ProxycheckKey => file.proxycheck_key = None,
+                ConfigKey::Timeout => file.timeout = None,
+                ConfigKey::NoColor => file.no_color = None,
+            }
+            config::save(path, &file)
+                .map_err(|err| err.context(text.errors.config_write.to_string()))?;
+            println!("{}", text.config.unset_saved);
+            warn_if_overridden(text, key, flag_lang);
+        }
     }
 
     Ok(())
+}
+
+/// 落盘并报告结果。
+fn save_config(
+    path: &std::path::Path,
+    file: &ConfigFile,
+    text: &Text,
+    key: ConfigKey,
+    flag_lang: Option<&str>,
+) -> Result<()> {
+    config::save(path, file).map_err(|err| err.context(text.errors.config_write.to_string()))?;
+    println!("{}", text.config.set_saved);
+    warn_if_overridden(text, key, flag_lang);
+    Ok(())
+}
+
+/// 写进去了，但当前生效的是更高优先级的来源——不提示的话，用户会以为"配了没生效"。
+/// 提示走 **stderr**：stdout 上只留命令自身的结果。
+fn warn_if_overridden(text: &Text, key: ConfigKey, flag_lang: Option<&str>) {
+    let source = match key {
+        ConfigKey::Language => flag_lang.map(|_| "--lang"),
+        ConfigKey::ProxycheckKey => std::env::var("PROXYCHECK_API_KEY")
+            .ok()
+            .filter(|v| !v.trim().is_empty())
+            .map(|_| "PROXYCHECK_API_KEY"),
+        // NO_COLOR 的约定：存在且非空即生效，不看具体值。
+        ConfigKey::NoColor => std::env::var("NO_COLOR")
+            .ok()
+            .filter(|v| !v.is_empty())
+            .map(|_| "NO_COLOR"),
+        // timeout 没有更高优先级的来源。
+        ConfigKey::Timeout => None,
+    };
+
+    if let Some(source) = source {
+        eprintln!("{}{source}", text.config.override_notice);
+    }
 }
 
 /// 配置读不出来时，语言还没解析成功——退回"忽略配置文件"的解析结果来选文案，
@@ -311,6 +426,11 @@ fn annotate_config_error(
 
 fn render_lang_error(err: LangError, system_locale: Option<&str>) -> anyhow::Error {
     let text = fallback_text(None, system_locale);
+    lang_error(&text, err)
+}
+
+/// 不支持的语种：错误信息必须列出受支持的取值，只说"不支持"等于让用户去猜。
+fn lang_error(text: &Text, err: LangError) -> anyhow::Error {
     match err {
         LangError::Unknown(value) => anyhow::anyhow!(
             "{}: {value} ({} / {})",
@@ -361,6 +481,49 @@ mod tests {
     fn config_set_only_accepts_whitelisted_keys() {
         assert!(Cli::try_parse_from(["preflight", "config", "set", "proxycheck-key"]).is_ok());
         assert!(Cli::try_parse_from(["preflight", "config", "set", "risk-threshold"]).is_err());
+        // 判级阈值与检测项开关永远不可配（docs/verdict.md §8）。
+        assert!(
+            Cli::try_parse_from(["preflight", "config", "set", "risk-threshold", "80"]).is_err()
+        );
+    }
+
+    #[test]
+    fn config_set_covers_every_whitelisted_key() {
+        for args in [
+            ["config", "set", "language", "zh-hans"],
+            ["config", "set", "timeout", "20"],
+            ["config", "set", "no-color", "true"],
+        ] {
+            let argv = ["preflight"].into_iter().chain(args);
+            assert!(Cli::try_parse_from(argv).is_ok(), "{args:?} 应被接受");
+        }
+    }
+
+    #[test]
+    fn non_secret_keys_require_a_value() {
+        // 少给值时报错，而不是把键当值悄悄写进去。
+        assert!(Cli::try_parse_from(["preflight", "config", "set", "language"]).is_err());
+        assert!(Cli::try_parse_from(["preflight", "config", "set", "timeout"]).is_err());
+        assert!(Cli::try_parse_from(["preflight", "config", "set", "no-color"]).is_err());
+    }
+
+    #[test]
+    fn timeout_is_bounded_and_no_color_is_a_bool() {
+        // 0 秒必然失败，几千秒看起来像卡死——两头都挡在解析层，非法值进不了配置文件。
+        assert!(Cli::try_parse_from(["preflight", "config", "set", "timeout", "0"]).is_err());
+        assert!(Cli::try_parse_from(["preflight", "config", "set", "timeout", "121"]).is_err());
+        assert!(Cli::try_parse_from(["preflight", "config", "set", "timeout", "1"]).is_ok());
+        assert!(Cli::try_parse_from(["preflight", "config", "set", "timeout", "120"]).is_ok());
+        assert!(Cli::try_parse_from(["preflight", "config", "set", "no-color", "yes"]).is_err());
+    }
+
+    #[test]
+    fn config_get_and_unset_accept_every_whitelisted_key() {
+        for key in ["language", "proxycheck-key", "timeout", "no-color"] {
+            assert!(Cli::try_parse_from(["preflight", "config", "get", key]).is_ok());
+            assert!(Cli::try_parse_from(["preflight", "config", "unset", key]).is_ok());
+        }
+        assert!(Cli::try_parse_from(["preflight", "config", "unset", "risk-threshold"]).is_err());
     }
 
     #[test]

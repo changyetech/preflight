@@ -402,6 +402,8 @@ CLI 有配置文件（`~/.config/preflight/config.toml`），**允许的键是�
 | `timeout` | 网络探测超时 |
 | `no_color` | 关闭彩色输出 |
 
+白名单里的键**都可经 `config set` 写入、`config unset` 移除**；`proxycheck_key` 只接受交互式输入（明文值在参数解析层就被拒绝，见第 9 节）。
+
 **禁止**：任何判级阈值、任何检测项开关。
 
 理由：用户能配阈值，本文就作废了——"我的 CLI 说低风险"从此不再是一句有意义的话，golden 向量也不再能证明任何事。

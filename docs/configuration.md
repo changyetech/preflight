@@ -170,13 +170,20 @@ CLI 零配置可用。以下都是可选项。
 
 **禁止**：任何判级阈值、任何检测项开关。用户能配阈值，判级契约就作废了。
 
-**设置 key**：
+**读写**：白名单里的每个键都可以经 `config set` 写入、`config unset` 移回默认，也可以直接编辑配置文件（`config set` 会重新序列化，手写的注释会丢）。
 
 ```bash
+preflight config set language zh-hans  # en / zh-hans
+preflight config set timeout 20        # 1–120 秒，超出范围直接报错
+preflight config set no-color true     # true / false
 preflight config set proxycheck-key    # 交互式、不回显，写入后权限置 600
+preflight config get timeout           # 打印生效值（secret 只报是否已设置）
+preflight config unset timeout         # 移除该键，恢复内置默认
 ```
 
-刻意**不提供** `--proxycheck-key <KEY>` 明文 flag——那会把 secret 写进 shell history，也会出现在 `ps` 的进程列表里。脚本／CI 场景用环境变量 `PROXYCHECK_API_KEY`。
+非法值在**写入前**就被拒绝，配置文件里不会留下半个不合法的配置。写入成功但当前被更高优先级来源（`--lang`、`PROXYCHECK_API_KEY`、`NO_COLOR`）覆盖时，stderr 会提示一行——否则用户会以为「配了没生效」。
+
+`proxycheck-key` 刻意**只有交互式**一条路径：`config set proxycheck-key <KEY>` 在参数解析层就被拒绝，明文 key 会进 shell history，也会出现在 `ps` 的进程列表里。脚本／CI 场景用环境变量 `PROXYCHECK_API_KEY`。
 
 **其他环境变量**：`NO_COLOR`（存在且非空即生效）、`--lang` 之外的语言来源依次是 config → `LC_ALL` / `LC_MESSAGES` / `LANG` → `en`。
 

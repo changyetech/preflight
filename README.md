@@ -38,6 +38,14 @@ preflight --lang en       # en / zh-hans
 preflight config set proxycheck-key    # 交互式输入，不回显、不进 shell history
 ```
 
+其他可配置项（`config list` 看生效值，`config unset <键>` 恢复默认）：
+
+```bash
+preflight config set language zh-hans  # en / zh-hans
+preflight config set timeout 20        # 网络探测超时，1–120 秒
+preflight config set no-color true     # 关闭彩色输出
+```
+
 ## 8 个检测项
 
 | ID | 检测项 | Web | CLI |
