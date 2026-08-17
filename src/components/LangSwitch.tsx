@@ -56,7 +56,9 @@ export function LangSwitch({
       aria-label={`${COPY.nav.switchLanguageTo} ${other.label}`}
     >
       <GlobeIcon />
-      {other.label}
+      {/* 语种名单独包一层：窄屏顶栏放不下它（品牌 + 两个跨页链接 + 两个工具挤在一行），
+          收成纯图标按钮。可访问名在外层 aria-label 上，隐藏文字不丢语义。 */}
+      <span className="lang-switch-label">{other.label}</span>
     </a>
   );
 }

@@ -38,6 +38,20 @@ function renderNav(lang: Lang, pageSlug?: string): string {
   );
 }
 
+// ≤352px 顶栏放不下品牌名，CSS 把 .brand-name 视觉隐藏（clip 而非 display:none）。
+// 隐藏手段是 CSS 的事，这里锁的是它的前提：文字必须留在 DOM 里——一旦有人改成
+// 「窄屏干脆不渲染品牌名」，这个链接就只剩 aria-hidden 的 svg，读屏读到一个无名链接。
+describe("顶栏品牌链接", () => {
+  it.each([
+    ["en", COPY.nav.brand] as const,
+    ["zh-hans", COPY_ZH_HANS.nav.brand] as const,
+  ])("%s 版品牌名渲染在 .brand-name 里，始终留在 DOM 中", (lang, brand) => {
+    const html = renderNav(lang);
+
+    expect(html).toContain(`<span class="brand-name">${brand}</span>`);
+  });
+});
+
 describe("顶栏 DNS 清单入口", () => {
   // 中文首页的顶栏不能把人送去英文 DNS 页。
   it.each([

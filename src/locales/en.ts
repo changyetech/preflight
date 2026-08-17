@@ -337,6 +337,17 @@ export const EN = {
       platforms: "macOS · Linux · Windows",
       /** 安装区块通往 /guide/ 的入口（spec docs/specs/2026-08-14-cli-guide-page.md 决策 3）。 */
       guideLink: "Read the full CLI guide →",
+      /**
+       * 安装命令下方的实物截图（public/screenshot_cli_check*.png）。两张是同一次
+       * `preflight --verbose` 输出的上下半：上半是结论 + 在线检测 O1–O6，下半是本机检测 C1–C4。
+       * 截图里的敏感字段（真实 IP、系统时区）已打码，caption 不复述具体数值。
+       */
+      shotAlt1:
+        "Terminal output of preflight --verbose: a Medium risk verdict, the coverage summary, and online checks O1 through O6.",
+      shotAlt2:
+        "Terminal output of preflight --verbose, continued: local checks C1 through C4, then the command hints at the end.",
+      shotCaption:
+        "the full output on a machine behind a proxy: the verdict up top, then every check with the reasoning behind it. C1–C4 at the end are the four items a webpage structurally cannot reach.",
     },
     compare: {
       title: "Web vs. CLI: Full Feature Comparison",

@@ -63,6 +63,35 @@ describe("落地内容三段", () => {
     expect(anchor).toContain('rel="noopener"');
   });
 
+  // 安装区块的实物截图（public/screenshot_cli_check*.png）：这一段在论证「CLI 覆盖全部 10 项」，
+  // 截图末尾的 C1–C4 就是这个论证的证据。两张图都必须有 alt——纯装饰图才允许 alt=""，
+  // 这两张承载信息，读屏用户拿不到就是信息缺失。
+  it.each([["en", COPY] as const, ["zh-hans", COPY_ZH_HANS] as const])(
+    "%s 版安装区块渲染两张 CLI 输出截图，各带本语种 alt",
+    (lang, copy) => {
+      const html = renderLanding(lang);
+
+      expect(html).toContain('src="/screenshot_cli_check1.png"');
+      expect(html).toContain('src="/screenshot_cli_check2.png"');
+      expect(html).toContain(`alt="${copy.landing.install.shotAlt1}"`);
+      expect(html).toContain(`alt="${copy.landing.install.shotAlt2}"`);
+      expect(html).toContain(copy.landing.install.shotCaption);
+    },
+  );
+
+  // 截图在首屏之下，不该跟结论区抢带宽；宽高写死避免图片到位时把下方内容顶走（CLS）。
+  it("截图懒加载并声明固有宽高", () => {
+    const html = renderLanding("en");
+    const imgs = html.match(/<img[^>]*screenshot_cli_check[^>]*>/g) ?? [];
+
+    expect(imgs).toHaveLength(2);
+    for (const img of imgs) {
+      expect(img).toContain('loading="lazy"');
+      expect(img).toContain("width=");
+      expect(img).toContain("height=");
+    }
+  });
+
   it("对照表渲染出全部 10 个检测项标题", () => {
     const html = renderLanding("zh-hans");
 

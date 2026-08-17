@@ -7,6 +7,18 @@
 
 按 IP 判断访客的工具与服务对访问环境很敏感，网络环境配置至关重要：IPv6 悄悄泄露真实地址、DNS 走国内服务商暴露位置、出口 IP 风险过高触发风控、系统时区与出口 IP 对不上……开跑之前先扫一眼。
 
+## 长什么样
+
+`preflight --verbose` 在一台开着代理的机器上跑出来的完整输出。结论在最上面——档位、出口 IP、风险分、覆盖度，以及需要注意的几项：
+
+![preflight --verbose 的输出：Medium risk 结论、覆盖度摘要与在线检测 O1–O6](public/screenshot_cli_check1.png)
+
+往下是本机检测 C1–C4，网页结构性拿不到的就是这四项，也是装 CLI 的理由：
+
+![preflight --verbose 的输出续：本机检测 C1–C4 与末尾的命令提示](public/screenshot_cli_check2.png)
+
+不带 `--verbose` 只留结论与每项的取值，没有这些解释段落。截图里的真实 IP 与系统时区已打码。
+
 ## 安装 CLI
 
 **macOS / Linux**
