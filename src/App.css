@@ -1184,6 +1184,38 @@ button {
   text-decoration: underline;
 }
 
+/* CLI 实物截图：两张是同一次 --verbose 输出的上下半，上下排。
+   宽度封在 48rem（768px）——两张原图分别宽 787/800px，封在这个值以内谁都不会被放大糊字；
+   窄屏等比缩小自适应，不出横向滚动条。
+   截图本身是深色终端，浅色主题下不跟着变——终端就是深的，强行反色反而失真。 */
+.cli-shot {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1.5rem 0 0;
+  max-width: 48rem;
+}
+
+.cli-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+
+.cli-shot figcaption {
+  margin-top: 0.25rem;
+  text-wrap: pretty;
+  font-size: 0.78125rem;
+  line-height: 1.85;
+  color: var(--muted);
+}
+
+.cli-shot figcaption code {
+  font-size: 0.71875rem;
+  color: var(--fg);
+}
+
 /* 「Web 与 CLI 对照表」：桌面表格，窄屏堆叠成卡片（原型只做横向滚动，未做移动端堆叠——
    本任务按计划文本要求补上，保留 <thead> 供读屏使用，值用 data-label 标出所属列）。 */
 .compare-table-wrap {

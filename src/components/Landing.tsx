@@ -78,6 +78,31 @@ export function Landing({ lang }: { lang: Lang }) {
             </div>
           </div>
         </div>
+
+        {/* 实物截图放在安装命令之后：这一段论证的是「CLI 覆盖全部 10 项」，截图末尾的
+            C1–C4 就是证据，而命令是本段的行动点，得紧跟正文不被图挤走。
+            两张是同一次输出的上下半，上下排（原始宽 787/800px，缩到分栏就看不清字了）。 */}
+        <figure className="cli-shot">
+          <img
+            src="/screenshot_cli_check1.png"
+            alt={install.shotAlt1}
+            width={787}
+            height={1002}
+            loading="lazy"
+            decoding="async"
+          />
+          <img
+            src="/screenshot_cli_check2.png"
+            alt={install.shotAlt2}
+            width={800}
+            height={669}
+            loading="lazy"
+            decoding="async"
+          />
+          <figcaption>
+            <code>preflight --verbose</code> — {install.shotCaption}
+          </figcaption>
+        </figure>
       </article>
 
       <article className="landing-section" id="compare">

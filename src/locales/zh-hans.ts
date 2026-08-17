@@ -281,6 +281,12 @@ export const ZH_HANS: Copy = {
       body: "网页版是快速摸底，能测 6 项；CLI 覆盖全部 10 项，包括本机真实 IP、本地 DNS 配置、代理与 TUN 检测、$TZ 时区一致性。",
       platforms: "macOS · Linux · Windows",
       guideLink: "查看完整使用手册 →",
+      shotAlt1:
+        "preflight --verbose 的终端输出：Medium risk 结论、覆盖度摘要，以及在线检测 O1–O6。",
+      shotAlt2:
+        "preflight --verbose 终端输出的下半段：本机检测 C1–C4，以及末尾的命令提示。",
+      shotCaption:
+        "开着代理时的完整输出：结论在最上面，然后逐项给出判断依据。末尾的 C1–C4 就是网页结构性拿不到的那四项。",
     },
     compare: {
       title: "Web 与 CLI 完整功能对照表",
