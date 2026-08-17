@@ -155,6 +155,48 @@ summary:focus-visible {
   flex-shrink: 0;
 }
 
+/* 窄屏顶栏预算：品牌 + 两个跨页链接 + 主题 + 语言，锚点组已隐藏也还是 422px，
+   iPhone 一档的 390/360 都装不下——整页因此出现横向滚动条（不是内容区的锅，
+   量出来的溢出元素就是 .nav-tools）。两处收窄，按「先砍装饰、再砍间距」的顺序：
+   语种名收成纯图标（可访问名在 aria-label 上，不丢语义），间距各收 4px。
+   断点取 30rem：480px 时顶栏还有 58px 余量，再宽就没必要藏字了。 */
+@media (max-width: 30rem) {
+  .lang-switch-label {
+    display: none;
+  }
+
+  /* 只剩图标，左右内边距对称收成圆形按钮，与旁边 2rem 的 .theme-switch 同一形状 */
+  .lang-switch {
+    padding: 0.28rem;
+    width: 2rem;
+    height: 2rem;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  .nav-in {
+    gap: 0.75rem;
+    padding: 0 0.75rem;
+  }
+}
+
+/* ≤352px（320 那一档老设备）：上面两处收窄还差 32px，再摘品牌名，只留 logo。
+   360px 起品牌名保留——那是主流 Android 宽度，不该为极窄设备牺牲。
+   视觉隐藏而非 display:none：链接的可访问名靠它，读屏不能丢（同 .compare-table thead 的写法）。 */
+@media (max-width: 22rem) {
+  .brand-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
 /* 吸顶条会盖住锚点目标，任何带 id 的地标滚动过去时都要预留出它的高度——
    不用 :target 是因为它只在「当前 URL 片段正好是这个 id」时才生效，
    程序化 scrollIntoView（比如跳过导航落点）不经过 URL 片段，同样需要这条规则。 */
@@ -574,6 +616,16 @@ article[id] {
   letter-spacing: 0.04em;
   color: var(--muted);
   white-space: nowrap;
+}
+
+/* 这个徽标装的是一整句话，窄屏放不下：nowrap 会让它直接切出卡片右边缘
+   （360px 下量到 314px 宽、卡片内宽只有 310px，右半截看不见）。窄屏改为换行，
+   line-height 同时从 1 放开——1 在两行时会把两行贴死。 */
+@media (max-width: 30rem) {
+  .stage-badge {
+    white-space: normal;
+    line-height: 1.5;
+  }
 }
 
 .summary {

@@ -64,6 +64,15 @@ describe("语言切换器：单键直切", () => {
     expect(ariaLabel).toBe("Switch language to 简体中文");
   });
 
+  // ≤480px 顶栏放不下语种名，CSS 把 .lang-switch-label 收掉、只留图标。
+  // 隐藏是 CSS 的事，这里锁前提：语种名得包在这层壳里，别被改成「窄屏不渲染」——
+  // 那样切换器就只剩一个 aria-hidden 的地球图标。
+  it("语种名包在 .lang-switch-label 里，供窄屏单独收起", () => {
+    const html = renderLangSwitch("zh-hans");
+
+    expect(html).toContain('<span class="lang-switch-label">English</span>');
+  });
+
   it("是真 <a> 元素，不是 button / onClick 触发", () => {
     const html = renderLangSwitch("en");
 

@@ -38,7 +38,10 @@ export function Nav({
               <path stroke="var(--ok)" strokeWidth="9" d="M47 21.2L52 15" />
             </g>
           </svg>
-          {COPY.nav.brand}
+          {/* 品牌名单独包一层：≤352px 时顶栏放不下它，收成只剩 logo 的形态。
+              用视觉隐藏而非 display:none——否则这个链接只剩 aria-hidden 的 svg，
+              读屏读到的是一个没有名字的链接。 */}
+          <span className="brand-name">{COPY.nav.brand}</span>
         </a>
         <div className="nav-links">
           <a href={`${anchorBase}#checks`}>{COPY.nav.checks}</a>
